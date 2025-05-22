@@ -43,7 +43,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true },
-  { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
   { href: "/events", label: "Events", icon: CalendarDays, matchStartsWith: true },
   { href: "/personnel", label: "Personnel", icon: Users, matchStartsWith: true },
   { href: "/deliverables", label: "Deliverables", icon: ClipboardList, matchStartsWith: true },
@@ -51,6 +50,7 @@ const navItems: NavItem[] = [
 ];
 
 const footerNavItems: NavItem[] = [
+  { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/support", label: "Support", icon: LifeBuoy },
 ];
@@ -94,7 +94,7 @@ function AppSidebar() {
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton 
                   asChild 
-                  isActive={pathname === item.href}
+                  isActive={item.matchStartsWith ? pathname.startsWith(item.href) : pathname === item.href}
                   tooltip={{children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground"}}
                 >
                   <a>
