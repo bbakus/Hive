@@ -3,6 +3,7 @@
 "use client"; // Required for chart components and context
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Activity, 
@@ -11,18 +12,20 @@ import {
   Users, 
   Package, 
   CalendarClock,
-  FolderKanban
+  FolderKanban,
+  ArrowRight
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell } from "recharts";
 import { 
   ChartContainer, 
   ChartTooltip, 
   ChartTooltipContent,
-  // ChartLegend, // Legend can be added back if needed
-  // ChartLegendContent,
   type ChartConfig
 } from "@/components/ui/chart";
 import { useProjectContext } from "@/contexts/ProjectContext";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
 // Mock data sources - In a real app, these would be fetched or managed more globally
 const allProjectsMock = [
@@ -40,11 +43,13 @@ const allEventsMock = [
 ];
 
 const allDeliverablesMock = [
-  { id: "del001", name: "Highlight Reel - Day 1", projectName: "Summer Music Festival 2024", status: "In Progress" },
-  { id: "del002", name: "Keynote Recording", projectName: "Tech Conference X", status: "Pending" },
-  { id: "del003", name: "Photo Album", projectName: "Corporate Gala Dinner", status: "Completed" },
-  { id: "del004", name: "Full Event Recap", projectName: "Summer Music Festival 2024", status: "Blocked" },
-  { id: "del005", name: "Presentation Slides", projectName: "Tech Conference X", status: "Completed" },
+  { id: "del001", name: "Highlight Reel - Day 1", projectName: "Summer Music Festival 2024", status: "In Progress", event: "Main Stage - Day 1" },
+  { id: "del002", name: "Keynote Recording", projectName: "Tech Conference X", status: "Pending", event: "Keynote Speech" },
+  { id: "del003", name: "Photo Album", projectName: "Corporate Gala Dinner", status: "Completed", event: "VIP Reception" },
+  { id: "del004", name: "Full Event Recap", projectName: "Summer Music Festival 2024", status: "Blocked", event: "Summer Music Festival 2024" },
+  { id: "del005", name: "Presentation Slides", projectName: "Tech Conference X", status: "Completed", event: "Tech Conference X" },
+  { id: "del006", name: "Social Media Clips", projectName: "Summer Music Festival 2024", status: "In Progress", event: "Main Stage - Day 1" },
+  { id: "del007", name: "Attendee Feedback Report", projectName: "Tech Conference X", status: "Pending", event: "Tech Conference X" },
 ];
 
 // Sample data for Event Coverage Chart - including projectName for filtering
@@ -60,8 +65,6 @@ const chartConfig = {
   coverage: {
     label: "Coverage (%)",
   },
-  // Individual event configs can be added if more specific legend/tooltips are needed per event
-  // For dynamic fills, the Cell component inside Bar is used.
 } satisfies ChartConfig;
 
 
@@ -84,7 +87,7 @@ export default function DashboardPage() {
   }, [selectedProject]);
   
   const eventCoverageData = useMemo(() => {
-    if (!selectedProject) return baseEventCoverageData;
+    if (!selectedProject) return baseEventCoverageData; // Show all if no project selected
     return baseEventCoverageData.filter(ec => ec.projectName === selectedProject.name);
   }, [selectedProject]);
 
@@ -99,14 +102,14 @@ export default function DashboardPage() {
         activeProjectsCount = allProjectsMock.filter(p => p.status === "In Progress" || p.status === "Planning").length;
     }
 
-    const upcomingEventsCount = filteredEvents.length; // Simplified: count all events for the project / all events
+    const upcomingEventsCount = filteredEvents.length; 
     const deliverablesDueCount = filteredDeliverables.filter(d => d.status !== "Completed").length;
 
     return [
       { title: selectedProjectId ? "Selected Project Status" : "Active Projects", value: selectedProjectId ? (selectedProject?.status || "N/A") : activeProjectsCount.toString(), icon: FolderKanban, description: selectedProjectId ? `Status of ${selectedProject?.name}` : "Currently ongoing or planning" },
-      { title: "Upcoming Events", value: upcomingEventsCount.toString(), icon: CalendarClock, description: selectedProject ? `For ${selectedProject.name}` : "Events this month" },
-      { title: "Deliverables Due", value: deliverablesDueCount.toString(), icon: Package, description: selectedProject ? `For ${selectedProject.name}` : "Pending deliverables" },
-      { title: "Team Load", value: "75%", icon: Users, description: "Average personnel capacity" }, // Remains global for now
+      { title: "Upcoming Events", value: upcomingEventsCount.toString(), icon: CalendarClock, description: selectedProject ? `For ${selectedProject.name}` : "Across all projects" },
+      { title: "Deliverables Due", value: deliverablesDueCount.toString(), icon: Package, description: selectedProject ? `For ${selectedProject.name}` : "Across all projects" },
+      { title: "Team Load", value: "75%", icon: Users, description: "Average personnel capacity" },
     ];
   }, [selectedProjectId, selectedProject, filteredEvents, filteredDeliverables]);
 
@@ -140,7 +143,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><BarChart3 className="h-6 w-6 text-accent" /> Event Coverage</CardTitle>
             <CardDescription>
-              {selectedProject ? `Event statuses for ${selectedProject.name}` : "Overview of upcoming event statuses."}
+              {selectedProject ? `Event coverage for ${selectedProject.name}` : "Overview of event coverage status."}
             </CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] p-4">
@@ -173,23 +176,48 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        <Card className="shadow-lg">
+        <Card className="shadow-lg flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><CheckCircle className="h-6 w-6 text-accent" /> Deliverables Status</CardTitle>
             <CardDescription>
               {selectedProject ? `Deliverable progress for ${selectedProject.name}` : "Summary of current deliverable progress."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            {/* Placeholder for chart or list */}
-            <div className="h-60 flex items-center justify-center bg-muted/50 rounded-md">
-              <p className="text-muted-foreground">
-                {filteredDeliverables.length > 0 ? `${filteredDeliverables.length} deliverables tracked.` : "No deliverables."}
-                {/* TODO: Implement a chart or detailed list here */}
-              </p>
-            </div>
-            <img src="https://placehold.co/600x300.png" alt="Deliverables Status Chart Placeholder" className="w-full h-auto mt-4 rounded-md" data-ai-hint="deliverables status chart"/>
+          <CardContent className="flex-grow p-4">
+            {filteredDeliverables.length > 0 ? (
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-3">
+                  {filteredDeliverables.map((deliverable) => (
+                    <div key={deliverable.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md hover:bg-muted/60 transition-colors">
+                      <div>
+                        <p className="font-medium text-sm">{deliverable.name}</p>
+                        <p className="text-xs text-muted-foreground">Event: {deliverable.event}</p>
+                      </div>
+                      <Badge variant={
+                        deliverable.status === "In Progress" ? "secondary" :
+                        deliverable.status === "Pending" ? "outline" :
+                        deliverable.status === "Completed" ? "default" : 
+                        deliverable.status === "Blocked" ? "destructive" : "outline"
+                      }>{deliverable.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                No deliverables {selectedProject ? `for ${selectedProject.name}` : "tracked"}.
+              </div>
+            )}
           </CardContent>
+           {filteredDeliverables.length > 0 && (
+            <CardContent className="pt-2 pb-4 border-t">
+               <Button variant="link" asChild className="p-0 h-auto text-sm text-accent hover:text-accent/90">
+                <Link href="/deliverables">
+                  View All Deliverables <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          )}
         </Card>
       </div>
     </div>
