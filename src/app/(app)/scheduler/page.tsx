@@ -103,7 +103,7 @@ const parseScheduleString = (scheduleString: string): ParsedSchedule => {
 
 export default function SchedulerPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [location, setLocation] = useState("Event Venue A");
+  const [location, setLocation] = useState(""); // Default to empty as it's optional
   const [personnel, setPersonnel] = useState("Alice, Bob, Charlie");
   const [eventType, setEventType] = useState("Concert");
   const [additionalCriteria, setAdditionalCriteria] = useState("Ensure regular breaks for all personnel. Prioritize main stage coverage.");
@@ -125,7 +125,7 @@ export default function SchedulerPage() {
 
     const input: GenerateScheduleInput = {
       date: format(date, "yyyy-MM-dd"),
-      location,
+      location: location.trim() || undefined, // Send undefined if empty
       personnel: personnel.split(",").map(p => p.trim()).filter(p => p),
       eventType,
       additionalCriteria,
@@ -169,7 +169,7 @@ export default function SchedulerPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Generate New Schedule</CardTitle>
-          <CardDescription>Provide details to generate an optimized schedule.</CardDescription>
+          <CardDescription>Provide details to generate an optimized schedule. Core inputs are Date, Personnel, and Event Type.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="grid md:grid-cols-2 gap-6">
@@ -200,8 +200,9 @@ export default function SchedulerPage() {
                 </Popover>
               </div>
               <div>
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Conference Hall B" />
+                <Label htmlFor="location">Location (Optional)</Label>
+                <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B (if relevant)" />
+                 <p className="text-xs text-muted-foreground mt-1">Specify if the location has unique scheduling implications.</p>
               </div>
               <div>
                 <Label htmlFor="personnel">Personnel (comma-separated)</Label>
@@ -212,16 +213,18 @@ export default function SchedulerPage() {
               <div>
                 <Label htmlFor="eventType">Event Type</Label>
                 <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Conference, Wedding, Music Festival" />
+                <p className="text-xs text-muted-foreground mt-1">Helps AI understand typical phases and tasks.</p>
               </div>
               <div>
-                <Label htmlFor="additionalCriteria">Additional Criteria</Label>
+                <Label htmlFor="additionalCriteria">Additional Criteria & Specific Tasks (Optional)</Label>
                 <Textarea 
                   id="additionalCriteria" 
                   value={additionalCriteria} 
                   onChange={(e) => setAdditionalCriteria(e.target.value)} 
-                  placeholder="e.g., Specific break times, equipment constraints, VIP presence" 
+                  placeholder="e.g., Specific break times, 'Alice to cover opening ceremony', equipment constraints, VIP presence" 
                   rows={5}
                 />
+                 <p className="text-xs text-muted-foreground mt-1">List any must-have items or strict preferences.</p>
               </div>
             </div>
           </CardContent>
@@ -240,7 +243,9 @@ export default function SchedulerPage() {
             <div>
               <CardTitle>Formatted Schedule Preview</CardTitle>
               <CardDescription>
-                For {date ? format(date, "PPP") : "the selected date"} at {location}.
+                For {date ? format(date, "PPP") : "the selected date"}
+                {location ? ` at ${location}` : ""}.
+                Event Type: {eventType}.
               </CardDescription>
             </div>
             <Button onClick={handlePrint} variant="outline">
@@ -293,3 +298,4 @@ export default function SchedulerPage() {
     </div>
   );
 }
+
