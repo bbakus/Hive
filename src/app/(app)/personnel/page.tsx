@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,6 +18,16 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,7 +61,10 @@ const initialPersonnel: Personnel[] = [
 
 export default function PersonnelPage() {
   const [personnelList, setPersonnelList] = useState<Personnel[]>(initialPersonnel);
-  const [isAddPersonnelDialogOpen, setIsAddPersonnelDialogOpen] = useState(false);
+  const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
+  const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [personnelToDeleteId, setPersonnelToDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const {
@@ -70,19 +83,76 @@ export default function PersonnelPage() {
     },
   });
 
-  const handleAddPersonnelSubmit: SubmitHandler<PersonnelFormData> = (data) => {
-    const newPersonnelMember: Personnel = {
-      ...data,
-      id: `user${String(personnelList.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-    };
-    setPersonnelList((prevList) => [...prevList, newPersonnelMember]);
-    toast({
-      title: "Team Member Added",
-      description: `"${data.name}" has been successfully added to the roster.`,
-    });
-    reset();
-    setIsAddPersonnelDialogOpen(false);
+  useEffect(() => {
+    if (editingPersonnel) {
+      reset(editingPersonnel);
+    } else {
+      reset({
+        name: "",
+        role: "",
+        avatar: "",
+        status: "Available",
+      });
+    }
+  }, [editingPersonnel, reset, isPersonnelModalOpen]);
+
+  const handlePersonnelSubmit: SubmitHandler<PersonnelFormData> = (data) => {
+    if (editingPersonnel) {
+      setPersonnelList(prevList => 
+        prevList.map(p => p.id === editingPersonnel.id ? { ...editingPersonnel, ...data } : p)
+      );
+      toast({
+        title: "Team Member Updated",
+        description: `"${data.name}" has been successfully updated.`,
+      });
+    } else {
+      const newPersonnelMember: Personnel = {
+        ...data,
+        id: `user${String(personnelList.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+      };
+      setPersonnelList((prevList) => [...prevList, newPersonnelMember]);
+      toast({
+        title: "Team Member Added",
+        description: `"${data.name}" has been successfully added to the roster.`,
+      });
+    }
+    closePersonnelModal();
   };
+
+  const openAddPersonnelModal = () => {
+    setEditingPersonnel(null);
+    setIsPersonnelModalOpen(true);
+  };
+
+  const openEditPersonnelModal = (personnel: Personnel) => {
+    setEditingPersonnel(personnel);
+    setIsPersonnelModalOpen(true);
+  };
+
+  const closePersonnelModal = () => {
+    setIsPersonnelModalOpen(false);
+    setEditingPersonnel(null);
+  };
+
+  const handleDeleteClick = (personnelId: string) => {
+    setPersonnelToDeleteId(personnelId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (personnelToDeleteId) {
+      const member = personnelList.find(p => p.id === personnelToDeleteId);
+      setPersonnelList(prevList => prevList.filter(p => p.id !== personnelToDeleteId));
+      toast({
+        title: "Team Member Deleted",
+        description: `Team member "${member?.name}" has been deleted.`,
+        variant: "destructive"
+      });
+      setPersonnelToDeleteId(null);
+    }
+    setIsDeleteDialogOpen(false);
+  };
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -91,21 +161,23 @@ export default function PersonnelPage() {
           <h1 className="text-3xl font-bold tracking-tight">Personnel Management</h1>
           <p className="text-muted-foreground">Assign team members to events and visualize schedules.</p>
         </div>
-        <Dialog open={isAddPersonnelDialogOpen} onOpenChange={setIsAddPersonnelDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="mr-2 h-5 w-5" />
-              Add Team Member
-            </Button>
-          </DialogTrigger>
+        <Button onClick={openAddPersonnelModal}>
+            <UserPlus className="mr-2 h-5 w-5" />
+            Add Team Member
+        </Button>
+      </div>
+
+      <Dialog open={isPersonnelModalOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) closePersonnelModal(); else setIsPersonnelModalOpen(true);
+      }}>
           <DialogContent className="sm:max-w-[525px]">
             <DialogHeader>
-              <DialogTitle>Add New Team Member</DialogTitle>
+              <DialogTitle>{editingPersonnel ? "Edit Team Member" : "Add New Team Member"}</DialogTitle>
               <DialogDescription>
-                Fill in the details for the new team member.
+                {editingPersonnel ? "Update the details for this team member." : "Fill in the details for the new team member."}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit(handleAddPersonnelSubmit)} className="grid gap-4 py-4">
+            <form onSubmit={handleSubmit(handlePersonnelSubmit)} className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Name</Label>
                 <div className="col-span-3">
@@ -134,7 +206,7 @@ export default function PersonnelPage() {
                     name="status"
                     control={control}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <SelectTrigger className={errors.status ? "border-destructive" : ""}>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
@@ -151,14 +223,28 @@ export default function PersonnelPage() {
               </div>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
+                  <Button type="button" variant="outline" onClick={closePersonnelModal}>Cancel</Button>
                 </DialogClose>
-                <Button type="submit">Add Member</Button>
+                <Button type="submit">{editingPersonnel ? "Save Changes" : "Add Member"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this team member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the team member.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPersonnelToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: "destructive" })}>Delete Member</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -205,11 +291,11 @@ export default function PersonnelPage() {
                         <Eye className="h-4 w-4" />
                         <span className="sr-only">Assign to Event</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditPersonnelModal(member)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(member.id)}>
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>
                       </Button>
