@@ -56,7 +56,7 @@ const initialShotRequestsMockForScheduler: ShotRequest[] = [
 interface ParsedScheduleItem {
   time: string;
   task: string;
-  matchedEventId?: string; // Store eventId if task is matched to an event
+  matchedEventId?: string; 
 }
 
 interface ParsedSchedulePerson {
@@ -76,25 +76,23 @@ const parseScheduleString = (scheduleString: string, eventsToday: Event[]): Pars
 
   for (const line of lines) {
     const trimmedLine = line.trim();
-    const personMatch = trimmedLine.match(/^([\w\s]+):$/i); // Matches "Person Name:"
+    const personMatch = trimmedLine.match(/^([\w\s]+):$/i); 
     
-    if (personMatch) { // New person
+    if (personMatch) { 
       if (currentPerson) {
         if (currentPerson.items.length > 0) parsed.push(currentPerson);
       }
       currentPerson = { name: personMatch[1].trim(), items: [] };
-      currentEventContextForPerson = null; // Reset event context for new person
-    } else if (currentPerson) { // Task for current person
-      const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i); // Matches "HH:MM - HH:MM : Task" or "HH:MM : Task"
+      currentEventContextForPerson = null; 
+    } else if (currentPerson) { 
+      const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i); 
       let taskDescription = itemMatch ? itemMatch[2].trim() : trimmedLine;
       let taskTime = itemMatch ? itemMatch[1].trim() : "General";
       let matchedEventId: string | undefined = undefined;
 
-      // Try to match task description with an event name for today
       for (const event of eventsToday) {
         if (taskDescription.toLowerCase().includes(event.name.toLowerCase())) {
           matchedEventId = event.id;
-          // Update current event context for this person if it's a new event for them
           if (!currentEventContextForPerson || currentEventContextForPerson.eventId !== event.id) {
             currentEventContextForPerson = { eventName: event.name, eventId: event.id };
           }
@@ -105,10 +103,10 @@ const parseScheduleString = (scheduleString: string, eventsToday: Event[]): Pars
       currentPerson.items.push({ 
         time: taskTime, 
         task: taskDescription,
-        matchedEventId: matchedEventId || currentEventContextForPerson?.eventId // Carry over context if no new match
+        matchedEventId: matchedEventId || currentEventContextForPerson?.eventId 
       });
 
-    } else if (trimmedLine && !parsed.length && !currentPerson) { // Handle general schedule if no person identified yet
+    } else if (trimmedLine && !parsed.length && !currentPerson) { 
         currentPerson = { name: "General Schedule Tasks", items: [] };
         const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i);
         if (itemMatch) {
@@ -123,7 +121,7 @@ const parseScheduleString = (scheduleString: string, eventsToday: Event[]): Pars
     parsed.push(currentPerson);
   }
   
-  if (parsed.length === 0 && scheduleString.trim()) { // Fallback for unstructured output
+  if (parsed.length === 0 && scheduleString.trim()) { 
     return [{
         name: "Generated Schedule",
         items: scheduleString.split('\n').filter(line => line.trim() !== '').map(line => ({ time: "Details", task: line.trim() }))
@@ -171,6 +169,8 @@ export default function SchedulerPage() {
       setProjectEventDates(uniqueDates);
       
       if (uniqueDates.length > 0) {
+        // Only update selectedDateString if it's not already a valid date for the current project
+        // or if it's undefined. This prevents resetting the date selection when project doesn't change.
         if (!selectedDateString || !uniqueDates.includes(selectedDateString)) {
             setSelectedDateString(uniqueDates[0]);
         }
@@ -185,6 +185,7 @@ export default function SchedulerPage() {
       
       const filteredPersonnel = allAvailablePersonnelMockForScheduler.filter(p => personnelIdsInProjectEvents.has(p.id));
       setProjectPersonnel(filteredPersonnel);
+      // Keep selected personnel if they are still valid for the new project context
       setSelectedPersonnelNames(prev => prev.filter(name => filteredPersonnel.some(p => p.name === name)));
 
     } else { 
@@ -194,7 +195,7 @@ export default function SchedulerPage() {
       setSelectedPersonnelNames([]);
       setEventsForSelectedDate([]);
     }
-  }, [selectedProjectId, useDemoData, isLoadingSettings, selectedDateString]); 
+  }, [selectedProjectId, useDemoData, isLoadingSettings]); // Removed selectedDateString from deps here to avoid re-triggering loop
 
   useEffect(() => {
     if (selectedDateString && selectedProjectId && useDemoData) {
@@ -224,10 +225,6 @@ export default function SchedulerPage() {
       toast({ title: "Error", description: "Please select at least one personnel member.", variant: "destructive" });
       return;
     }
-    if (!eventType.trim()) {
-      toast({ title: "Error", description: "Please specify an Event Type for context.", variant: "destructive" });
-      return;
-    }
     if (!selectedProject) {
         toast({ title: "Error", description: "Please select a project first.", variant: "destructive" });
         return;
@@ -237,15 +234,12 @@ export default function SchedulerPage() {
     setScheduleOutput(null);
     setParsedSchedule([]);
 
-    const eventNamesOnDate = eventsForSelectedDate.map(e => e.name);
-
     const input: GenerateScheduleInput = {
       date: selectedDateString,
       location: location.trim() || undefined,
       personnel: selectedPersonnelNames,
-      eventType,
-      additionalCriteria,
-      // eventNamesOnDate: eventNamesOnDate.length > 0 ? eventNamesOnDate : undefined // We decided not to modify AI flow for now
+      eventType: eventType.trim() || undefined,
+      additionalCriteria: additionalCriteria.trim() || undefined,
     };
 
     try {
@@ -336,12 +330,12 @@ export default function SchedulerPage() {
               <div>
                 <Label htmlFor="location">Location (Optional)</Label>
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" disabled={isSchedulerDisabled} />
-                 <p className="text-xs text-muted-foreground mt-1">Specify a general event area if it has distinct scheduling implications (e.g., "Conference Center West Wing"). Specific sub-locations or venues are better detailed in 'Additional Criteria' or covered by the 'Event Type'.</p>
+                 <p className="text-xs text-muted-foreground mt-1">Specify a general event area if it has distinct scheduling implications (e.g., "Conference Center West Wing"). Specific sub-locations for events within the project should be part of their names or detailed in 'Additional Criteria'.</p>
               </div>
               <div>
-                <Label htmlFor="eventType">Event Type <span className="text-destructive">*</span></Label>
-                <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Concert, Conference, Photoshoot" disabled={isSchedulerDisabled}/>
-                <p className="text-xs text-muted-foreground mt-1">Crucial for AI context. Be descriptive (e.g., "Music Festival Main Day Setup", "Corporate Product Launch Keynotes", "Wedding Ceremony & Reception Coverage"). This helps the AI understand typical phases and tasks.</p>
+                <Label htmlFor="eventType">Event Type (Optional)</Label>
+                <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Music Festival Day 1, Conference Keynotes" disabled={isSchedulerDisabled}/>
+                <p className="text-xs text-muted-foreground mt-1">Optional. Providing context (e.g., "Concert Setup Phase", "Wedding Reception Coverage") helps the AI understand typical activities and phases. If scheduling for multiple distinct events on the same day, ensure they are clearly named in 'Additional Criteria' if not covered by a general Event Type.</p>
               </div>
             </div>
 
@@ -365,7 +359,7 @@ export default function SchedulerPage() {
                   </div>
                 </ScrollArea>
               ) : (
-                 <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-[10rem] flex items-center justify-center bg-muted/50"> {/* Increased min-h */}
+                 <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-[10rem] flex items-center justify-center bg-muted/50">
                     <p className="text-center">
                       {isSchedulerDisabled ? (selectedProject ? "Enable demo data or ensure project has events with assigned personnel." : "Select a project to see available personnel.") : (selectedProject ? "No personnel assigned to events in this project, or no personnel data found for this project." : "Select a project.")}
                     </p>
@@ -388,7 +382,7 @@ export default function SchedulerPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading || isSchedulerDisabled || selectedPersonnelNames.length === 0 || !selectedDateString || !eventType.trim()}>
+            <Button type="submit" disabled={isLoading || isSchedulerDisabled || selectedPersonnelNames.length === 0 || !selectedDateString}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Generate Schedule
             </Button>
@@ -403,9 +397,9 @@ export default function SchedulerPage() {
               <CardTitle>Formatted Schedule Preview</CardTitle>
               <CardDescription>
                 For {selectedProject?.name || "Selected Project"}, {selectedDateString ? format(parseISO(selectedDateString), "PPP") : "the selected date"}
-                {location.trim() ? ` at ${location.trim()}` : ""}.
-                Event Type: {eventType}.
-                Personnel: {selectedPersonnelNames.join(", ") || "N/A"}.
+                {location.trim() ? ` at ${location.trim()}` : ""}
+                {eventType.trim() ? `. Event Type: ${eventType}` : ""}
+                . Personnel: {selectedPersonnelNames.join(", ") || "N/A"}.
               </CardDescription>
             </div>
             <Button onClick={handlePrint} variant="outline">
@@ -434,7 +428,7 @@ export default function SchedulerPage() {
                                 <span className="sm:ml-2 flex-grow">{item.task}</span>
                               </div>
                               {eventForTask && shotsForEvent.length > 0 && (
-                                <div className="mt-1.5 pl-4 sm:pl-[calc(10rem+0.5rem)] text-xs"> {/* Adjusted padding to align under task description */}
+                                <div className="mt-1.5 pl-4 sm:pl-[calc(10rem+0.5rem)] text-xs">
                                   <p className="font-medium text-muted-foreground flex items-center gap-1.5">
                                     <ListChecks className="h-3.5 w-3.5" /> 
                                     Shot Requests for "{eventForTask.name}":
@@ -470,7 +464,7 @@ export default function SchedulerPage() {
               <AlertTitle>Exporting Schedule</AlertTitle>
               <AlertDescription>
                 To export this schedule as a PDF, please use your browser's "Print" function (Ctrl/Cmd + P) and choose "Save as PDF" as the destination. 
-                Individual per-personnel PDF downloads are a planned future enhancement.
+                This will print the current formatted preview. Per-personnel PDF downloads are a planned future enhancement.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -479,6 +473,4 @@ export default function SchedulerPage() {
     </div>
   );
 }
-    
-
     

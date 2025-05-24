@@ -18,7 +18,7 @@ const GenerateScheduleInputSchema = z.object({
   date: z.string().describe('The date for which to generate the schedule (YYYY-MM-DD).'),
   location: z.string().optional().describe('The specific venue or area of the event, if it has scheduling implications (e.g., "Main Stage", "Hall A", "Outdoor Area").'),
   personnel: z.array(z.string()).describe('The team members to include in the schedule.'),
-  eventType: z.string().describe('The type of event (e.g., concert, conference, wedding, photoshoot). This helps determine typical activities and phases.'),
+  eventType: z.string().optional().describe('The type of event (e.g., concert, conference, wedding, photoshoot). This helps determine typical activities and phases.'),
   additionalCriteria: z.string().optional().describe('Crucial constraints, preferences, or specific tasks that must be included or considered (e.g., "Alice needs a 1-hour break around 1pm", "Focus on capturing X specific moment").'),
 });
 export type GenerateScheduleInput = z.infer<typeof GenerateScheduleInputSchema>;
@@ -43,7 +43,9 @@ const prompt = ai.definePrompt({
   Key Information:
   Date: {{{date}}}
   Personnel: {{#each personnel}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+  {{#if eventType}}
   Event Type: {{{eventType}}}. Tailor the schedule considering typical activities, phases (e.g., setup, main event, teardown), and personnel roles common to this type of event.
+  {{/if}}
 
   {{#if location}}
   Event Location: {{{location}}}. Consider any logistical implications or specific needs related to this location in your scheduling.
