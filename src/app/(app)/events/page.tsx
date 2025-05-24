@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  // DialogTrigger, // Not used directly if modal opened programmatically
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -37,7 +36,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { format, parseISO } from "date-fns";
-import { Calendar } from "@/components/ui/calendar"; // Added for event calendar display
+import { Calendar } from "@/components/ui/calendar"; 
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -120,8 +119,10 @@ export default function EventsPage() {
   }, [selectedProject, events]);
 
   const eventDatesForCalendar = useMemo(() => {
-    return events.map(event => parseISO(event.date));
-  }, [events]);
+    // Get unique dates from filteredEvents
+    const uniqueDates = new Set(filteredEvents.map(event => event.date));
+    return Array.from(uniqueDates).map(dateStr => parseISO(dateStr));
+  }, [filteredEvents]);
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
     const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
@@ -321,7 +322,7 @@ export default function EventsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event Calendar</CardTitle>
           <CardDescription>
-            View scheduled events. Dates with events are marked with a dot.
+            Provides a quick visual glance at days with scheduled events. Dates with events are highlighted.
             {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
           </CardDescription>
         </CardHeader>
@@ -330,16 +331,13 @@ export default function EventsPage() {
             mode="single" 
             modifiers={{ 
               hasEvents: eventDatesForCalendar,
-              ...(selectedProject && { 
-                // Could add a different style for events specifically within the selected project if needed
-                // For now, all eventDatesForCalendar are already filtered if a project is selected indirectly via filteredEvents
-              })
             }}
             modifiersClassNames={{
-              hasEvents: 'relative after:content-["•"] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-1.5 after:text-lg after:text-accent font-semibold',
+              hasEvents: 'bg-accent/20 rounded-md', // Apply a background tint to days with events
             }}
             className="rounded-md border shadow-inner bg-background"
-            month={selectedProject && filteredEvents.length > 0 ? parseISO(filteredEvents[0].date) : undefined} // Show month of first event if project selected
+            month={selectedProject && filteredEvents.length > 0 ? parseISO(filteredEvents[0].date) : (eventDatesForCalendar.length > 0 ? eventDatesForCalendar[0] : new Date())}
+            selected={eventDatesForCalendar} // This helps visually, but doesn't enable multi-select
           />
         </CardContent>
       </Card>
@@ -411,3 +409,6 @@ export default function EventsPage() {
     </div>
   );
 }
+
+
+    
