@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState, useEffect } from 'react';
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Camera, PlusCircle, Edit, Trash2 } from 'lucide-react';
@@ -19,6 +19,16 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -44,6 +54,7 @@ const shotRequestSchema = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   shotType: z.enum(["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"]),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
+  status: z.enum(["Planned", "Assigned", "Captured", "Reviewed", "Blocked"]),
   notes: z.string().optional(),
 });
 
@@ -52,7 +63,6 @@ type ShotRequestFormData = z.infer<typeof shotRequestSchema>;
 export type ShotRequest = ShotRequestFormData & {
   id: string;
   eventId: string;
-  status: "Planned" | "Assigned" | "Captured" | "Reviewed" | "Blocked";
   // assignedTo?: string; // For future use
 };
 
@@ -73,7 +83,12 @@ export default function ShotListPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [shotRequests, setShotRequests] = useState<ShotRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddShotDialogOpen, setIsAddShotDialogOpen] = useState(false);
+  
+  const [isShotModalOpen, setIsShotModalOpen] = useState(false);
+  const [editingShotRequest, setEditingShotRequest] = useState<ShotRequest | null>(null);
+  const [isShotDeleteDialogOpen, setIsShotDeleteDialogOpen] = useState(false);
+  const [shotRequestToDeleteId, setShotRequestToDeleteId] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   const {
@@ -88,6 +103,7 @@ export default function ShotListPage() {
       description: "",
       shotType: "Medium",
       priority: "Medium",
+      status: "Planned",
       notes: "",
     },
   });
@@ -96,29 +112,87 @@ export default function ShotListPage() {
     if (eventId) {
       const foundEvent = initialEventsForShotPage.find(e => e.id === eventId);
       setEvent(foundEvent || null);
-      // Filter mock shot requests for the current event
       const eventSpecificShots = initialShotRequests.filter(sr => sr.eventId === eventId);
       setShotRequests(eventSpecificShots);
       setIsLoading(false);
     }
   }, [eventId]);
 
-  const handleAddShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
-    if (!eventId) return; // Should not happen if page loads correctly
+  useEffect(() => {
+    if (editingShotRequest) {
+      reset(editingShotRequest);
+    } else {
+      reset({
+        description: "",
+        shotType: "Medium",
+        priority: "Medium",
+        status: "Planned",
+        notes: "",
+      });
+    }
+  }, [editingShotRequest, reset, isShotModalOpen]);
 
-    const newShotRequest: ShotRequest = {
-      ...data,
-      id: `sr${String(shotRequests.length + initialShotRequests.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`, // Ensure somewhat unique ID
-      eventId: eventId,
-      status: "Planned", // Default status
-    };
-    setShotRequests((prevRequests) => [...prevRequests, newShotRequest]);
-    toast({
-      title: "Shot Request Added",
-      description: `"${data.description.substring(0,30)}..." has been added.`,
-    });
-    reset(); // Reset form fields
-    setIsAddShotDialogOpen(false); // Close dialog
+
+  const handleShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
+    if (!eventId) return;
+
+    if (editingShotRequest) {
+      setShotRequests(prevRequests => 
+        prevRequests.map(sr => 
+          sr.id === editingShotRequest.id ? { ...editingShotRequest, ...data } : sr
+        )
+      );
+      toast({
+        title: "Shot Request Updated",
+        description: `"${data.description.substring(0,30)}..." has been updated.`,
+      });
+    } else {
+      const newShotRequest: ShotRequest = {
+        ...data,
+        id: `sr${String(shotRequests.length + initialShotRequests.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        eventId: eventId,
+      };
+      setShotRequests((prevRequests) => [...prevRequests, newShotRequest]);
+      toast({
+        title: "Shot Request Added",
+        description: `"${data.description.substring(0,30)}..." has been added.`,
+      });
+    }
+    closeShotModal();
+  };
+  
+  const openAddShotModal = () => {
+    setEditingShotRequest(null);
+    setIsShotModalOpen(true);
+  };
+
+  const openEditShotModal = (shot: ShotRequest) => {
+    setEditingShotRequest(shot);
+    setIsShotModalOpen(true);
+  };
+
+  const closeShotModal = () => {
+    setIsShotModalOpen(false);
+    setEditingShotRequest(null);
+  };
+  
+  const handleDeleteShotClick = (shotId: string) => {
+    setShotRequestToDeleteId(shotId);
+    setIsShotDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteShot = () => {
+    if (shotRequestToDeleteId) {
+      const shot = shotRequests.find(sr => sr.id === shotRequestToDeleteId);
+      setShotRequests(prevRequests => prevRequests.filter(sr => sr.id !== shotRequestToDeleteId));
+      toast({
+        title: "Shot Request Deleted",
+        description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
+        variant: "destructive"
+      });
+      setShotRequestToDeleteId(null);
+    }
+    setIsShotDeleteDialogOpen(false);
   };
 
 
@@ -153,93 +227,131 @@ export default function ShotListPage() {
         <p className="text-muted-foreground">Project: {event.project} | Date: {event.date} | Time: {event.time}</p>
       </div>
 
+      <AlertDialog open={isShotDeleteDialogOpen} onOpenChange={setIsShotDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Shot Request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this shot request? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShotRequestToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteShot} className={buttonVariants({ variant: "destructive" })}>Delete Shot</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={isShotModalOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) closeShotModal(); else setIsShotModalOpen(true);
+      }}>
+          <DialogContent className="sm:max-w-[525px]">
+            <DialogHeader>
+              <DialogTitle>{editingShotRequest ? "Edit Shot Request" : "Add New Shot Request"}</DialogTitle>
+              <DialogDescription>
+                {editingShotRequest ? "Update the details for this shot." : "Fill in the details for the new shot."}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit(handleShotRequestSubmit)} className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">Description</Label>
+                <div className="col-span-3">
+                  <Input id="description" {...register("description")} className={errors.description ? "border-destructive" : ""} />
+                  {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="shotType" className="text-right">Shot Type</Label>
+                <div className="col-span-3">
+                  <Controller
+                    name="shotType"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <SelectTrigger className={errors.shotType ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select shot type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"].map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.shotType && <p className="text-xs text-destructive mt-1">{errors.shotType.message}</p>}
+                </div>
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="priority" className="text-right">Priority</Label>
+                <div className="col-span-3">
+                   <Controller
+                    name="priority"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <SelectTrigger className={errors.priority ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Low", "Medium", "High", "Critical"].map(prio => (
+                            <SelectItem key={prio} value={prio}>{prio}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">Status</Label>
+                <div className="col-span-3">
+                   <Controller
+                    name="status"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <SelectTrigger className={errors.status ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Planned", "Assigned", "Captured", "Reviewed", "Blocked"].map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.status && <p className="text-xs text-destructive mt-1">{errors.status.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="notes" className="text-right pt-2">Notes</Label>
+                <div className="col-span-3">
+                  <Textarea id="notes" {...register("notes")} placeholder="Optional notes, camera settings, talent cues..." />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" onClick={closeShotModal}>Cancel</Button>
+                </DialogClose>
+                <Button type="submit">{editingShotRequest ? "Save Changes" : "Add Shot"}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Manage Shot Requests</CardTitle>
             <CardDescription>Define and track all required shots for this event. ({shotRequests.length} shots)</CardDescription>
           </div>
-          <Dialog open={isAddShotDialogOpen} onOpenChange={setIsAddShotDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-5 w-5" />
-                Add Shot Request
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[525px]">
-              <DialogHeader>
-                <DialogTitle>Add New Shot Request</DialogTitle>
-                <DialogDescription>
-                  Fill in the details for the new shot.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit(handleAddShotRequestSubmit)} className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="description" className="text-right">Description</Label>
-                  <div className="col-span-3">
-                    <Input id="description" {...register("description")} className={errors.description ? "border-destructive" : ""} />
-                    {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="shotType" className="text-right">Shot Type</Label>
-                  <div className="col-span-3">
-                    <Controller
-                      name="shotType"
-                      control={control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <SelectTrigger className={errors.shotType ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Select shot type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"].map(type => (
-                              <SelectItem key={type} value={type}>{type}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.shotType && <p className="text-xs text-destructive mt-1">{errors.shotType.message}</p>}
-                  </div>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="priority" className="text-right">Priority</Label>
-                  <div className="col-span-3">
-                     <Controller
-                      name="priority"
-                      control={control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <SelectTrigger className={errors.priority ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {["Low", "Medium", "High", "Critical"].map(prio => (
-                              <SelectItem key={prio} value={prio}>{prio}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-start gap-4"> {/* Use items-start for textarea alignment */}
-                  <Label htmlFor="notes" className="text-right pt-2">Notes</Label> {/* Add padding-top for alignment */}
-                  <div className="col-span-3">
-                    <Textarea id="notes" {...register("notes")} placeholder="Optional notes, camera settings, talent cues..." />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="outline">Cancel</Button>
-                  </DialogClose>
-                  <Button type="submit">Add Shot</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={openAddShotModal}>
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Add Shot Request
+          </Button>
         </CardHeader>
         <CardContent>
           {shotRequests.length > 0 ? (
@@ -261,9 +373,9 @@ export default function ShotListPage() {
                     <TableCell>
                        <Badge variant={
                         shot.priority === "Critical" ? "destructive" :
-                        shot.priority === "High" ? "secondary" : // Assuming secondary is prominent enough for High
+                        shot.priority === "High" ? "secondary" : 
                         shot.priority === "Medium" ? "outline" : 
-                        "default" // For Low or if default is subtle
+                        "default" 
                       }>{shot.priority}</Badge>
                     </TableCell>
                     <TableCell>
@@ -277,11 +389,11 @@ export default function ShotListPage() {
                       }>{shot.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditShotModal(shot)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit Shot</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteShotClick(shot.id)}>
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete Shot</span>
                       </Button>
@@ -302,5 +414,3 @@ export default function ShotListPage() {
     </div>
   );
 }
-
-    
