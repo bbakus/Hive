@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon, Eye } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye } from "lucide-react"; // Renamed to avoid conflict
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  // DialogTrigger, // Not used directly if modal opened programmatically
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -35,8 +35,9 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectContext, type Project } from "@/contexts/ProjectContext";
-import { format } from "date-fns";
+import { useProjectContext } from "@/contexts/ProjectContext";
+import { format, parseISO } from "date-fns";
+import { Calendar } from "@/components/ui/calendar"; // Added for event calendar display
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -100,9 +101,9 @@ export default function EventsPage() {
         priority: editingEvent.priority as EventFormData['priority'],
       });
     } else {
-      reset({ // Reset to default values for adding new event
+      reset({ 
         name: "",
-        projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""), // Pre-select current project or first project
+        projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""), 
         date: format(new Date(), "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
@@ -117,6 +118,10 @@ export default function EventsPage() {
     }
     return events.filter(event => event.projectId === selectedProject.id);
   }, [selectedProject, events]);
+
+  const eventDatesForCalendar = useMemo(() => {
+    return events.map(event => parseISO(event.date));
+  }, [events]);
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
     const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
@@ -150,7 +155,6 @@ export default function EventsPage() {
   
   const openAddEventModal = () => {
     setEditingEvent(null);
-    // Reset form to defaults, pre-selecting current project if available
     reset({
       name: "",
       projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
@@ -163,14 +167,12 @@ export default function EventsPage() {
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
-    // Form reset with event data is handled by useEffect
     setIsEventModalOpen(true);
   };
 
   const closeEventModal = () => {
     setIsEventModalOpen(false);
     setEditingEvent(null);
-    // Form reset to defaults for "add" mode is handled by useEffect
   };
 
   const handleDeleteClick = (eventId: string) => {
@@ -235,8 +237,8 @@ export default function EventsPage() {
                   render={({ field }) => (
                     <Select 
                       onValueChange={field.onChange} 
-                      value={field.value} // Ensure value is controlled
-                      defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))} // Ensure a default if field.value is empty initially
+                      value={field.value} 
+                      defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))} 
                     >
                       <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select project" />
@@ -315,10 +317,36 @@ export default function EventsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event Calendar</CardTitle>
+          <CardDescription>
+            View scheduled events. Dates with events are marked with a dot.
+            {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center p-0 sm:p-4 md:p-6">
+          <Calendar
+            mode="single" 
+            modifiers={{ 
+              hasEvents: eventDatesForCalendar,
+              ...(selectedProject && { 
+                // Could add a different style for events specifically within the selected project if needed
+                // For now, all eventDatesForCalendar are already filtered if a project is selected indirectly via filteredEvents
+              })
+            }}
+            modifiersClassNames={{
+              hasEvents: 'relative after:content-["•"] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-1.5 after:text-lg after:text-accent font-semibold',
+            }}
+            className="rounded-md border shadow-inner bg-background"
+            month={selectedProject && filteredEvents.length > 0 ? parseISO(filteredEvents[0].date) : undefined} // Show month of first event if project selected
+          />
+        </CardContent>
+      </Card>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarIcon className="h-6 w-6 text-accent" /> Event List</CardTitle>
+          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List</CardTitle>
           <CardDescription>
             {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
             ({filteredEvents.length} events)
@@ -380,19 +408,6 @@ export default function EventsPage() {
           )}
         </CardContent>
       </Card>
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Shot Request Manager / Calendar View</CardTitle>
-          <CardDescription>Detailed view for managing shot requests or a calendar interface.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">A table UI or Calendar UI will allow management of events linked to specific projects, each including shot requests, timing details, priority levels and deliverables. (Coming Soon)</p>
-          <img src="https://placehold.co/600x400.png" alt="Calendar View Placeholder" className="w-full h-auto mt-4 rounded-md" data-ai-hint="calendar schedule task" />
-        </CardContent>
-      </Card>
     </div>
   );
 }
-
-    
