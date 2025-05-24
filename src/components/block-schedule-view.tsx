@@ -1,22 +1,22 @@
 
 "use client";
 
-import type { Event } from "@/app/(app)/events/page"; // Assuming Event type is exported
-import { parseEventTimes } from "@/app/(app)/events/page"; // Assuming parseEventTimes is exported
+import type { Event } from "@/app/(app)/events/page"; 
+import { parseEventTimes } from "@/app/(app)/events/page"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { Users } from "lucide-react"; // Import Users icon
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
   eventsForDate: Event[];
 }
 
-const HOUR_ROW_HEIGHT_REM = 4; // 4rem = 64px if 1rem = 16px
+const HOUR_ROW_HEIGHT_REM = 4; 
 const TOTAL_HOURS = 24;
 
-// Helper to get a color based on priority
 const getPriorityColor = (priority: Event['priority']): string => {
   switch (priority) {
     case "Critical":
@@ -34,9 +34,9 @@ const getPriorityColor = (priority: Event['priority']): string => {
 
 
 export function BlockScheduleView({ selectedDate, eventsForDate }: BlockScheduleViewProps) {
-  const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i); // 0-23
+  const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i); 
 
-  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; // Assuming 1rem = 16px
+  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; 
   const pixelsPerMinute = hourRowHeightPx / 60;
 
   const getEventStyle = (event: Event): React.CSSProperties => {
@@ -47,12 +47,11 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
     const startMinute = times.start.getMinutes();
     
     let durationInMinutes = ((times.end.getTime() - times.start.getTime()) / (1000 * 60));
-    if (durationInMinutes <=0) durationInMinutes = 5; // Min duration for visibility
+    if (durationInMinutes <=0) durationInMinutes = 15; // Min duration for visibility (e.g. 15 mins)
 
     const top = (startHour * hourRowHeightPx) + (startMinute * pixelsPerMinute);
     const height = durationInMinutes * pixelsPerMinute;
     
-    // This is a very basic way to stagger overlapping events
     const concurrentEvents = eventsForDate.filter(e => {
         if (e.id === event.id) return false;
         const eTimes = parseEventTimes(e.date, e.time);
@@ -60,7 +59,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
         return eTimes.start < times.end && eTimes.end > times.start;
     });
 
-    const numberOfOverlapping = concurrentEvents.length + 1; // +1 for the event itself
+    const numberOfOverlapping = concurrentEvents.length + 1;
 
     const eventIndexAmongConcurrent = eventsForDate
       .filter(e => {
@@ -70,17 +69,17 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
       .sort((a,b) => (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) || a.id.localeCompare(b.id))
       .findIndex(e => e.id === event.id);
       
-    const widthPercentage = 98 / numberOfOverlapping; // 98% to leave small gaps
+    const widthPercentage = 98 / numberOfOverlapping; 
     const leftPercentage = eventIndexAmongConcurrent * (widthPercentage + (2 / numberOfOverlapping));
 
 
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 20)}px`, // Minimum height for visibility and basic text
+      height: `${Math.max(height, 30)}px`, // Minimum height for visibility and basic text
       left: `${leftPercentage}%`,
       width: `${widthPercentage}%`, 
-      zIndex: startMinute + 10, // Basic z-indexing
+      zIndex: startMinute + 10, 
       overflow: 'hidden',
     };
   };
@@ -115,7 +114,6 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
               className="border-b"
               style={{ height: `${HOUR_ROW_HEIGHT_REM}rem` }}
             >
-              {/* Optional: 30-min line */}
               <div className="border-b border-dashed border-border/50" style={{height: `${HOUR_ROW_HEIGHT_REM / 2}rem`}}></div>
             </div>
           ))}
@@ -126,7 +124,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
               key={event.id}
               style={getEventStyle(event)}
               className={cn(
-                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between", // Added flex for content spacing
+                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between", 
                 getPriorityColor(event.priority)
               )}
               title={`${event.name} (${event.time}) - Project: ${event.project}`}
@@ -135,9 +133,16 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
                 <p className="text-xs font-semibold truncate leading-tight">{event.name}</p>
                 <p className="text-[10px] truncate opacity-80 leading-tight">{event.time}</p>
               </div>
-              <div className="mt-0.5">
+              <div className="mt-0.5 space-y-0.5">
                 {event.project && <p className="text-[10px] truncate opacity-70 leading-tight">Proj: {event.project}</p>}
-                <p className="text-[10px] truncate opacity-70 leading-tight">Contact: J. Doe (Ex.)</p>
+                {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
+                  <p className="text-[10px] truncate opacity-70 leading-tight flex items-center">
+                    <Users className="mr-1 h-3 w-3 shrink-0" />
+                    {event.assignedPersonnelIds.length} Assigned
+                  </p>
+                )}
+                 {/* Placeholder for contact, can be removed or made dynamic later */}
+                {/* <p className="text-[10px] truncate opacity-70 leading-tight">Contact: J. Doe (Ex.)</p> */}
               </div>
             </div>
           ))}

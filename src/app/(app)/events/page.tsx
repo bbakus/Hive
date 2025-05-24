@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -42,12 +44,29 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view"; 
 
+// Minimal Personnel type for assignment
+type PersonnelMinimal = {
+  id: string;
+  name: string;
+  role: string; // Added role for potential future use in display
+};
+
+// Mock available personnel (ideally from context or API)
+const availablePersonnelList: PersonnelMinimal[] = [
+  { id: "user001", name: "Alice Wonderland", role: "Lead Camera Op" },
+  { id: "user002", name: "Bob The Builder", role: "Audio Engineer" },
+  { id: "user003", name: "Charlie Chaplin", role: "Producer" },
+  { id: "user004", name: "Diana Prince", role: "Drone Pilot" },
+  { id: "user005", name: "Edward Scissorhands", role: "Grip" },
+];
+
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
   projectId: z.string().min(1, { message: "Please select a project." }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date must be YYYY-MM-DD." }),
   time: z.string().regex(/^\d{2}:\d{2} - \d{2}:\d{2}$/, { message: "Time must be HH:MM - HH:MM." }),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
+  assignedPersonnelIds: z.array(z.string()).optional(),
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
@@ -61,13 +80,13 @@ export type Event = EventFormData & {
 };
 
 const initialEvents: Event[] = [
-  { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20 },
-  { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5 },
+  { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20, assignedPersonnelIds: ["user001", "user002"] },
+  { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5, assignedPersonnelIds: ["user003"] },
   { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", projectId: "proj003", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3 },
-  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10 },
+  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10, assignedPersonnelIds: ["user001"] },
   { id: "evt005", name: "Closing Ceremony", project: "Tech Conference X", projectId: "proj002", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8 },
-  { id: "evt006", name: "Sound Check", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "12:00 - 13:30", priority: "Medium", deliverables: 0, shotRequests: 2 },
-  { id: "evt007", name: "Team Briefing AM", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "09:00 - 09:30", priority: "High", deliverables: 0, shotRequests: 1 },
+  { id: "evt006", name: "Sound Check", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "12:00 - 13:30", priority: "Medium", deliverables: 0, shotRequests: 2, assignedPersonnelIds: ["user002"] },
+  { id: "evt007", name: "Team Briefing AM", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "09:00 - 09:30", priority: "High", deliverables: 0, shotRequests: 1, assignedPersonnelIds: ["user003", "user001"] },
   { id: "evt008", name: "Tech Rehearsal", project: "Tech Conference X", projectId: "proj002", date: "2024-09-14", time: "14:00 - 17:00", priority: "High", deliverables: 0, shotRequests: 3 },
 ];
 
@@ -125,6 +144,8 @@ export default function EventsPage() {
     reset,
     control,
     formState: { errors },
+    setValue,
+    watch
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
   });
@@ -138,6 +159,7 @@ export default function EventsPage() {
         date: editingEvent.date,
         time: editingEvent.time,
         priority: editingEvent.priority as EventFormData['priority'],
+        assignedPersonnelIds: editingEvent.assignedPersonnelIds || [],
       });
     } else {
       reset({
@@ -146,6 +168,7 @@ export default function EventsPage() {
         date: format(defaultDate, "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
+        assignedPersonnelIds: [],
       });
     }
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
@@ -223,9 +246,9 @@ export default function EventsPage() {
         ...data,
         id: `evt${String(events.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
-        deliverables: 0,
-        shotRequests: 0, 
-        hasOverlap: false,
+        deliverables: 0, // Default value for new events
+        shotRequests: 0, // Default value for new events
+        hasOverlap: false, // Will be recalculated by useMemo
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -289,111 +312,153 @@ export default function EventsPage() {
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
       }}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="sm:max-w-2xl"> {/* Increased width for personnel list */}
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Event" : "Add New Event"}</DialogTitle>
             <DialogDescription>
               {editingEvent ? "Update the details for this event." : "Fill in the details below to create a new event."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-name" className="text-right">Name</Label>
-              <div className="col-span-3">
-                <Input id="event-name" {...register("name")} className={errors.name ? "border-destructive" : ""} />
-                {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-projectId" className="text-right">Project</Label>
-              <div className="col-span-3">
-                <Controller
-                  name="projectId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
-                    >
-                      <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allProjects.map((proj) => (
-                          <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.projectId && <p className="text-xs text-destructive mt-1">{errors.projectId.message}</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-date" className="text-right">Date</Label>
-              <div className="col-span-3">
-                <Controller
-                    name="date"
-                    control={control}
-                    render={({ field }) => (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !field.value && "text-muted-foreground",
-                              errors.date ? "border-destructive" : ""
+          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Event Details Column */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
+                  <div className="col-span-3">
+                    <Input id="event-name" {...register("name")} className={errors.name ? "border-destructive" : ""} />
+                    {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-projectId" className="text-right col-span-1">Project</Label>
+                  <div className="col-span-3">
+                    <Controller
+                      name="projectId"
+                      control={control}
+                      render={({ field }) => (
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
+                        >
+                          <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
+                            <SelectValue placeholder="Select project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allProjects.map((proj) => (
+                              <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {errors.projectId && <p className="text-xs text-destructive mt-1">{errors.projectId.message}</p>}
+                  </div>
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="event-date" className="text-right col-span-1">Date</Label>
+                    <div className="col-span-3">
+                        <Controller
+                            name="date"
+                            control={control}
+                            render={({ field }) => (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground",
+                                    errors.date ? "border-destructive" : ""
+                                    )}
+                                >
+                                    <CalendarIconLucide className="mr-2 h-4 w-4" />
+                                    {field.value ? format(parseISO(field.value), "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={field.value ? parseISO(field.value) : undefined}
+                                    onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                                    initialFocus
+                                    defaultMonth={activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date()}
+                                />
+                                </PopoverContent>
+                            </Popover>
                             )}
-                          >
-                            <CalendarIconLucide className="mr-2 h-4 w-4" />
-                            {field.value ? format(parseISO(field.value), "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={field.value ? parseISO(field.value) : undefined}
-                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
-                            initialFocus
-                            defaultMonth={activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date()}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                        />
+                        {errors.date && <p className="text-xs text-destructive mt-1">{errors.date.message}</p>}
+                    </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-time" className="text-right col-span-1">Time</Label>
+                  <div className="col-span-3">
+                    <Input id="event-time" {...register("time")} placeholder="HH:MM - HH:MM" className={errors.time ? "border-destructive" : ""} />
+                    {errors.time && <p className="text-xs text-destructive mt-1">{errors.time.message}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-priority" className="text-right col-span-1">Priority</Label>
+                  <div className="col-span-3">
+                    <Controller
+                      name="priority"
+                      control={control}
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                          <SelectTrigger className={errors.priority ? "border-destructive" : ""}>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Critical">Critical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Assign Personnel Column */}
+              <div className="space-y-2">
+                <Label>Assign Personnel</Label>
+                <ScrollArea className="h-60 w-full rounded-md border p-4">
+                  <Controller
+                    name="assignedPersonnelIds"
+                    control={control}
+                    defaultValue={[]}
+                    render={({ field }) => (
+                      <div className="space-y-2">
+                        {availablePersonnelList.map((person) => (
+                          <div key={person.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`person-${person.id}`}
+                              checked={field.value?.includes(person.id)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...(field.value || []), person.id])
+                                  : field.onChange(
+                                      (field.value || []).filter(
+                                        (id) => id !== person.id
+                                      )
+                                    );
+                              }}
+                            />
+                            <Label htmlFor={`person-${person.id}`} className="font-normal">
+                              {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   />
-                {errors.date && <p className="text-xs text-destructive mt-1">{errors.date.message}</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-time" className="text-right">Time</Label>
-              <div className="col-span-3">
-                <Input id="event-time" {...register("time")} placeholder="HH:MM - HH:MM" className={errors.time ? "border-destructive" : ""} />
-                {errors.time && <p className="text-xs text-destructive mt-1">{errors.time.message}</p>}
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="event-priority" className="text-right">Priority</Label>
-              <div className="col-span-3">
-                <Controller
-                  name="priority"
-                  control={control}
-                  render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                      <SelectTrigger className={errors.priority ? "border-destructive" : ""}>
-                        <SelectValue placeholder="Select priority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Low">Low</SelectItem>
-                        <SelectItem value="Medium">Medium</SelectItem>
-                        <SelectItem value="High">High</SelectItem>
-                        <SelectItem value="Critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
+                </ScrollArea>
+                {errors.assignedPersonnelIds && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelIds.message}</p>}
               </div>
             </div>
             <DialogFooter>
@@ -461,9 +526,15 @@ export default function EventsPage() {
                               {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
                             </CardDescription>
                           </CardHeader>
-                          <CardContent className="flex-grow">
+                          <CardContent className="flex-grow space-y-1">
                             {!selectedProject && event.project && (
                               <p className="text-xs text-muted-foreground">Project: {event.project}</p>
+                            )}
+                             {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
+                              <p className="text-xs text-muted-foreground flex items-center">
+                                <Users className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                                Assigned: {event.assignedPersonnelIds.length}
+                              </p>
                             )}
                             <p className="text-xs text-muted-foreground">Shot Requests: {event.shotRequests}</p>
                             <p className="text-xs text-muted-foreground">Deliverables: {event.deliverables}</p>
@@ -507,6 +578,7 @@ export default function EventsPage() {
                       {!selectedProject && <TableHead>Project</TableHead>}
                       <TableHead>Date & Time</TableHead>
                       <TableHead>Priority</TableHead>
+                      <TableHead>Assigned</TableHead>
                       <TableHead>Shot Requests</TableHead>
                       <TableHead>Deliverables</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -527,6 +599,9 @@ export default function EventsPage() {
                             event.priority === "High" ? "secondary" :
                             event.priority === "Medium" ? "outline" : "default"
                           }>{event.priority}</Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {event.assignedPersonnelIds?.length || 0}
                         </TableCell>
                         <TableCell>{event.shotRequests}</TableCell>
                         <TableCell>{event.deliverables}</TableCell>
