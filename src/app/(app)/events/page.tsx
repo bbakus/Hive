@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye } from "lucide-react"; // Renamed to avoid conflict
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,8 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import { format, parseISO } from "date-fns";
-import { Calendar } from "@/components/ui/calendar"; 
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore } from "date-fns";
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -60,9 +59,51 @@ const initialEvents: Event[] = [
   { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20 },
   { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5 },
   { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", projectId: "proj003", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3 },
-  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10 },
+  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10 }, // Overlaps with Main Stage Day 1
   { id: "evt005", name: "Closing Ceremony", project: "Tech Conference X", projectId: "proj002", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8 },
+  { id: "evt006", name: "Sound Check", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "12:00 - 13:30", priority: "Medium", deliverables: 0, shotRequests: 2 },
 ];
+
+// Helper function to parse time string "HH:MM - HH:MM" and date string "YYYY-MM-DD"
+const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
+  const baseDate = parseISO(dateStr);
+  if (!isValid(baseDate)) return null;
+
+  const parts = timeStr.split(' - ');
+  if (parts.length !== 2) return null;
+
+  const [startTimeStr, endTimeStr] = parts;
+  const [startHour, startMinute] = startTimeStr.split(':').map(Number);
+  const [endHour, endMinute] = endTimeStr.split(':').map(Number);
+
+  if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
+
+  let startDate = setHours(baseDate, startHour);
+  startDate = setMinutes(startDate, startMinute);
+
+  let endDate = setHours(baseDate, endHour);
+  endDate = setMinutes(endDate, endMinute);
+  
+  // Handle overnight events if end time is earlier than start time (e.g. 22:00 - 02:00)
+  if (isBefore(endDate, startDate)) {
+    endDate.setDate(endDate.getDate() + 1);
+  }
+
+  return { start: startDate, end: endDate };
+};
+
+const checkOverlap = (eventA: Event, eventB: Event): boolean => {
+  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false; // Only check for same day, different events
+
+  const timesA = parseEventTimes(eventA.date, eventA.time);
+  const timesB = parseEventTimes(eventB.date, eventB.time);
+
+  if (!timesA || !timesB) return false; // Invalid time format
+
+  // Overlap condition: A.start < B.end AND A.end > B.start
+  return isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
+};
+
 
 export default function EventsPage() {
   const { selectedProject, projects: allProjects } = useProjectContext(); 
@@ -112,17 +153,49 @@ export default function EventsPage() {
 
 
   const filteredEvents = useMemo(() => {
-    if (!selectedProject) {
-      return events; 
+    let currentEvents = events;
+    if (selectedProject) {
+      currentEvents = events.filter(event => event.projectId === selectedProject.id);
     }
-    return events.filter(event => event.projectId === selectedProject.id);
+    // Add overlap information
+    return currentEvents.map(event => {
+      let hasOverlap = false;
+      for (const otherEvent of currentEvents) {
+        if (event.id !== otherEvent.id && event.date === otherEvent.date) {
+          if (checkOverlap(event, otherEvent)) {
+            hasOverlap = true;
+            break;
+          }
+        }
+      }
+      return { ...event, hasOverlap };
+    });
   }, [selectedProject, events]);
 
-  const eventDatesForCalendar = useMemo(() => {
-    // Get unique dates from filteredEvents
-    const uniqueDates = new Set(filteredEvents.map(event => event.date));
-    return Array.from(uniqueDates).map(dateStr => parseISO(dateStr));
+  const groupedAndSortedEvents = useMemo(() => {
+    const grouped = filteredEvents.reduce((acc, event) => {
+      const date = event.date;
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(event);
+      return acc;
+    }, {} as Record<string, (Event & { hasOverlap?: boolean })[]>);
+
+    Object.values(grouped).forEach(dayEvents => {
+      dayEvents.sort((a, b) => {
+        const timesA = parseEventTimes(a.date, a.time);
+        const timesB = parseEventTimes(b.date, b.time);
+        if (timesA && timesB) {
+          return timesA.start.getTime() - timesB.start.getTime();
+        }
+        return 0;
+      });
+    });
+    
+    return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [filteredEvents]);
+
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
     const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
@@ -320,31 +393,66 @@ export default function EventsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event Calendar</CardTitle>
+          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
           <CardDescription>
-            Provides a quick visual glance at days with scheduled events. Dates with events are highlighted.
+            Visualizes events grouped by day. Events with potential time conflicts are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
             {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center p-0 sm:p-4 md:p-6">
-          <Calendar
-            mode="single" 
-            modifiers={{ 
-              hasEvents: eventDatesForCalendar,
-            }}
-            modifiersClassNames={{
-              hasEvents: 'bg-accent/20 rounded-md', // Apply a background tint to days with events
-            }}
-            className="rounded-md border shadow-inner bg-background"
-            month={selectedProject && filteredEvents.length > 0 ? parseISO(filteredEvents[0].date) : (eventDatesForCalendar.length > 0 ? eventDatesForCalendar[0] : new Date())}
-            selected={eventDatesForCalendar} // This helps visually, but doesn't enable multi-select
-          />
+        <CardContent className="space-y-6">
+          {groupedAndSortedEvents.length > 0 ? (
+            groupedAndSortedEvents.map(([date, dayEvents]) => (
+              <div key={date}>
+                <h3 className="text-xl font-semibold mb-3 border-b pb-2">
+                  {format(parseISO(date), "EEEE, MMMM do, yyyy")}
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {dayEvents.map((event) => (
+                    <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center justify-between">
+                          {event.name}
+                          <Badge variant={
+                            event.priority === "Critical" ? "destructive" :
+                            event.priority === "High" ? "secondary" : 
+                            event.priority === "Medium" ? "outline" : "default"
+                          }>{event.priority}</Badge>
+                        </CardTitle>
+                        <CardDescription className="flex items-center">
+                          {event.time}
+                          {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        {!selectedProject && event.project && (
+                          <p className="text-xs text-muted-foreground">Project: {event.project}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">Shot Requests: {event.shotRequests}</p>
+                        <p className="text-xs text-muted-foreground">Deliverables: {event.deliverables}</p>
+                      </CardContent>
+                      <CardFooter className="border-t pt-3">
+                         <Button variant="outline" size="sm" asChild className="w-full">
+                            <Link href={`/events/${event.id}/shots`}>
+                              <Eye className="mr-2 h-4 w-4" /> View/Manage Shots
+                            </Link>
+                          </Button>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              No events scheduled {selectedProject ? `for ${selectedProject.name}` : "that match your criteria"}.
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List</CardTitle>
+          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
           <CardDescription>
             {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
             ({filteredEvents.length} events)
@@ -369,7 +477,10 @@ export default function EventsPage() {
                   <TableRow key={event.id}>
                     <TableCell className="font-medium">{event.name}</TableCell>
                     {!selectedProject && <TableCell>{event.project}</TableCell>}
-                    <TableCell>{event.date} <span className="text-muted-foreground">({event.time})</span></TableCell>
+                    <TableCell className="flex items-center">
+                      {event.date} <span className="text-muted-foreground ml-1">({event.time})</span>
+                      {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={
                         event.priority === "Critical" ? "destructive" :
@@ -409,6 +520,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-
-    
