@@ -22,7 +22,7 @@ const getPriorityColor = (priority: Event['priority']): string => {
     case "Critical":
       return "bg-destructive/80 border-destructive text-destructive-foreground";
     case "High":
-      return "bg-secondary border-foreground/30 text-secondary-foreground"; // Using secondary as an orange/amber proxy
+      return "bg-secondary border-foreground/30 text-secondary-foreground";
     case "Medium":
       return "bg-primary/70 border-primary text-primary-foreground";
     case "Low":
@@ -41,69 +41,45 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
 
   const getEventStyle = (event: Event): React.CSSProperties => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return { display: 'none' }; // Should not happen if eventsForDate is pre-filtered
+    if (!times) return { display: 'none' };
 
     const startHour = times.start.getHours();
     const startMinute = times.start.getMinutes();
-    const endHour = times.end.getHours();
-    const endMinute = times.end.getMinutes();
     
-    // Calculate duration in minutes
-    // Handle overnight events correctly for duration calculation if needed, though parseEventTimes handles date advancement for end time.
     let durationInMinutes = ((times.end.getTime() - times.start.getTime()) / (1000 * 60));
-    if (durationInMinutes <=0) durationInMinutes = 5; // Min height for very short events
+    if (durationInMinutes <=0) durationInMinutes = 5; // Min duration for visibility
 
     const top = (startHour * hourRowHeightPx) + (startMinute * pixelsPerMinute);
     const height = durationInMinutes * pixelsPerMinute;
     
-    // Basic overlap handling: assign a column
-    // This is a very simplified version. Real collision detection is complex.
-    // For now, we'll just let them overlap if this isn't sufficient.
-    // A more robust solution would calculate max overlaps and divide width.
-    const columnIndex = eventsForDate.filter(e => {
+    // This is a very basic way to stagger overlapping events
+    const concurrentEvents = eventsForDate.filter(e => {
         if (e.id === event.id) return false;
         const eTimes = parseEventTimes(e.date, e.time);
         if (!eTimes) return false;
-        // Check if e starts before current event ends AND e ends after current event starts
         return eTimes.start < times.end && eTimes.end > times.start;
-    }).findIndex(e => e.id === event.id); // This logic for column is not quite right, needs proper overlap grouping
+    });
 
-    const numberOfOverlapping = eventsForDate.reduce((acc, otherEvent) => {
-        if (otherEvent.id === event.id) return acc;
-        const otherTimes = parseEventTimes(otherEvent.date, otherEvent.time);
-        if (!otherTimes) return acc;
-        if (otherTimes.start < times.end && otherTimes.end > times.start) {
-            return acc + 1;
-        }
-        return acc;
-    }, 0) +1; // +1 for the event itself
+    const numberOfOverlapping = concurrentEvents.length + 1; // +1 for the event itself
 
-
-    // This is a very basic way to stagger overlapping events, not true column layout
-    // Count how many other events start at the exact same time to determine an offset.
-    const concurrentStartIndex = eventsForDate
-      .filter(e => parseEventTimes(e.date, e.time)?.start.getTime() === times.start.getTime())
-      .sort((a,b) => a.id.localeCompare(b.id)) // Consistent sort for stable staggering
+    const eventIndexAmongConcurrent = eventsForDate
+      .filter(e => {
+        const eTimes = parseEventTimes(e.date, e.time);
+        return eTimes && eTimes.start < times.end && eTimes.end > times.start;
+      })
+      .sort((a,b) => (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) || a.id.localeCompare(b.id))
       .findIndex(e => e.id === event.id);
-    
-    const widthPercentage = 100 / numberOfOverlapping ; // Example: if 2 overlap, each gets 50%
-    const leftPercentage = eventsForDate
-        .filter(e => {
-            const eTimes = parseEventTimes(e.date, e.time);
-            return eTimes && eTimes.start < times.end && eTimes.end > times.start && e.id < event.id;
-        })
-        .reduce((acc, curr) => acc + (100 / (eventsForDate.filter(ev => {
-            const evTimes = parseEventTimes(ev.date, ev.time);
-            return evTimes && evTimes.start < parseEventTimes(curr.date, curr.time)!.end && evTimes.end > parseEventTimes(curr.date, curr.time)!.start;
-        }).length +1 ) ), 0);
+      
+    const widthPercentage = 98 / numberOfOverlapping; // 98% to leave small gaps
+    const leftPercentage = eventIndexAmongConcurrent * (widthPercentage + (2 / numberOfOverlapping));
 
 
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 15)}px`, // Minimum height for visibility
-      left: `${concurrentStartIndex * (100 / (numberOfOverlapping +1))}%`, // Simple staggering
-      width: `${100 / (numberOfOverlapping +1) - 2}%`, // Adjust width based on overlaps, with a small gap
+      height: `${Math.max(height, 20)}px`, // Minimum height for visibility and basic text
+      left: `${leftPercentage}%`,
+      width: `${widthPercentage}%`, 
       zIndex: startMinute + 10, // Basic z-indexing
       overflow: 'hidden',
     };
@@ -150,14 +126,19 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
               key={event.id}
               style={getEventStyle(event)}
               className={cn(
-                "absolute rounded-md p-2 border transition-all duration-150 ease-in-out shadow-md",
+                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between", // Added flex for content spacing
                 getPriorityColor(event.priority)
               )}
-              title={`${event.name} (${event.time})`}
+              title={`${event.name} (${event.time}) - Project: ${event.project}`}
             >
-              <p className="text-xs font-semibold truncate">{event.name}</p>
-              <p className="text-xs truncate opacity-80">{event.time}</p>
-               {/* <p className="text-[10px] truncate opacity-60">{event.project}</p> */}
+              <div>
+                <p className="text-xs font-semibold truncate leading-tight">{event.name}</p>
+                <p className="text-[10px] truncate opacity-80 leading-tight">{event.time}</p>
+              </div>
+              <div className="mt-0.5">
+                {event.project && <p className="text-[10px] truncate opacity-70 leading-tight">Proj: {event.project}</p>}
+                <p className="text-[10px] truncate opacity-70 leading-tight">Contact: J. Doe (Ex.)</p>
+              </div>
             </div>
           ))}
         </div>
@@ -165,6 +146,3 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
     </div>
   );
 }
-
-
-    
