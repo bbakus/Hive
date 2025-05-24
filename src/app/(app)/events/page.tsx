@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -102,13 +102,13 @@ export default function EventsPage() {
     } else {
       reset({ // Reset to default values for adding new event
         name: "",
-        projectId: selectedProject?.id || "", // Pre-select current project if available
+        projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""), // Pre-select current project or first project
         date: format(new Date(), "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
       });
     }
-  }, [editingEvent, reset, isEventModalOpen, selectedProject]);
+  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects]);
 
 
   const filteredEvents = useMemo(() => {
@@ -150,17 +150,27 @@ export default function EventsPage() {
   
   const openAddEventModal = () => {
     setEditingEvent(null);
+    // Reset form to defaults, pre-selecting current project if available
+    reset({
+      name: "",
+      projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
+      date: format(new Date(), "yyyy-MM-dd"),
+      time: "09:00 - 17:00",
+      priority: "Medium",
+    });
     setIsEventModalOpen(true);
   };
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
+    // Form reset with event data is handled by useEffect
     setIsEventModalOpen(true);
   };
 
   const closeEventModal = () => {
     setIsEventModalOpen(false);
     setEditingEvent(null);
+    // Form reset to defaults for "add" mode is handled by useEffect
   };
 
   const handleDeleteClick = (eventId: string) => {
@@ -175,6 +185,7 @@ export default function EventsPage() {
       toast({
         title: "Event Deleted",
         description: `Event "${event?.name}" has been deleted.`,
+        variant: "destructive"
       });
       setEventToDeleteId(null);
     }
@@ -222,7 +233,11 @@ export default function EventsPage() {
                   name="projectId"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      value={field.value} // Ensure value is controlled
+                      defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))} // Ensure a default if field.value is empty initially
+                    >
                       <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select project" />
                       </SelectTrigger>
@@ -332,7 +347,7 @@ export default function EventsPage() {
                     <TableCell>
                       <Badge variant={
                         event.priority === "Critical" ? "destructive" :
-                        event.priority === "High" ? "secondary" : // Adjusted for more visual distinction
+                        event.priority === "High" ? "secondary" : 
                         event.priority === "Medium" ? "outline" : "default"
                       }>{event.priority}</Badge>
                     </TableCell>
