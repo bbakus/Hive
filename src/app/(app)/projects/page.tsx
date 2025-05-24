@@ -25,13 +25,7 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock data - initial set
-const initialProjects = [
-  { id: "proj001", name: "Summer Music Festival 2024", startDate: "2024-06-01", endDate: "2024-08-31", status: "In Progress", description: "Annual summer music festival featuring diverse artists." },
-  { id: "proj002", name: "Tech Conference X", startDate: "2024-09-15", endDate: "2024-09-17", status: "Planning", description: "Major technology conference showcasing new innovations." },
-  { id: "proj003", name: "Corporate Gala Dinner", startDate: "2024-11-05", endDate: "2024-11-05", status: "Completed", description: "Annual corporate fundraising gala." },
-];
+import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 
 const projectSchema = z.object({
   name: z.string().min(3, { message: "Project name must be at least 3 characters." }),
@@ -43,10 +37,10 @@ const projectSchema = z.object({
 
 type ProjectFormData = z.infer<typeof projectSchema>;
 
-export type Project = ProjectFormData & { id: string };
+// Project type is now imported from ProjectContext
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const { projects, addProject } = useProjectContext(); // Use projects and addProject from context
   const [isAddProjectDialogOpen, setIsAddProjectDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -67,12 +61,8 @@ export default function ProjectsPage() {
     },
   });
 
-  const handleAddProject: SubmitHandler<ProjectFormData> = (data) => {
-    const newProject: Project = {
-      ...data,
-      id: `proj${String(projects.length + 1).padStart(3, '0')}`, // Simple ID generation
-    };
-    setProjects((prevProjects) => [...prevProjects, newProject]);
+  const handleAddProjectSubmit: SubmitHandler<ProjectFormData> = (data) => {
+    addProject(data); // Call addProject from context
     toast({
       title: "Project Added",
       description: `"${data.name}" has been successfully added.`,
@@ -102,7 +92,7 @@ export default function ProjectsPage() {
                 Fill in the details below to create a new project.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit(handleAddProject)} className="grid gap-4 py-4">
+            <form onSubmit={handleSubmit(handleAddProjectSubmit)} className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Name</Label>
                 <div className="col-span-3">
@@ -192,10 +182,10 @@ export default function ProjectsPage() {
                       <Badge variant={
                         project.status === "In Progress" ? "secondary" :
                         project.status === "Planning" ? "outline" :
-                        project.status === "Completed" ? "default" : 
-                        project.status === "On Hold" ? "outline" : // Added for On Hold
-                        project.status === "Cancelled" ? "destructive" : // Added for Cancelled
-                        "destructive" // Default for any other unmapped status
+                        project.status === "Completed" ? "default" :
+                        project.status === "On Hold" ? "outline" :
+                        project.status === "Cancelled" ? "destructive" :
+                        "destructive"
                       }>{project.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -233,5 +223,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
-    
