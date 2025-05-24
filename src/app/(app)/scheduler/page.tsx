@@ -134,6 +134,7 @@ const parseScheduleString = (scheduleString: string, eventsToday: Event[]): Pars
 export default function SchedulerPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { selectedProjectId, selectedProject } = useProjectContext();
+  const { toast } = useToast();
 
   const [selectedDateString, setSelectedDateString] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
@@ -169,8 +170,8 @@ export default function SchedulerPage() {
       setProjectEventDates(uniqueDates);
       
       if (uniqueDates.length > 0) {
-        // Only update selectedDateString if it's not already a valid date for the current project
-        // or if it's undefined. This prevents resetting the date selection when project doesn't change.
+         // Only update selectedDateString if it's not already a valid date for the current project
+        // or if it's undefined or the current selectedDateString isn't in the new uniqueDates.
         if (!selectedDateString || !uniqueDates.includes(selectedDateString)) {
             setSelectedDateString(uniqueDates[0]);
         }
@@ -195,7 +196,7 @@ export default function SchedulerPage() {
       setSelectedPersonnelNames([]);
       setEventsForSelectedDate([]);
     }
-  }, [selectedProjectId, useDemoData, isLoadingSettings]); // Removed selectedDateString from deps here to avoid re-triggering loop
+  }, [selectedProjectId, useDemoData, isLoadingSettings, selectedDateString]); 
 
   useEffect(() => {
     if (selectedDateString && selectedProjectId && useDemoData) {
@@ -330,12 +331,12 @@ export default function SchedulerPage() {
               <div>
                 <Label htmlFor="location">Location (Optional)</Label>
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" disabled={isSchedulerDisabled} />
-                 <p className="text-xs text-muted-foreground mt-1">Specify a general event area if it has distinct scheduling implications (e.g., "Conference Center West Wing"). Specific sub-locations for events within the project should be part of their names or detailed in 'Additional Criteria'.</p>
+                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing") if it has distinct scheduling implications. Specific sub-locations or venue names from events in the selected project can be referenced in 'Additional Criteria' for more granular AI focus.</p>
               </div>
               <div>
                 <Label htmlFor="eventType">Event Type (Optional)</Label>
                 <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Music Festival Day 1, Conference Keynotes" disabled={isSchedulerDisabled}/>
-                <p className="text-xs text-muted-foreground mt-1">Optional. Providing context (e.g., "Concert Setup Phase", "Wedding Reception Coverage") helps the AI understand typical activities and phases. If scheduling for multiple distinct events on the same day, ensure they are clearly named in 'Additional Criteria' if not covered by a general Event Type.</p>
+                <p className="text-xs text-muted-foreground mt-1">Optional. Providing context (e.g., "Concert - Main Performances", "Wedding Reception Coverage", "Tech Expo - Booth Setup") helps the AI understand typical activities and phases. Be descriptive for best results.</p>
               </div>
             </div>
 
@@ -365,7 +366,7 @@ export default function SchedulerPage() {
                     </p>
                   </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">Personnel list is populated based on assignments in the selected project's events. Select all relevant team members.</p>
+              <p className="text-xs text-muted-foreground mt-1">Personnel list is dynamically populated based on assignments in the selected project's events. Select all relevant team members.</p>
             </div>
             
             <div className="md:col-span-2 space-y-2">
@@ -382,7 +383,7 @@ export default function SchedulerPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading || isSchedulerDisabled || selectedPersonnelNames.length === 0 || !selectedDateString}>
+            <Button type="submit" disabled={isLoading || isSchedulerDisabled || selectedPersonnelNames.length === 0 || !selectedDateString }>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Generate Schedule
             </Button>
@@ -398,7 +399,7 @@ export default function SchedulerPage() {
               <CardDescription>
                 For {selectedProject?.name || "Selected Project"}, {selectedDateString ? format(parseISO(selectedDateString), "PPP") : "the selected date"}
                 {location.trim() ? ` at ${location.trim()}` : ""}
-                {eventType.trim() ? `. Event Type: ${eventType}` : ""}
+                {eventType.trim() ? `. Type: ${eventType}` : ""}
                 . Personnel: {selectedPersonnelNames.join(", ") || "N/A"}.
               </CardDescription>
             </div>
