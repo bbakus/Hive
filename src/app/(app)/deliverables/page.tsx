@@ -7,67 +7,132 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea"; // Textarea not used directly in AI form now
 import { Label } from "@/components/ui/label";
-import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2 } from "lucide-react";
-import { generateDeliverableSummary, type DeliverableSummaryInput, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
+import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, CalendarIcon } from "lucide-react";
+import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectContext } from "@/contexts/ProjectContext";
+import { useProjectContext, type Project } from "@/contexts/ProjectContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format, parseISO } from "date-fns";
+import { cn } from "@/lib/utils";
 
-// Updated Mock data with projectName
-const allDeliverables = [
-  { id: "del001", name: "Highlight Reel - Day 1", event: "Main Stage - Day 1", dueDate: "2024-07-16", status: "In Progress", type: "Video", projectName: "Summer Music Festival 2024" },
-  { id: "del002", name: "Keynote Recording", event: "Keynote Speech", dueDate: "2024-09-15", status: "Pending", type: "Video", projectName: "Tech Conference X" },
-  { id: "del003", name: "Photo Album", event: "VIP Reception", dueDate: "2024-11-06", status: "Completed", type: "Images", projectName: "Corporate Gala Dinner" },
-  { id: "del004", name: "Full Event Recap", event: "Summer Music Festival 2024", dueDate: "2024-09-15", status: "Blocked", type: "Report/Video", projectName: "Summer Music Festival 2024" },
-  { id: "del005", name: "Sizzle Reel - Tech", event: "Tech Conference X", dueDate: "2024-09-20", status: "In Progress", type: "Video", projectName: "Tech Conference X" },
+// Deliverable Schema
+const deliverableSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters."),
+  event: z.string().min(3, "Event name must be at least 3 characters."),
+  projectId: z.string().min(1, "Please select a project."),
+  dueDate: z.date({ required_error: "Due date is required." }),
+  status: z.enum(["Pending", "In Progress", "Completed", "Blocked"]),
+  type: z.string().min(2, "Type must be at least 2 characters."),
+});
+
+type DeliverableFormData = z.infer<typeof deliverableSchema>;
+
+export type Deliverable = DeliverableFormData & {
+  id: string;
+  projectName: string; // Denormalized for easy filtering/display
+};
+
+// Initial Mock data - will be managed by state now
+const initialDeliverables: Deliverable[] = [
+  { id: "del001", name: "Highlight Reel - Day 1", event: "Main Stage - Day 1", dueDate: parseISO("2024-07-16"), status: "In Progress", type: "Video", projectName: "Summer Music Festival 2024", projectId: "proj001" },
+  { id: "del002", name: "Keynote Recording", event: "Keynote Speech", dueDate: parseISO("2024-09-15"), status: "Pending", type: "Video", projectName: "Tech Conference X", projectId: "proj002" },
+  { id: "del003", name: "Photo Album", event: "VIP Reception", dueDate: parseISO("2024-11-06"), status: "Completed", type: "Images", projectName: "Corporate Gala Dinner", projectId: "proj003" },
+  { id: "del004", name: "Full Event Recap", event: "Summer Music Festival 2024", dueDate: parseISO("2024-09-15"), status: "Blocked", type: "Report/Video", projectName: "Summer Music Festival 2024", projectId: "proj001" },
+  { id: "del005", name: "Sizzle Reel - Tech", event: "Tech Conference X", dueDate: parseISO("2024-09-20"), status: "In Progress", type: "Video", projectName: "Tech Conference X", projectId: "proj002" },
 ];
 
 export default function DeliverablesPage() {
-  const { selectedProject } = useProjectContext();
+  const { selectedProject, projects: allProjectsFromContext } = useProjectContext();
+  const [deliverablesList, setDeliverablesList] = useState<Deliverable[]>(initialDeliverables);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [summaryResult, setSummaryResult] = useState<DeliverableSummaryOutput | null>(null);
   const [eventNameForSummary, setEventNameForSummary] = useState("All Projects");
+  const [isAddDeliverableDialogOpen, setIsAddDeliverableDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const deliverables = useMemo(() => {
+  const {
+    register: registerDeliverable,
+    handleSubmit: handleSubmitDeliverable,
+    reset: resetDeliverableForm,
+    control: controlDeliverable,
+    formState: { errors: deliverableErrors },
+  } = useForm<DeliverableFormData>({
+    resolver: zodResolver(deliverableSchema),
+    defaultValues: {
+      name: "",
+      event: "",
+      projectId: "",
+      dueDate: new Date(),
+      status: "Pending",
+      type: "",
+    },
+  });
+
+  const filteredDeliverables = useMemo(() => {
     if (!selectedProject) {
-      return allDeliverables; // Show all if no project selected
+      return deliverablesList; // Show all if no project selected
     }
-    return allDeliverables.filter(d => d.projectName === selectedProject.name);
-  }, [selectedProject]);
+    return deliverablesList.filter(d => d.projectName === selectedProject.name);
+  }, [selectedProject, deliverablesList]);
   
-  // Update eventNameForSummary when selectedProject changes
   useEffect(() => {
     if (selectedProject) {
       setEventNameForSummary(selectedProject.name);
     } else {
       setEventNameForSummary("All Projects");
     }
-    setSummaryResult(null); // Clear previous summary when project changes
+    setSummaryResult(null); 
   }, [selectedProject]);
 
+  const handleAddDeliverableSubmit: SubmitHandler<DeliverableFormData> = (data) => {
+    const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
+    const newDeliverable: Deliverable = {
+      ...data,
+      id: `del${String(deliverablesList.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+      projectName: selectedProjInfo?.name || "Unknown Project",
+    };
+    setDeliverablesList((prevList) => [...prevList, newDeliverable]);
+    toast({
+      title: "Deliverable Added",
+      description: `"${data.name}" has been successfully added.`,
+    });
+    resetDeliverableForm();
+    setIsAddDeliverableDialogOpen(false);
+  };
 
   const handleGenerateSummary = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoadingSummary(true);
     setSummaryResult(null);
 
-    // Use the filtered deliverables for the summary context
-    const deliverablesToSummarize = selectedProject 
-      ? allDeliverables.filter(d => d.projectName === selectedProject.name) 
-      : allDeliverables;
-
-    const deliverablesData = JSON.stringify(deliverablesToSummarize.map(d => ({
+    // Use the currently filtered deliverables for the summary
+    const deliverablesData = JSON.stringify(filteredDeliverables.map(d => ({
         name: d.name,
         status: d.status,
-        dueDate: d.dueDate,
-        event: d.event, // Include event for better context in summary
+        dueDate: format(d.dueDate, "yyyy-MM-dd"),
+        event: d.event,
+        project: d.projectName,
     })));
 
     try {
       const result = await generateDeliverableSummary({
-        eventOrProjectName: eventNameForSummary, // This is now aligned with selectedProject or "All Projects"
+        eventOrProjectName: eventNameForSummary,
         deliverablesData: deliverablesData,
       });
       setSummaryResult(result);
@@ -96,7 +161,130 @@ export default function DeliverablesPage() {
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
           </p>
         </div>
-        {/* Button to add new deliverable could be here */}
+        <Dialog open={isAddDeliverableDialogOpen} onOpenChange={setIsAddDeliverableDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Add New Deliverable
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[525px]">
+            <DialogHeader>
+              <DialogTitle>Add New Deliverable</DialogTitle>
+              <DialogDescription>
+                Fill in the details for the new deliverable.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitDeliverable(handleAddDeliverableSubmit)} className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliverable-name" className="text-right">Name</Label>
+                <div className="col-span-3">
+                  <Input id="deliverable-name" {...registerDeliverable("name")} className={deliverableErrors.name ? "border-destructive" : ""} />
+                  {deliverableErrors.name && <p className="text-xs text-destructive mt-1">{deliverableErrors.name.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliverable-event" className="text-right">Event</Label>
+                <div className="col-span-3">
+                  <Input id="deliverable-event" {...registerDeliverable("event")} className={deliverableErrors.event ? "border-destructive" : ""} />
+                  {deliverableErrors.event && <p className="text-xs text-destructive mt-1">{deliverableErrors.event.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliverable-project" className="text-right">Project</Label>
+                <div className="col-span-3">
+                  <Controller
+                    name="projectId"
+                    control={controlDeliverable}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <SelectTrigger className={deliverableErrors.projectId ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allProjectsFromContext.map((proj) => (
+                            <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {deliverableErrors.projectId && <p className="text-xs text-destructive mt-1">{deliverableErrors.projectId.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliverable-dueDate" className="text-right">Due Date</Label>
+                <div className="col-span-3">
+                  <Controller
+                    name="dueDate"
+                    control={controlDeliverable}
+                    render={({ field }) => (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                              deliverableErrors.dueDate ? "border-destructive" : ""
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  />
+                  {deliverableErrors.dueDate && <p className="text-xs text-destructive mt-1">{deliverableErrors.dueDate.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliverable-status" className="text-right">Status</Label>
+                <div className="col-span-3">
+                  <Controller
+                    name="status"
+                    control={controlDeliverable}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <SelectTrigger className={deliverableErrors.status ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["Pending", "In Progress", "Completed", "Blocked"].map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                   {deliverableErrors.status && <p className="text-xs text-destructive mt-1">{deliverableErrors.status.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="deliverable-type" className="text-right">Type</Label>
+                <div className="col-span-3">
+                  <Input id="deliverable-type" {...registerDeliverable("type")} placeholder="e.g., Video, Images, Report" className={deliverableErrors.type ? "border-destructive" : ""} />
+                  {deliverableErrors.type && <p className="text-xs text-destructive mt-1">{deliverableErrors.type.message}</p>}
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button type="submit">Add Deliverable</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card className="shadow-lg">
@@ -104,10 +292,11 @@ export default function DeliverablesPage() {
           <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6 text-accent" /> Deliverables List</CardTitle>
           <CardDescription>
             {selectedProject ? `Deliverables associated with ${selectedProject.name}.` : "Centralized list of all project deliverables."}
+            ({filteredDeliverables.length} items)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {deliverables.length > 0 ? (
+          {filteredDeliverables.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -121,12 +310,12 @@ export default function DeliverablesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {deliverables.map((item) => (
+                {filteredDeliverables.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>{item.event}</TableCell>
                     {!selectedProject && <TableCell>{item.projectName}</TableCell>}
-                    <TableCell>{item.dueDate}</TableCell>
+                    <TableCell>{format(item.dueDate, "yyyy-MM-dd")}</TableCell>
                     <TableCell>
                       <Badge variant={
                         item.status === "In Progress" ? "secondary" :
@@ -137,15 +326,15 @@ export default function DeliverablesPage() {
                     </TableCell>
                     <TableCell>{item.type}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent">
+                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
                         <UploadCloud className="h-4 w-4" />
                         <span className="sr-only">Upload</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent">
+                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive">
+                      <Button variant="ghost" size="icon" className="hover:text-destructive" disabled>
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>
                       </Button>
@@ -174,7 +363,7 @@ export default function DeliverablesPage() {
               <Input 
                 id="eventNameSummary" 
                 value={eventNameForSummary}
-                readOnly // Value is now controlled by project context
+                readOnly 
                 className="bg-muted/50"
               />
               <p className="text-xs text-muted-foreground mt-1">Summary will be generated for the currently selected project (or all projects if "All Projects" is chosen).</p>
@@ -182,7 +371,7 @@ export default function DeliverablesPage() {
             <p className="text-sm text-muted-foreground">Using current deliverable data for the specified scope to generate summary.</p>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoadingSummary || deliverables.length === 0}>
+            <Button type="submit" disabled={isLoadingSummary || filteredDeliverables.length === 0}>
               {isLoadingSummary ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Generate Summary
             </Button>
@@ -202,3 +391,6 @@ export default function DeliverablesPage() {
     </div>
   );
 }
+
+
+    
