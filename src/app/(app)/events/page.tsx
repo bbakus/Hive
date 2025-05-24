@@ -79,17 +79,6 @@ export type Event = EventFormData & {
   hasOverlap?: boolean; 
 };
 
-const initialEvents: Event[] = [
-  { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20, assignedPersonnelIds: ["user001", "user002"] },
-  { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5, assignedPersonnelIds: ["user003"] },
-  { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", projectId: "proj003", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3 },
-  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10, assignedPersonnelIds: ["user001"] },
-  { id: "evt005", name: "Closing Ceremony", project: "Tech Conference X", projectId: "proj002", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8 },
-  { id: "evt006", name: "Sound Check", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "12:00 - 13:30", priority: "Medium", deliverables: 0, shotRequests: 2, assignedPersonnelIds: ["user002"] },
-  { id: "evt007", name: "Team Briefing AM", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "09:00 - 09:30", priority: "High", deliverables: 0, shotRequests: 1, assignedPersonnelIds: ["user003", "user001"] },
-  { id: "evt008", name: "Tech Rehearsal", project: "Tech Conference X", projectId: "proj002", date: "2024-09-14", time: "14:00 - 17:00", priority: "High", deliverables: 0, shotRequests: 3 },
-];
-
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   const baseDate = parseISO(dateStr);
   if (!isValid(baseDate)) return null;
@@ -130,7 +119,7 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
 
 export default function EventsPage() {
   const { selectedProject, projects: allProjects } = useProjectContext();
-  const [events, setEvents] = useState<Event[]>(initialEvents);
+  const [events, setEvents] = useState<Event[]>([]); // Initialize with empty array
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

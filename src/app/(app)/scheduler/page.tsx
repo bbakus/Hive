@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type FormEvent } from "react";
@@ -8,11 +9,97 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Cpu, Wand2, Loader2 } from "lucide-react";
+import { CalendarIcon, Cpu, Wand2, Loader2, Printer, Info } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { generateSchedule, type GenerateScheduleInput, type GenerateScheduleOutput } from "@/ai/flows/smart-schedule-generator";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+interface ParsedScheduleItem {
+  time: string;
+  task: string;
+}
+
+interface ParsedSchedulePerson {
+  name: string;
+  items: ParsedScheduleItem[];
+}
+
+type ParsedSchedule = ParsedSchedulePerson[];
+
+// Helper function to parse the schedule string
+const parseScheduleString = (scheduleString: string): ParsedSchedule => {
+  const parsed: ParsedSchedule = [];
+  if (!scheduleString) return parsed;
+
+  const lines = scheduleString.split('\n').filter(line => line.trim() !== '');
+  let currentPerson: ParsedSchedulePerson | null = null;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    // Check if the line looks like a person's name (ends with a colon or is followed by indented lines)
+    // This regex tries to capture names like "Personnel:" or "Alice:"
+    const personMatch = trimmedLine.match(/^([\w\s]+):$/i);
+    
+    if (personMatch) {
+      if (currentPerson) {
+        // Before starting a new person, push the old one if they have items
+        if (currentPerson.items.length > 0) {
+          parsed.push(currentPerson);
+        }
+      }
+      currentPerson = { name: personMatch[1].trim(), items: [] };
+    } else if (currentPerson) {
+      // This regex looks for a time pattern like "HH:MM - HH:MM:" or "HH:MM:" followed by a task
+      const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i);
+      if (itemMatch) {
+        currentPerson.items.push({ time: itemMatch[1].trim(), task: itemMatch[2].trim() });
+      } else if (trimmedLine) { 
+        // If it doesn't match the time pattern but there's text, add as a general task for the current person
+        // This handles cases where tasks might not have a strict time prefix
+        // To avoid adding sub-items of tasks, check indentation or add a simple heuristic
+        if (!line.startsWith("  ") && !line.startsWith("\t")) { // Basic check for non-indented lines
+            if (currentPerson.items.length > 0) {
+                 // Append to the last task if it seems like a continuation
+                const lastItem = currentPerson.items[currentPerson.items.length -1];
+                if (!lastItem.task.includes(trimmedLine)) { // Avoid duplicates
+                    lastItem.task += ` (${trimmedLine})`; 
+                }
+            } else {
+                 currentPerson.items.push({ time: "General", task: trimmedLine });
+            }
+        }
+      }
+    } else if (trimmedLine && !parsed.length && !currentPerson) {
+        // Handle case where the schedule might start with tasks without a person explicitly named first
+        // Or if the first line is a general title that isn't a person.
+        // For now, we'll create a "General Schedule" person for these.
+        currentPerson = { name: "General Schedule Tasks", items: [] };
+        const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i);
+        if (itemMatch) {
+            currentPerson.items.push({ time: itemMatch[1].trim(), task: itemMatch[2].trim() });
+        } else {
+            currentPerson.items.push({ time: "Task", task: trimmedLine });
+        }
+    }
+  }
+
+  if (currentPerson && currentPerson.items.length > 0) {
+    parsed.push(currentPerson);
+  }
+  
+  // If parsing fails to produce distinct persons, return the whole string under a general title
+  if (parsed.length === 0 && scheduleString.trim()) {
+    return [{
+        name: "Generated Schedule",
+        items: scheduleString.split('\n').filter(line => line.trim() !== '').map(line => ({ time: "Details", task: line.trim() }))
+    }];
+  }
+
+  return parsed;
+};
+
 
 export default function SchedulerPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -23,6 +110,7 @@ export default function SchedulerPage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [scheduleOutput, setScheduleOutput] = useState<GenerateScheduleOutput | null>(null);
+  const [parsedSchedule, setParsedSchedule] = useState<ParsedSchedule>([]);
   const { toast } = useToast();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -33,6 +121,7 @@ export default function SchedulerPage() {
     }
     setIsLoading(true);
     setScheduleOutput(null);
+    setParsedSchedule([]);
 
     const input: GenerateScheduleInput = {
       date: format(date, "yyyy-MM-dd"),
@@ -45,6 +134,9 @@ export default function SchedulerPage() {
     try {
       const result = await generateSchedule(input);
       setScheduleOutput(result);
+      if (result.schedule) {
+        setParsedSchedule(parseScheduleString(result.schedule));
+      }
       toast({
         title: "Schedule Generated",
         description: "The smart schedule has been successfully generated.",
@@ -59,6 +151,10 @@ export default function SchedulerPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -139,17 +235,58 @@ export default function SchedulerPage() {
       </Card>
 
       {scheduleOutput && (
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Generated Schedule</CardTitle>
-            <CardDescription>
-              For {scheduleOutput.schedule ? format(date!, "PPP") : "the selected date"} at {location}
-            </CardDescription>
+        <Card className="shadow-lg" id="schedule-preview">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Formatted Schedule Preview</CardTitle>
+              <CardDescription>
+                For {date ? format(date, "PPP") : "the selected date"} at {location}.
+              </CardDescription>
+            </div>
+            <Button onClick={handlePrint} variant="outline">
+              <Printer className="mr-2 h-4 w-4" />
+              Print / Export to PDF
+            </Button>
           </CardHeader>
-          <CardContent>
-            <pre className="p-4 bg-muted/50 rounded-md whitespace-pre-wrap text-sm max-h-96 overflow-auto">
-              {scheduleOutput.schedule}
-            </pre>
+          <CardContent className="space-y-6">
+            {parsedSchedule.length > 0 ? (
+              parsedSchedule.map((person, pIndex) => (
+                <Card key={`person-${pIndex}`} className="bg-muted/30">
+                  <CardHeader>
+                    <CardTitle className="text-lg">{person.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {person.items.length > 0 ? (
+                      <ul className="space-y-2">
+                        {person.items.map((item, iIndex) => (
+                          <li key={`item-${pIndex}-${iIndex}`} className="flex flex-col sm:flex-row text-sm">
+                            <span className="font-semibold sm:w-48 shrink-0">{item.time}:</span>
+                            <span className="sm:ml-2">{item.task}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No specific tasks listed for {person.name}.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <p className="text-muted-foreground">Could not parse the schedule into a structured format. Displaying raw output:</p>
+            )}
+            {parsedSchedule.length === 0 && scheduleOutput.schedule && (
+                 <pre className="p-4 bg-muted/50 rounded-md whitespace-pre-wrap text-sm max-h-96 overflow-auto">
+                    {scheduleOutput.schedule}
+                </pre>
+            )}
+
+            <Alert variant="default" className="mt-6">
+              <Info className="h-4 w-4" />
+              <AlertTitle>Exporting Schedule</AlertTitle>
+              <AlertDescription>
+                To export this schedule as a PDF, please use your browser's "Print" function (Ctrl/Cmd + P) and choose "Save as PDF" as the destination.
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
       )}
