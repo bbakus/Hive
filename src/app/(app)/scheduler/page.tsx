@@ -17,8 +17,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useProjectContext, type Project } from "@/contexts/ProjectContext";
-import type { Event } from "@/app/(app)/events/page"; // Re-using Event type for structure
+import { useProjectContext } from "@/contexts/ProjectContext";
+import type { Event } from "@/app/(app)/events/page"; 
 
 // Mock data - In a real app, this would come from a global store or API
 // Duplicating relevant mock data for now to make scheduler page self-contained for filtering
@@ -55,7 +55,6 @@ interface ParsedSchedulePerson {
 type ParsedSchedule = ParsedSchedulePerson[];
 
 const parseScheduleString = (scheduleString: string): ParsedSchedule => {
-  // ... (parser remains the same)
   const parsed: ParsedSchedule = [];
   if (!scheduleString) return parsed;
 
@@ -121,7 +120,7 @@ export default function SchedulerPage() {
   const [selectedDateString, setSelectedDateString] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
   const [selectedPersonnelNames, setSelectedPersonnelNames] = useState<string[]>([]);
-  const [eventType, setEventType] = useState("Concert");
+  const [eventType, setEventType] = useState("Concert"); // Default, can be changed by user
   const [additionalCriteria, setAdditionalCriteria] = useState("Ensure regular breaks for all personnel. Prioritize main stage coverage.");
   
   const [isLoading, setIsLoading] = useState(false);
@@ -134,12 +133,12 @@ export default function SchedulerPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // This effect populates dynamic dropdowns based on selected project
     if (isLoadingSettings || !useDemoData) {
       setProjectEventDates([]);
       setProjectPersonnel([]);
       setSelectedDateString(undefined);
       setSelectedPersonnelNames([]);
+      if (!useDemoData) setEventType(""); // Clear event type if demo data is off
       return;
     }
 
@@ -147,12 +146,15 @@ export default function SchedulerPage() {
       const eventsForProject = initialEventsMockForScheduler.filter(event => event.projectId === selectedProjectId);
       const uniqueDates = Array.from(new Set(eventsForProject.map(event => event.date))).sort();
       setProjectEventDates(uniqueDates);
-      if (uniqueDates.length > 0 && !uniqueDates.includes(selectedDateString!)) {
-         setSelectedDateString(uniqueDates[0]); // Default to first available date
-      } else if (uniqueDates.length === 0) {
-        setSelectedDateString(undefined);
+      
+      if (uniqueDates.length > 0) {
+        // If current selectedDateString is not in new uniqueDates, or undefined, set to first uniqueDate
+        if (!selectedDateString || !uniqueDates.includes(selectedDateString)) {
+            setSelectedDateString(uniqueDates[0]);
+        }
+      } else {
+        setSelectedDateString(undefined); // No dates for this project
       }
-
 
       const personnelIdsInProject = new Set<string>();
       eventsForProject.forEach(event => {
@@ -161,16 +163,15 @@ export default function SchedulerPage() {
       
       const filteredPersonnel = allAvailablePersonnelMockForScheduler.filter(p => personnelIdsInProject.has(p.id));
       setProjectPersonnel(filteredPersonnel);
-      // Filter selectedPersonnelNames to only include those available in the current project
       setSelectedPersonnelNames(prev => prev.filter(name => filteredPersonnel.some(p => p.name === name)));
 
-    } else {
+    } else { // No project selected
       setProjectEventDates([]);
       setProjectPersonnel([]);
       setSelectedDateString(undefined);
       setSelectedPersonnelNames([]);
     }
-  }, [selectedProjectId, useDemoData, isLoadingSettings]);
+  }, [selectedProjectId, useDemoData, isLoadingSettings, selectedDateString]); // added selectedDateString
 
 
   const handlePersonnelChange = (personnelName: string, checked: boolean) => {
@@ -187,6 +188,10 @@ export default function SchedulerPage() {
     }
     if (selectedPersonnelNames.length === 0) {
       toast({ title: "Error", description: "Please select at least one personnel member.", variant: "destructive" });
+      return;
+    }
+    if (!eventType.trim()) {
+      toast({ title: "Error", description: "Please specify an Event Type for context.", variant: "destructive" });
       return;
     }
     if (!selectedProject) {
@@ -276,10 +281,10 @@ export default function SchedulerPage() {
                 <Select 
                   value={selectedDateString} 
                   onValueChange={setSelectedDateString}
-                  disabled={projectEventDates.length === 0}
+                  disabled={projectEventDates.length === 0 || isSchedulerDisabled}
                 >
                   <SelectTrigger id="date-select">
-                    <SelectValue placeholder={projectEventDates.length > 0 ? "Select a date" : "No event dates for project"} />
+                    <SelectValue placeholder={projectEventDates.length > 0 ? "Select a date" : (selectedProject ? "No event dates for project" : "Select a project first")} />
                   </SelectTrigger>
                   <SelectContent>
                     {projectEventDates.map(dateStr => (
@@ -289,23 +294,23 @@ export default function SchedulerPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Dates are filtered based on events scheduled for the selected project.</p>
+                <p className="text-xs text-muted-foreground mt-1">Dates are dynamically populated based on events scheduled for the selected project. Choose a relevant date.</p>
               </div>
               <div>
                 <Label htmlFor="location">Location (Optional)</Label>
-                <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" />
-                 <p className="text-xs text-muted-foreground mt-1">General event area if it has specific scheduling implications. Default location context is often derived from the event name for the selected date.</p>
+                <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" disabled={isSchedulerDisabled} />
+                 <p className="text-xs text-muted-foreground mt-1">Specify a general event area if it has distinct scheduling implications (e.g., "Conference Center West Wing", "Outdoor Festival Area"). Detailed locations can be in 'Additional Criteria'.</p>
               </div>
               <div>
-                <Label htmlFor="eventType">Event Type</Label>
-                <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Conference, Wedding, Music Festival" />
-                <p className="text-xs text-muted-foreground mt-1">Helps AI understand typical phases and tasks (e.g., "Concert", "Photoshoot", "Conference Keynote").</p>
+                <Label htmlFor="eventType">Event Type <span className="text-destructive">*</span></Label>
+                <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Concert, Conference, Photoshoot" disabled={isSchedulerDisabled}/>
+                <p className="text-xs text-muted-foreground mt-1">Crucial for AI context. Be descriptive (e.g., "Music Festival Main Day", "Corporate Product Launch", "Wedding Ceremony & Reception"). This helps the AI understand typical phases and tasks.</p>
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Select Personnel <span className="text-destructive">*</span></Label>
-              {projectPersonnel.length > 0 ? (
+              {projectPersonnel.length > 0 && !isSchedulerDisabled ? (
                 <ScrollArea className="h-48 w-full rounded-md border p-4">
                   <div className="space-y-2">
                     {projectPersonnel.map((person) => (
@@ -323,13 +328,13 @@ export default function SchedulerPage() {
                   </div>
                 </ScrollArea>
               ) : (
-                 <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-24 flex items-center justify-center">
-                    <p>
-                      {selectedProject ? "No personnel assigned to events in this project, or demo data is disabled." : "Select a project to see available personnel."}
+                 <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-24 flex items-center justify-center bg-muted/50">
+                    <p className="text-center">
+                      {isSchedulerDisabled ? (selectedProject ? "Enable demo data for personnel." : "Select a project to see personnel.") : "No personnel assigned to events in this project, or no personnel found."}
                     </p>
                   </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">Personnel list is filtered based on assignments in the selected project's events.</p>
+              <p className="text-xs text-muted-foreground mt-1">Personnel list is dynamically populated based on assignments in the selected project's events.</p>
             </div>
             
             <div className="md:col-span-2 space-y-2">
@@ -338,14 +343,15 @@ export default function SchedulerPage() {
                 id="additionalCriteria" 
                 value={additionalCriteria} 
                 onChange={(e) => setAdditionalCriteria(e.target.value)} 
-                placeholder="e.g., Specific break times, 'Alice to cover opening ceremony', equipment constraints, VIP presence. Be specific for best results." 
+                placeholder="e.g., 'Alice needs a 1-hour break around 1pm', 'Focus on capturing opening act', 'Bob is on setup crew from 8am-10am only', equipment constraints, VIP presence. Be specific for best results." 
                 rows={4}
+                disabled={isSchedulerDisabled}
               />
-                <p className="text-xs text-muted-foreground mt-1">List any must-have items or strict preferences. Crucial for tailoring the schedule (e.g., "Bob needs a 1-hour lunch break around 1 PM", "Focus on capturing X specific moments").</p>
+                <p className="text-xs text-muted-foreground mt-1">List any must-have items, strict preferences, or specific tasks that must be included. The AI will prioritize these.</p>
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading || isSchedulerDisabled || selectedPersonnelNames.length === 0 || !selectedDateString}>
+            <Button type="submit" disabled={isLoading || isSchedulerDisabled || selectedPersonnelNames.length === 0 || !selectedDateString || !eventType.trim()}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Generate Schedule
             </Button>
@@ -353,14 +359,14 @@ export default function SchedulerPage() {
         </form>
       </Card>
 
-      {scheduleOutput && (
+      {scheduleOutput && !isSchedulerDisabled && (
         <Card className="shadow-lg" id="schedule-preview">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Formatted Schedule Preview</CardTitle>
               <CardDescription>
                 For {selectedProject?.name || "Selected Project"}, {selectedDateString ? format(parseISO(selectedDateString), "PPP") : "the selected date"}
-                {location ? ` at ${location}` : ""}.
+                {location.trim() ? ` at ${location.trim()}` : ""}.
                 Event Type: {eventType}.
                 Personnel: {selectedPersonnelNames.join(", ") || "N/A"}.
               </CardDescription>
@@ -415,6 +421,5 @@ export default function SchedulerPage() {
     </div>
   );
 }
-
 
     
