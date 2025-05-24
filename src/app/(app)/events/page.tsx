@@ -40,13 +40,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-
+import { BlockScheduleView } from "@/components/block-schedule-view"; // Added import
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
   projectId: z.string().min(1, { message: "Please select a project." }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date must be YYYY-MM-DD." }),
-  time: z.string().regex(/^\d{2}:\d{2} - \d{2}:\d{2}$/, { message: "Time must be HH:MM - HH:MM." }), // Basic time range validation
+  time: z.string().regex(/^\d{2}:\d{2} - \d{2}:\d{2}$/, { message: "Time must be HH:MM - HH:MM." }),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
 });
 
@@ -59,18 +59,20 @@ export type Event = EventFormData & {
   shotRequests: number;
 };
 
-// Initial Mock data - will be managed by state now
 const initialEvents: Event[] = [
   { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20 },
   { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5 },
   { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", projectId: "proj003", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3 },
-  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10 }, // Overlaps with Main Stage Day 1
+  { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10 },
   { id: "evt005", name: "Closing Ceremony", project: "Tech Conference X", projectId: "proj002", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8 },
   { id: "evt006", name: "Sound Check", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "12:00 - 13:30", priority: "Medium", deliverables: 0, shotRequests: 2 },
+  { id: "evt007", name: "Team Briefing AM", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "09:00 - 09:30", priority: "High", deliverables: 0, shotRequests: 1 },
+  { id: "evt008", name: "Tech Rehearsal", project: "Tech Conference X", projectId: "proj002", date: "2024-09-14", time: "14:00 - 17:00", priority: "High", deliverables: 0, shotRequests: 3 },
 ];
 
 // Helper function to parse time string "HH:MM - HH:MM" and date string "YYYY-MM-DD"
-const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
+// This function should ideally be in a utils file if used in multiple places.
+export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   const baseDate = parseISO(dateStr);
   if (!isValid(baseDate)) return null;
 
@@ -83,10 +85,10 @@ const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: 
 
   if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
 
-  let startDate = setHours(baseDate, startHour);
+  let startDate = setHours(startOfDay(baseDate), startHour); // Use startOfDay to avoid timezone issues with parseISO
   startDate = setMinutes(startDate, startMinute);
 
-  let endDate = setHours(baseDate, endHour);
+  let endDate = setHours(startOfDay(baseDate), endHour); // Use startOfDay
   endDate = setMinutes(endDate, endMinute);
 
   // Handle overnight events if end time is earlier than start time (e.g. 22:00 - 02:00)
@@ -98,14 +100,13 @@ const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: 
 };
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false; // Only check for same day, different events
+  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false;
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; // Invalid time format
+  if (!timesA || !timesB) return false;
 
-  // Overlap condition: A.start < B.end AND A.end > B.start
   return isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
 };
 
@@ -150,12 +151,12 @@ export default function EventsPage() {
       reset({
         name: "",
         projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: format(selectedBlockDate || new Date(), "yyyy-MM-dd"), // Use selectedBlockDate if available
         time: "09:00 - 17:00",
         priority: "Medium",
       });
     }
-  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects]);
+  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, selectedBlockDate]);
 
 
   const filteredEvents = useMemo(() => {
@@ -163,10 +164,10 @@ export default function EventsPage() {
     if (selectedProject) {
       currentEvents = events.filter(event => event.projectId === selectedProject.id);
     }
-    // Add overlap information
     return currentEvents.map(event => {
       let hasOverlap = false;
-      for (const otherEvent of currentEvents) {
+      // Check overlap only against other events in the currently *filtered* list for the same project/view
+      for (const otherEvent of currentEvents) { 
         if (event.id !== otherEvent.id && event.date === otherEvent.date) {
           if (checkOverlap(event, otherEvent)) {
             hasOverlap = true;
@@ -175,7 +176,7 @@ export default function EventsPage() {
         }
       }
       return { ...event, hasOverlap };
-    });
+    }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
   }, [selectedProject, events]);
 
   const groupedAndSortedEvents = useMemo(() => {
@@ -202,6 +203,12 @@ export default function EventsPage() {
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [filteredEvents]);
 
+  const eventsForBlockSchedule = useMemo(() => {
+    if (!selectedBlockDate) return [];
+    const formattedDate = format(selectedBlockDate, "yyyy-MM-dd");
+    return filteredEvents.filter(event => event.date === formattedDate);
+  }, [selectedBlockDate, filteredEvents]);
+
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
     const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
@@ -222,7 +229,7 @@ export default function EventsPage() {
         id: `evt${String(events.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
         deliverables: 0,
-        shotRequests: 0,
+        shotRequests: 0, // Initialize with 0, can be updated later
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -235,24 +242,19 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
-    reset({
-      name: "",
-      projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
-      date: format(new Date(), "yyyy-MM-dd"),
-      time: "09:00 - 17:00",
-      priority: "Medium",
-    });
+    // Reset logic is handled by useEffect
     setIsEventModalOpen(true);
   };
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
+    // Reset logic for form fields is handled by useEffect
     setIsEventModalOpen(true);
   };
 
   const closeEventModal = () => {
     setIsEventModalOpen(false);
-    setEditingEvent(null);
+    setEditingEvent(null); 
   };
 
   const handleDeleteClick = (eventId: string) => {
@@ -337,7 +339,35 @@ export default function EventsPage() {
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="event-date" className="text-right">Date</Label>
               <div className="col-span-3">
-                <Input id="event-date" type="date" {...register("date")} className={errors.date ? "border-destructive" : ""} />
+                <Controller
+                    name="date"
+                    control={control}
+                    render={({ field }) => (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground",
+                              errors.date ? "border-destructive" : ""
+                            )}
+                          >
+                            <CalendarIconLucide className="mr-2 h-4 w-4" />
+                            {field.value ? format(parseISO(field.value), "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value ? parseISO(field.value) : undefined}
+                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  />
                 {errors.date && <p className="text-xs text-destructive mt-1">{errors.date.message}</p>}
               </div>
             </div>
@@ -386,8 +416,7 @@ export default function EventsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this event?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the event
-              and all its associated data (like shot requests, if implemented).
+              This action cannot be undone. This will permanently delete the event.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -494,7 +523,7 @@ export default function EventsPage() {
                         <TableCell className="font-medium">{event.name}</TableCell>
                         {!selectedProject && <TableCell>{event.project}</TableCell>}
                         <TableCell className="flex items-center">
-                          {event.date} <span className="text-muted-foreground ml-1">({event.time})</span>
+                          {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
                           {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
                         </TableCell>
                         <TableCell>
@@ -544,8 +573,8 @@ export default function EventsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Label htmlFor="block-schedule-date">Select Date:</Label>
+              <div className="flex items-center gap-4 p-4 border-b">
+                <Label htmlFor="block-schedule-date" className="whitespace-nowrap">Select Date:</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -570,11 +599,23 @@ export default function EventsPage() {
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="p-8 text-center text-muted-foreground border-2 border-dashed rounded-md">
-                <p className="text-lg font-medium">Detailed Block Schedule View - Coming Soon!</p>
-                <p>This section will display events for {selectedBlockDate ? format(selectedBlockDate, "MMMM do, yyyy") : "the selected date"} in an hourly timeline format.</p>
-                <img src="https://placehold.co/600x300.png" alt="Block Schedule Placeholder" className="w-full max-w-md h-auto mt-4 rounded-md mx-auto" data-ai-hint="timeline schedule blocks" />
-              </div>
+              
+              {selectedBlockDate && eventsForBlockSchedule.length > 0 ? (
+                <BlockScheduleView 
+                  selectedDate={selectedBlockDate} 
+                  eventsForDate={eventsForBlockSchedule} 
+                />
+              ) : (
+                <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center">
+                  <CalendarIconLucide size={48} className="mb-4 text-muted" />
+                  <p className="text-lg font-medium">
+                    {selectedBlockDate ? "No events scheduled for this day." : "Please select a date to view the schedule."}
+                  </p>
+                  <p>
+                    {selectedBlockDate ? "You can add events for " + format(selectedBlockDate, "MMMM do, yyyy") + " or choose another date." : ""}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -582,3 +623,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
+    
