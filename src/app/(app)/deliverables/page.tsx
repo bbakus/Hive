@@ -12,6 +12,7 @@ import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, Cal
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,6 @@ import { z } from "zod";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 
-// Deliverable Schema
 const deliverableSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters."),
   event: z.string().min(3, "Event name must be at least 3 characters."),
@@ -45,11 +45,10 @@ type DeliverableFormData = z.infer<typeof deliverableSchema>;
 
 export type Deliverable = DeliverableFormData & {
   id: string;
-  projectName: string; // Denormalized for easy filtering/display
+  projectName: string; 
 };
 
-// Initial Mock data - will be managed by state now
-const initialDeliverables: Deliverable[] = [
+const initialDeliverablesMock: Deliverable[] = [
   { id: "del001", name: "Highlight Reel - Day 1", event: "Main Stage - Day 1", dueDate: parseISO("2024-07-16"), status: "In Progress", type: "Video", projectName: "Summer Music Festival 2024", projectId: "proj001" },
   { id: "del002", name: "Keynote Recording", event: "Keynote Speech", dueDate: parseISO("2024-09-15"), status: "Pending", type: "Video", projectName: "Tech Conference X", projectId: "proj002" },
   { id: "del003", name: "Photo Album", event: "VIP Reception", dueDate: parseISO("2024-11-06"), status: "Completed", type: "Images", projectName: "Corporate Gala Dinner", projectId: "proj003" },
@@ -58,13 +57,20 @@ const initialDeliverables: Deliverable[] = [
 ];
 
 export default function DeliverablesPage() {
-  const { selectedProject, projects: allProjectsFromContext } = useProjectContext();
-  const [deliverablesList, setDeliverablesList] = useState<Deliverable[]>(initialDeliverables);
+  const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const [deliverablesList, setDeliverablesList] = useState<Deliverable[]>([]);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [summaryResult, setSummaryResult] = useState<DeliverableSummaryOutput | null>(null);
   const [eventNameForSummary, setEventNameForSummary] = useState("All Projects");
   const [isAddDeliverableDialogOpen, setIsAddDeliverableDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isLoadingSettings) {
+      setDeliverablesList(useDemoData ? initialDeliverablesMock : []);
+    }
+  }, [useDemoData, isLoadingSettings]);
 
   const {
     register: registerDeliverable,
@@ -86,7 +92,7 @@ export default function DeliverablesPage() {
 
   const filteredDeliverables = useMemo(() => {
     if (!selectedProject) {
-      return deliverablesList; // Show all if no project selected
+      return deliverablesList;
     }
     return deliverablesList.filter(d => d.projectName === selectedProject.name);
   }, [selectedProject, deliverablesList]);
@@ -121,7 +127,6 @@ export default function DeliverablesPage() {
     setIsLoadingSummary(true);
     setSummaryResult(null);
 
-    // Use the currently filtered deliverables for the summary
     const deliverablesData = JSON.stringify(filteredDeliverables.map(d => ({
         name: d.name,
         status: d.status,
@@ -151,6 +156,10 @@ export default function DeliverablesPage() {
       setIsLoadingSummary(false);
     }
   };
+
+  if (isLoadingSettings || isLoadingProjects) {
+    return <div>Loading deliverables data settings...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -345,7 +354,7 @@ export default function DeliverablesPage() {
             </Table>
           ) : (
              <p className="text-muted-foreground text-center py-8">
-              No deliverables found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}.
+              No deliverables found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}. {useDemoData ? 'Toggle "Load Demo Data" in settings or add one.' : 'Add a deliverable to get started.'}
             </p>
           )}
         </CardContent>
@@ -391,6 +400,3 @@ export default function DeliverablesPage() {
     </div>
   );
 }
-
-
-    

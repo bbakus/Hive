@@ -1,8 +1,7 @@
 
-// src/app/(app)/dashboard/page.tsx
-"use client"; // Required for chart components and context
+"use client"; 
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -23,18 +22,18 @@ import {
   type ChartConfig
 } from "@/components/ui/chart";
 import { useProjectContext } from "@/contexts/ProjectContext";
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 
-// Mock data sources - In a real app, these would be fetched or managed more globally
-const allProjectsMock = [
+const allProjectsMockData = [
   { id: "proj001", name: "Summer Music Festival 2024", status: "In Progress" },
   { id: "proj002", name: "Tech Conference X", status: "Planning" },
   { id: "proj003", name: "Corporate Gala Dinner", status: "Completed" },
 ];
 
-const allEventsMock = [
+const allEventsMockData = [
   { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", date: "2024-07-15", coverage: 75 },
   { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", date: "2024-09-15", coverage: 90 },
   { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", date: "2024-11-05", coverage: 60 },
@@ -42,7 +41,7 @@ const allEventsMock = [
   { id: "evt005", name: "Product Launch Q3", project: "Tech Conference X", date: "2024-09-16", coverage: 50 },
 ];
 
-const allDeliverablesMock = [
+const allDeliverablesMockData = [
   { id: "del001", name: "Highlight Reel - Day 1", projectName: "Summer Music Festival 2024", status: "In Progress", event: "Main Stage - Day 1" },
   { id: "del002", name: "Keynote Recording", projectName: "Tech Conference X", status: "Pending", event: "Keynote Speech" },
   { id: "del003", name: "Photo Album", projectName: "Corporate Gala Dinner", status: "Completed", event: "VIP Reception" },
@@ -52,8 +51,7 @@ const allDeliverablesMock = [
   { id: "del007", name: "Attendee Feedback Report", projectName: "Tech Conference X", status: "Pending", event: "Tech Conference X" },
 ];
 
-// Sample data for Event Coverage Chart - including projectName for filtering
-const baseEventCoverageData = [
+const baseEventCoverageDataMock = [
   { event: "Music Fest D1", coverage: 75, fill: "hsl(var(--chart-1))", projectName: "Summer Music Festival 2024" },
   { event: "Tech Conf X", coverage: 90, fill: "hsl(var(--chart-2))", projectName: "Tech Conference X" },
   { event: "Gala Dinner", coverage: 60, fill: "hsl(var(--chart-3))", projectName: "Corporate Gala Dinner" },
@@ -69,37 +67,53 @@ const chartConfig = {
 
 
 export default function DashboardPage() {
-  const { selectedProjectId, selectedProject } = useProjectContext();
+  const { selectedProjectId, selectedProject, isLoadingProjects } = useProjectContext();
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+
+  const [allProjects, setAllProjects] = useState(allProjectsMockData);
+  const [allEvents, setAllEvents] = useState(allEventsMockData);
+  const [allDeliverables, setAllDeliverables] = useState(allDeliverablesMockData);
+  const [baseEventCoverageData, setBaseEventCoverageData] = useState(baseEventCoverageDataMock);
+
+  useEffect(() => {
+    if (!isLoadingSettings) {
+      setAllProjects(useDemoData ? allProjectsMockData : []);
+      setAllEvents(useDemoData ? allEventsMockData : []);
+      setAllDeliverables(useDemoData ? allDeliverablesMockData : []);
+      setBaseEventCoverageData(useDemoData ? baseEventCoverageDataMock : []);
+    }
+  }, [useDemoData, isLoadingSettings]);
+
 
   const filteredProjects = useMemo(() => {
-    if (!selectedProjectId) return allProjectsMock;
-    return allProjectsMock.filter(p => p.id === selectedProjectId);
-  }, [selectedProjectId]);
+    if (!selectedProjectId) return allProjects;
+    return allProjects.filter(p => p.id === selectedProjectId);
+  }, [selectedProjectId, allProjects]);
 
   const filteredEvents = useMemo(() => {
-    if (!selectedProject) return allEventsMock;
-    return allEventsMock.filter(e => e.project === selectedProject.name);
-  }, [selectedProject]);
+    if (!selectedProject) return allEvents;
+    return allEvents.filter(e => e.project === selectedProject.name);
+  }, [selectedProject, allEvents]);
 
   const filteredDeliverables = useMemo(() => {
-    if (!selectedProject) return allDeliverablesMock;
-    return allDeliverablesMock.filter(d => d.projectName === selectedProject.name);
-  }, [selectedProject]);
+    if (!selectedProject) return allDeliverables;
+    return allDeliverables.filter(d => d.projectName === selectedProject.name);
+  }, [selectedProject, allDeliverables]);
   
   const eventCoverageData = useMemo(() => {
-    if (!selectedProject) return baseEventCoverageData; // Show all if no project selected
+    if (!selectedProject) return baseEventCoverageData; 
     return baseEventCoverageData.filter(ec => ec.projectName === selectedProject.name);
-  }, [selectedProject]);
+  }, [selectedProject, baseEventCoverageData]);
 
   const overviewItems = useMemo(() => {
     let activeProjectsCount = 0;
     if (selectedProjectId) {
-        const proj = allProjectsMock.find(p => p.id === selectedProjectId);
+        const proj = allProjects.find(p => p.id === selectedProjectId);
         if (proj && (proj.status === "In Progress" || proj.status === "Planning")) {
             activeProjectsCount = 1;
         }
     } else {
-        activeProjectsCount = allProjectsMock.filter(p => p.status === "In Progress" || p.status === "Planning").length;
+        activeProjectsCount = allProjects.filter(p => p.status === "In Progress" || p.status === "Planning").length;
     }
 
     const upcomingEventsCount = filteredEvents.length; 
@@ -109,10 +123,13 @@ export default function DashboardPage() {
       { title: selectedProjectId ? "Selected Project Status" : "Active Projects", value: selectedProjectId ? (selectedProject?.status || "N/A") : activeProjectsCount.toString(), icon: FolderKanban, description: selectedProjectId ? `Status of ${selectedProject?.name}` : "Currently ongoing or planning" },
       { title: "Upcoming Events", value: upcomingEventsCount.toString(), icon: CalendarClock, description: selectedProject ? `For ${selectedProject.name}` : "Across all projects" },
       { title: "Deliverables Due", value: deliverablesDueCount.toString(), icon: Package, description: selectedProject ? `For ${selectedProject.name}` : "Across all projects" },
-      { title: "Team Load", value: "75%", icon: Users, description: "Average personnel capacity" },
+      { title: "Team Load", value: useDemoData ? "75%" : "N/A", icon: Users, description: useDemoData ? "Average personnel capacity" : "No personnel data" },
     ];
-  }, [selectedProjectId, selectedProject, filteredEvents, filteredDeliverables]);
+  }, [selectedProjectId, selectedProject, filteredEvents, filteredDeliverables, allProjects, useDemoData]);
 
+  if (isLoadingSettings || isLoadingProjects) {
+    return <div>Loading dashboard data settings...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-8">

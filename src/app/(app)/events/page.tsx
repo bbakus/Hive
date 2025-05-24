@@ -37,6 +37,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext } from "@/contexts/ProjectContext";
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Import useSettingsContext
 import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -48,7 +49,7 @@ import { BlockScheduleView } from "@/components/block-schedule-view";
 type PersonnelMinimal = {
   id: string;
   name: string;
-  role: string; // Added role for potential future use in display
+  role: string;
 };
 
 // Mock available personnel (ideally from context or API)
@@ -73,11 +74,20 @@ type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventFormData & {
   id: string;
-  project?: string; // Denormalized project name for display
+  project?: string; 
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean; 
 };
+
+const initialEventsMock: Event[] = [
+    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20, assignedPersonnelIds: ["user001", "user002"] },
+    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5, assignedPersonnelIds: ["user003"] },
+    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3, assignedPersonnelIds: [] },
+    { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10, assignedPersonnelIds: ["user004"] },
+    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8, assignedPersonnelIds: ["user001", "user003", "user005"] },
+];
+
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   const baseDate = parseISO(dateStr);
@@ -118,8 +128,9 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
 
 
 export default function EventsPage() {
-  const { selectedProject, projects: allProjects } = useProjectContext();
-  const [events, setEvents] = useState<Event[]>([]); // Initialize with empty array
+  const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const [events, setEvents] = useState<Event[]>([]);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -138,6 +149,12 @@ export default function EventsPage() {
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
   });
+
+  useEffect(() => {
+    if (!isLoadingSettings) {
+        setEvents(useDemoData ? initialEventsMock : []);
+    }
+  }, [useDemoData, isLoadingSettings]);
   
   useEffect(() => {
     const defaultDate = activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date();
@@ -235,9 +252,9 @@ export default function EventsPage() {
         ...data,
         id: `evt${String(events.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
-        deliverables: 0, // Default value for new events
-        shotRequests: 0, // Default value for new events
-        hasOverlap: false, // Will be recalculated by useMemo
+        deliverables: 0, 
+        shotRequests: 0, 
+        hasOverlap: false, 
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -282,6 +299,9 @@ export default function EventsPage() {
     setIsDeleteDialogOpen(false);
   };
 
+  if (isLoadingSettings || isLoadingProjects) {
+      return <div>Loading event data settings...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -301,7 +321,7 @@ export default function EventsPage() {
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
       }}>
-        <DialogContent className="sm:max-w-2xl"> {/* Increased width for personnel list */}
+        <DialogContent className="sm:max-w-2xl"> 
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Event" : "Add New Event"}</DialogTitle>
             <DialogDescription>
@@ -310,7 +330,6 @@ export default function EventsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Event Details Column */}
               <div className="space-y-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
@@ -413,7 +432,6 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              {/* Assign Personnel Column */}
               <div className="space-y-2">
                 <Label>Assign Personnel</Label>
                 <ScrollArea className="h-60 w-full rounded-md border p-4">
@@ -672,4 +690,3 @@ export default function EventsPage() {
     </div>
   );
 }
-    

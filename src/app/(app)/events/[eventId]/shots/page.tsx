@@ -37,11 +37,10 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import type { Event } from '../page'; // Import Event type from parent page
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
+import type { Event } from '../page'; 
 
-// Re-using initialEvents from parent for simplicity in this example.
-// In a real app, you'd fetch this data or have it in a global state/context.
-const initialEventsForShotPage: Event[] = [
+const initialEventsForShotPageMock: Event[] = [
     { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20 },
     { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5 },
     { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", projectId: "proj003", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3 },
@@ -49,7 +48,6 @@ const initialEventsForShotPage: Event[] = [
     { id: "evt005", name: "Closing Ceremony", project: "Tech Conference X", projectId: "proj002", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8 },
 ];
 
-// --- Shot Request Definitions ---
 const shotRequestSchema = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   shotType: z.enum(["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"]),
@@ -63,26 +61,24 @@ type ShotRequestFormData = z.infer<typeof shotRequestSchema>;
 export type ShotRequest = ShotRequestFormData & {
   id: string;
   eventId: string;
-  // assignedTo?: string; // For future use
 };
 
-// Mock Shot Requests - this would typically be fetched or managed globally
-const initialShotRequests: ShotRequest[] = [
+const initialShotRequestsMock: ShotRequest[] = [
   { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd", shotType: "Wide", priority: "High", status: "Planned", notes: "Get this as gates open" },
   { id: "sr002", eventId: "evt001", description: "Close-up of lead singer - Song 3", shotType: "Close-up", priority: "Critical", status: "Planned" },
   { id: "sr003", eventId: "evt002", description: "Speaker walking onto stage", shotType: "Medium", priority: "High", status: "Captured" },
   { id: "sr004", eventId: "evt001", description: "Drone shot of entire festival area at sunset", shotType: "Drone", priority: "Medium", status: "Assigned", notes: "Requires licensed pilot" },
 ];
-// --- End Shot Request Definitions ---
 
 
 export default function ShotListPage() {
   const params = useParams();
   const eventId = params.eventId as string;
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   
   const [event, setEvent] = useState<Event | null>(null);
   const [shotRequests, setShotRequests] = useState<ShotRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   
   const [isShotModalOpen, setIsShotModalOpen] = useState(false);
   const [editingShotRequest, setEditingShotRequest] = useState<ShotRequest | null>(null);
@@ -109,14 +105,21 @@ export default function ShotListPage() {
   });
 
   useEffect(() => {
+    if (isLoadingSettings) return;
+
     if (eventId) {
-      const foundEvent = initialEventsForShotPage.find(e => e.id === eventId);
+      const eventsToUse = useDemoData ? initialEventsForShotPageMock : [];
+      const shotsToUse = useDemoData ? initialShotRequestsMock : [];
+
+      const foundEvent = eventsToUse.find(e => e.id === eventId);
       setEvent(foundEvent || null);
-      const eventSpecificShots = initialShotRequests.filter(sr => sr.eventId === eventId);
+      const eventSpecificShots = shotsToUse.filter(sr => sr.eventId === eventId);
       setShotRequests(eventSpecificShots);
-      setIsLoading(false);
+      setIsLoadingData(false);
+    } else {
+      setIsLoadingData(false);
     }
-  }, [eventId]);
+  }, [eventId, useDemoData, isLoadingSettings]);
 
   useEffect(() => {
     if (editingShotRequest) {
@@ -149,7 +152,7 @@ export default function ShotListPage() {
     } else {
       const newShotRequest: ShotRequest = {
         ...data,
-        id: `sr${String(shotRequests.length + initialShotRequests.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        id: `sr${String(shotRequests.length + initialShotRequestsMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         eventId: eventId,
       };
       setShotRequests((prevRequests) => [...prevRequests, newShotRequest]);
@@ -196,14 +199,15 @@ export default function ShotListPage() {
   };
 
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading event details...</div>;
+  if (isLoadingSettings || isLoadingData) {
+    return <div className="flex items-center justify-center h-screen">Loading event shot list...</div>;
   }
 
   if (!event) {
     return (
         <div className="flex flex-col items-center justify-center h-screen gap-4">
             <p className="text-xl text-muted-foreground">Event not found.</p>
+             <p className="text-sm text-muted-foreground">{!useDemoData && "Demo data is turned off. Event details might not be available unless added."}</p>
             <Button asChild variant="outline">
                 <Link href="/events">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Events
@@ -406,7 +410,7 @@ export default function ShotListPage() {
             <div className="text-center py-12 text-muted-foreground">
               <Camera size={48} className="mx-auto mb-4" />
               <p className="text-lg font-medium">No shot requests defined for this event yet.</p>
-              <p>Click "Add Shot Request" to get started.</p>
+              <p>Click "Add Shot Request" to get started. {useDemoData && shotRequests.length === 0 ? "(Or ensure demo data for this event includes shots)" : ""}</p>
             </div>
           )}
         </CardContent>

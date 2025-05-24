@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -35,6 +34,7 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Import useSettingsContext
 
 // --- Personnel Definitions ---
 const personnelSchema = z.object({
@@ -51,7 +51,7 @@ export type Personnel = PersonnelFormData & {
 };
 
 // Initial Mock data
-const initialPersonnel: Personnel[] = [
+const initialPersonnelMock: Personnel[] = [
   { id: "user001", name: "Alice Wonderland", role: "Lead Camera Operator", status: "Available", avatar: "https://placehold.co/40x40.png" },
   { id: "user002", name: "Bob The Builder", role: "Audio Engineer", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
   { id: "user003", name: "Charlie Chaplin", role: "Producer", status: "Available", avatar: "https://placehold.co/40x40.png" },
@@ -60,7 +60,8 @@ const initialPersonnel: Personnel[] = [
 // --- End Personnel Definitions ---
 
 export default function PersonnelPage() {
-  const [personnelList, setPersonnelList] = useState<Personnel[]>(initialPersonnel);
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -82,6 +83,12 @@ export default function PersonnelPage() {
       status: "Available",
     },
   });
+  
+  useEffect(() => {
+    if (!isLoadingSettings) {
+        setPersonnelList(useDemoData ? initialPersonnelMock : []);
+    }
+  }, [useDemoData, isLoadingSettings]);
 
   useEffect(() => {
     if (editingPersonnel) {
@@ -152,6 +159,10 @@ export default function PersonnelPage() {
     }
     setIsDeleteDialogOpen(false);
   };
+
+  if (isLoadingSettings) {
+    return <div>Loading personnel data settings...</div>;
+  }
 
 
   return (
@@ -306,7 +317,7 @@ export default function PersonnelPage() {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No team members found. Click "Add Team Member" to get started.
+              No team members found. {useDemoData ? 'Toggle "Load Demo Data" in settings or add a new member.' : 'Add a new team member to get started.'}
             </p>
           )}
         </CardContent>

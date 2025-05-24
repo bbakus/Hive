@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
 
 interface ParsedScheduleItem {
   time: string;
@@ -30,9 +31,7 @@ interface ParsedSchedulePerson {
 
 type ParsedSchedule = ParsedSchedulePerson[];
 
-// Mock available personnel (ideally from context or API in a real app)
-// This list should align with personnel available for assignment on events page.
-const allAvailablePersonnel: { id: string; name: string; role: string }[] = [
+const allAvailablePersonnelMock: { id: string; name: string; role: string }[] = [
   { id: "user001", name: "Alice Wonderland", role: "Lead Camera Op" },
   { id: "user002", name: "Bob The Builder", role: "Audio Engineer" },
   { id: "user003", name: "Charlie Chaplin", role: "Producer" },
@@ -42,8 +41,6 @@ const allAvailablePersonnel: { id: string; name: string; role: string }[] = [
   { id: "user007", name: "George Jetson", role: "Tech Lead" },
 ];
 
-
-// Helper function to parse the schedule string
 const parseScheduleString = (scheduleString: string): ParsedSchedule => {
   const parsed: ParsedSchedule = [];
   if (!scheduleString) return parsed;
@@ -105,6 +102,7 @@ const parseScheduleString = (scheduleString: string): ParsedSchedule => {
 
 
 export default function SchedulerPage() {
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [location, setLocation] = useState("");
   const [selectedPersonnel, setSelectedPersonnel] = useState<string[]>([]);
@@ -114,7 +112,15 @@ export default function SchedulerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [scheduleOutput, setScheduleOutput] = useState<GenerateScheduleOutput | null>(null);
   const [parsedSchedule, setParsedSchedule] = useState<ParsedSchedule>([]);
+  const [availablePersonnelForScheduler, setAvailablePersonnelForScheduler] = useState<{ id: string; name: string; role: string }[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isLoadingSettings) {
+      setAvailablePersonnelForScheduler(useDemoData ? allAvailablePersonnelMock : []);
+    }
+  }, [useDemoData, isLoadingSettings]);
+
 
   const handlePersonnelChange = (personnelName: string, checked: boolean) => {
     setSelectedPersonnel(prev =>
@@ -170,6 +176,10 @@ export default function SchedulerPage() {
   const handlePrint = () => {
     window.print();
   };
+  
+  if (isLoadingSettings) {
+    return <div>Loading scheduler settings...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -187,7 +197,6 @@ export default function SchedulerPage() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="grid md:grid-cols-2 gap-x-6 gap-y-4">
-            {/* Column 1: Date, Location, Event Type */}
             <div className="space-y-4">
               <div>
                 <Label htmlFor="date">Date</Label>
@@ -227,29 +236,33 @@ export default function SchedulerPage() {
               </div>
             </div>
 
-            {/* Column 2: Personnel Selection */}
             <div className="space-y-2">
-              <Label>Select Personnel</Label>
-              <ScrollArea className="h-48 w-full rounded-md border p-4">
-                <div className="space-y-2">
-                  {allAvailablePersonnel.map((person) => (
-                    <div key={person.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`person-${person.id}`}
-                        checked={selectedPersonnel.includes(person.name)}
-                        onCheckedChange={(checked) => handlePersonnelChange(person.name, !!checked)}
-                      />
-                      <Label htmlFor={`person-${person.id}`} className="font-normal">
-                        {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+              <Label>Select Personnel <span className="text-destructive">*</span></Label>
+              {availablePersonnelForScheduler.length > 0 ? (
+                <ScrollArea className="h-48 w-full rounded-md border p-4">
+                  <div className="space-y-2">
+                    {availablePersonnelForScheduler.map((person) => (
+                      <div key={person.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`sched-person-${person.id}`}
+                          checked={selectedPersonnel.includes(person.name)}
+                          onCheckedChange={(checked) => handlePersonnelChange(person.name, !!checked)}
+                        />
+                        <Label htmlFor={`sched-person-${person.id}`} className="font-normal">
+                          {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              ) : (
+                 <p className="text-xs text-muted-foreground mt-1 p-4 border rounded-md">
+                    No personnel available. {useDemoData ? 'Ensure demo personnel data is loaded.' : 'Add personnel on the Personnel page.'}
+                  </p>
+              )}
               <p className="text-xs text-muted-foreground mt-1">Choose personnel relevant to the event(s) on the selected date.</p>
             </div>
             
-            {/* Additional Criteria - Spans both columns if needed or stays in its flow */}
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="additionalCriteria">Additional Criteria & Specific Tasks (Optional)</Label>
               <Textarea 
@@ -263,7 +276,7 @@ export default function SchedulerPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || availablePersonnelForScheduler.length === 0}>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Generate Schedule
             </Button>
@@ -333,4 +346,3 @@ export default function SchedulerPage() {
     </div>
   );
 }
-    

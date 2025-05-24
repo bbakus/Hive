@@ -2,7 +2,8 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
+import { useSettingsContext } from './SettingsContext'; // Import useSettingsContext
 
 // Define project structure based on existing mock data
 export type Project = {
@@ -24,11 +25,11 @@ type ProjectContextType = {
   updateProject: (projectId: string, projectData: ProjectFormData) => void; // Function to update a project
   deleteProject: (projectId: string) => void; // Function to delete a project
   selectedProject: Project | null; // The full selected project object
+  isLoadingProjects: boolean;
 };
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-// Hardcoded mock projects (ideally fetched from a service or props)
 const initialMockProjects: Project[] = [
   { id: "proj001", name: "Summer Music Festival 2024", startDate: "2024-06-01", endDate: "2024-08-31", status: "In Progress", description: "Annual summer music festival featuring diverse artists." },
   { id: "proj002", name: "Tech Conference X", startDate: "2024-09-15", endDate: "2024-09-17", status: "Planning", description: "Major technology conference showcasing new innovations." },
@@ -37,14 +38,24 @@ const initialMockProjects: Project[] = [
 
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>(initialMockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+
+  useEffect(() => {
+    if (!isLoadingSettings) {
+      setProjects(useDemoData ? initialMockProjects : []);
+      setIsLoadingProjects(false);
+    }
+  }, [useDemoData, isLoadingSettings]);
+
 
   const addProject = useCallback((projectData: ProjectFormData) => {
     setProjects((prevProjects) => {
       const newProject: Project = {
         ...projectData,
-        id: `proj${String(prevProjects.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`, // More robust ID
+        id: `proj${String(prevProjects.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
       };
       return [...prevProjects, newProject];
     });
@@ -62,7 +73,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setProjects((prevProjects) =>
       prevProjects.filter((proj) => proj.id !== projectId)
     );
-    // If the deleted project was the selected one, reset selection
     if (selectedProjectId === projectId) {
       setSelectedProjectId(null);
     }
@@ -81,7 +91,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     updateProject,
     deleteProject,
     selectedProject,
-  }), [selectedProjectId, projects, addProject, updateProject, deleteProject, selectedProject]);
+    isLoadingProjects,
+  }), [selectedProjectId, projects, addProject, updateProject, deleteProject, selectedProject, isLoadingProjects]);
 
   return (
     <ProjectContext.Provider value={value}>
