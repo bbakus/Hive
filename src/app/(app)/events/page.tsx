@@ -35,7 +35,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore } from "date-fns";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -50,8 +55,8 @@ type EventFormData = z.infer<typeof eventSchema>;
 export type Event = EventFormData & {
   id: string;
   project?: string; // Denormalized project name for display
-  deliverables: number; 
-  shotRequests: number; 
+  deliverables: number;
+  shotRequests: number;
 };
 
 // Initial Mock data - will be managed by state now
@@ -83,7 +88,7 @@ const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: 
 
   let endDate = setHours(baseDate, endHour);
   endDate = setMinutes(endDate, endMinute);
-  
+
   // Handle overnight events if end time is earlier than start time (e.g. 22:00 - 02:00)
   if (isBefore(endDate, startDate)) {
     endDate.setDate(endDate.getDate() + 1);
@@ -106,12 +111,13 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
 
 
 export default function EventsPage() {
-  const { selectedProject, projects: allProjects } = useProjectContext(); 
+  const { selectedProject, projects: allProjects } = useProjectContext();
   const [events, setEvents] = useState<Event[]>(initialEvents);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
+  const [selectedBlockDate, setSelectedBlockDate] = useState<Date | undefined>(new Date());
   const { toast } = useToast();
 
   const {
@@ -141,9 +147,9 @@ export default function EventsPage() {
         priority: editingEvent.priority as EventFormData['priority'],
       });
     } else {
-      reset({ 
+      reset({
         name: "",
-        projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""), 
+        projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
         date: format(new Date(), "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
@@ -192,7 +198,7 @@ export default function EventsPage() {
         return 0;
       });
     });
-    
+
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [filteredEvents]);
 
@@ -201,9 +207,9 @@ export default function EventsPage() {
     const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
 
     if (editingEvent) {
-      setEvents(prevEvents => prevEvents.map(evt => 
-        evt.id === editingEvent.id 
-        ? { ...evt, ...data, project: selectedProjInfo?.name || "Unknown Project" } 
+      setEvents(prevEvents => prevEvents.map(evt =>
+        evt.id === editingEvent.id
+        ? { ...evt, ...data, project: selectedProjInfo?.name || "Unknown Project" }
         : evt
       ));
       toast({
@@ -215,8 +221,8 @@ export default function EventsPage() {
         ...data,
         id: `evt${String(events.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
-        deliverables: 0, 
-        shotRequests: 0, 
+        deliverables: 0,
+        shotRequests: 0,
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -226,7 +232,7 @@ export default function EventsPage() {
     }
     closeEventModal();
   };
-  
+
   const openAddEventModal = () => {
     setEditingEvent(null);
     reset({
@@ -309,10 +315,10 @@ export default function EventsPage() {
                   name="projectId"
                   control={control}
                   render={({ field }) => (
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value} 
-                      defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))} 
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
                     >
                       <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select project" />
@@ -374,7 +380,7 @@ export default function EventsPage() {
           </form>
         </DialogContent>
       </Dialog>
-      
+
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -391,132 +397,188 @@ export default function EventsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
-          <CardDescription>
-            Visualizes events grouped by day. Events with potential time conflicts are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
-            {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {groupedAndSortedEvents.length > 0 ? (
-            groupedAndSortedEvents.map(([date, dayEvents]) => (
-              <div key={date}>
-                <h3 className="text-xl font-semibold mb-3 border-b pb-2">
-                  {format(parseISO(date), "EEEE, MMMM do, yyyy")}
-                </h3>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {dayEvents.map((event) => (
-                    <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-lg flex items-center justify-between">
-                          {event.name}
+      <Tabs defaultValue="daily-overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="daily-overview">Daily Overview</TabsTrigger>
+          <TabsTrigger value="event-list">Event List</TabsTrigger>
+          <TabsTrigger value="block-schedule">Block Schedule</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="daily-overview">
+          <Card className="shadow-lg mt-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
+              <CardDescription>
+                Visualizes events grouped by day. Events with potential time conflicts are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
+                {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {groupedAndSortedEvents.length > 0 ? (
+                groupedAndSortedEvents.map(([date, dayEvents]) => (
+                  <div key={date}>
+                    <h3 className="text-xl font-semibold mb-3 border-b pb-2">
+                      {format(parseISO(date), "EEEE, MMMM do, yyyy")}
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {dayEvents.map((event) => (
+                        <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center justify-between">
+                              {event.name}
+                              <Badge variant={
+                                event.priority === "Critical" ? "destructive" :
+                                event.priority === "High" ? "secondary" :
+                                event.priority === "Medium" ? "outline" : "default"
+                              }>{event.priority}</Badge>
+                            </CardTitle>
+                            <CardDescription className="flex items-center">
+                              {event.time}
+                              {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="flex-grow">
+                            {!selectedProject && event.project && (
+                              <p className="text-xs text-muted-foreground">Project: {event.project}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">Shot Requests: {event.shotRequests}</p>
+                            <p className="text-xs text-muted-foreground">Deliverables: {event.deliverables}</p>
+                          </CardContent>
+                          <CardFooter className="border-t pt-3">
+                             <Button variant="outline" size="sm" asChild className="w-full">
+                                <Link href={`/events/${event.id}/shots`}>
+                                  <Eye className="mr-2 h-4 w-4" /> View/Manage Shots
+                                </Link>
+                              </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  No events scheduled {selectedProject ? `for ${selectedProject.name}` : "that match your criteria"}.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="event-list">
+          <Card className="shadow-lg mt-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
+              <CardDescription>
+                {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
+                ({filteredEvents.length} events)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredEvents.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event Name</TableHead>
+                      {!selectedProject && <TableHead>Project</TableHead>}
+                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Shot Requests</TableHead>
+                      <TableHead>Deliverables</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEvents.map((event) => (
+                      <TableRow key={event.id}>
+                        <TableCell className="font-medium">{event.name}</TableCell>
+                        {!selectedProject && <TableCell>{event.project}</TableCell>}
+                        <TableCell className="flex items-center">
+                          {event.date} <span className="text-muted-foreground ml-1">({event.time})</span>
+                          {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={
                             event.priority === "Critical" ? "destructive" :
-                            event.priority === "High" ? "secondary" : 
+                            event.priority === "High" ? "secondary" :
                             event.priority === "Medium" ? "outline" : "default"
                           }>{event.priority}</Badge>
-                        </CardTitle>
-                        <CardDescription className="flex items-center">
-                          {event.time}
-                          {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex-grow">
-                        {!selectedProject && event.project && (
-                          <p className="text-xs text-muted-foreground">Project: {event.project}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">Shot Requests: {event.shotRequests}</p>
-                        <p className="text-xs text-muted-foreground">Deliverables: {event.deliverables}</p>
-                      </CardContent>
-                      <CardFooter className="border-t pt-3">
-                         <Button variant="outline" size="sm" asChild className="w-full">
+                        </TableCell>
+                        <TableCell>{event.shotRequests}</TableCell>
+                        <TableCell>{event.deliverables}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
                             <Link href={`/events/${event.id}/shots`}>
-                              <Eye className="mr-2 h-4 w-4" /> View/Manage Shots
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">View/Manage Shots</span>
                             </Link>
                           </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              No events scheduled {selectedProject ? `for ${selectedProject.name}` : "that match your criteria"}.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+                          <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit Event</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(event.id)}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Event</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  No events found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
-          <CardDescription>
-            {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
-            ({filteredEvents.length} events)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {filteredEvents.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Event Name</TableHead>
-                  {!selectedProject && <TableHead>Project</TableHead>}
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Shot Requests</TableHead>
-                  <TableHead>Deliverables</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEvents.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
-                    {!selectedProject && <TableCell>{event.project}</TableCell>}
-                    <TableCell className="flex items-center">
-                      {event.date} <span className="text-muted-foreground ml-1">({event.time})</span>
-                      {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        event.priority === "Critical" ? "destructive" :
-                        event.priority === "High" ? "secondary" : 
-                        event.priority === "Medium" ? "outline" : "default"
-                      }>{event.priority}</Badge>
-                    </TableCell>
-                    <TableCell>{event.shotRequests}</TableCell>
-                    <TableCell>{event.deliverables}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
-                        <Link href={`/events/${event.id}/shots`}>
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">View/Manage Shots</span>
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit Event</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(event.id)}>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete Event</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">
-              No events found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="block-schedule">
+          <Card className="shadow-lg mt-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
+              <CardDescription>
+                View events for a selected day laid out on an hourly timeline.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Label htmlFor="block-schedule-date">Select Date:</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="block-schedule-date"
+                      variant={"outline"}
+                      className={cn(
+                        "w-[280px] justify-start text-left font-normal",
+                        !selectedBlockDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIconLucide className="mr-2 h-4 w-4" />
+                      {selectedBlockDate ? format(selectedBlockDate, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={selectedBlockDate}
+                      onSelect={setSelectedBlockDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="p-8 text-center text-muted-foreground border-2 border-dashed rounded-md">
+                <p className="text-lg font-medium">Detailed Block Schedule View - Coming Soon!</p>
+                <p>This section will display events for {selectedBlockDate ? format(selectedBlockDate, "MMMM do, yyyy") : "the selected date"} in an hourly timeline format.</p>
+                <img src="https://placehold.co/600x300.png" alt="Block Schedule Placeholder" className="w-full max-w-md h-auto mt-4 rounded-md mx-auto" data-ai-hint="timeline schedule blocks" />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
