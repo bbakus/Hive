@@ -40,7 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { BlockScheduleView } from "@/components/block-schedule-view"; // Added import
+import { BlockScheduleView } from "@/components/block-schedule-view"; 
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -57,6 +57,7 @@ export type Event = EventFormData & {
   project?: string; // Denormalized project name for display
   deliverables: number;
   shotRequests: number;
+  hasOverlap?: boolean; 
 };
 
 const initialEvents: Event[] = [
@@ -70,8 +71,6 @@ const initialEvents: Event[] = [
   { id: "evt008", name: "Tech Rehearsal", project: "Tech Conference X", projectId: "proj002", date: "2024-09-14", time: "14:00 - 17:00", priority: "High", deliverables: 0, shotRequests: 3 },
 ];
 
-// Helper function to parse time string "HH:MM - HH:MM" and date string "YYYY-MM-DD"
-// This function should ideally be in a utils file if used in multiple places.
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   const baseDate = parseISO(dateStr);
   if (!isValid(baseDate)) return null;
@@ -85,13 +84,12 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
   if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
 
-  let startDate = setHours(startOfDay(baseDate), startHour); // Use startOfDay to avoid timezone issues with parseISO
+  let startDate = setHours(startOfDay(baseDate), startHour); 
   startDate = setMinutes(startDate, startMinute);
 
-  let endDate = setHours(startOfDay(baseDate), endHour); // Use startOfDay
+  let endDate = setHours(startOfDay(baseDate), endHour); 
   endDate = setMinutes(endDate, endMinute);
 
-  // Handle overnight events if end time is earlier than start time (e.g. 22:00 - 02:00)
   if (isBefore(endDate, startDate)) {
     endDate.setDate(endDate.getDate() + 1);
   }
@@ -118,7 +116,7 @@ export default function EventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
-  const [selectedBlockDate, setSelectedBlockDate] = useState<Date | undefined>(new Date());
+  const [activeBlockScheduleDateKey, setActiveBlockScheduleDateKey] = useState<string | null>(null);
   const { toast } = useToast();
 
   const {
@@ -129,16 +127,10 @@ export default function EventsPage() {
     formState: { errors },
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
-    defaultValues: {
-      name: "",
-      projectId: "",
-      date: format(new Date(), "yyyy-MM-dd"),
-      time: "09:00 - 17:00",
-      priority: "Medium",
-    },
   });
-
+  
   useEffect(() => {
+    const defaultDate = activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date();
     if (editingEvent) {
       reset({
         name: editingEvent.name,
@@ -151,12 +143,12 @@ export default function EventsPage() {
       reset({
         name: "",
         projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
-        date: format(selectedBlockDate || new Date(), "yyyy-MM-dd"), // Use selectedBlockDate if available
+        date: format(defaultDate, "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
       });
     }
-  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, selectedBlockDate]);
+  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
 
 
   const filteredEvents = useMemo(() => {
@@ -166,7 +158,6 @@ export default function EventsPage() {
     }
     return currentEvents.map(event => {
       let hasOverlap = false;
-      // Check overlap only against other events in the currently *filtered* list for the same project/view
       for (const otherEvent of currentEvents) { 
         if (event.id !== otherEvent.id && event.date === otherEvent.date) {
           if (checkOverlap(event, otherEvent)) {
@@ -187,7 +178,7 @@ export default function EventsPage() {
       }
       acc[date].push(event);
       return acc;
-    }, {} as Record<string, (Event & { hasOverlap?: boolean })[]>);
+    }, {} as Record<string, Event[]>);
 
     Object.values(grouped).forEach(dayEvents => {
       dayEvents.sort((a, b) => {
@@ -199,15 +190,19 @@ export default function EventsPage() {
         return 0;
       });
     });
-
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [filteredEvents]);
 
-  const eventsForBlockSchedule = useMemo(() => {
-    if (!selectedBlockDate) return [];
-    const formattedDate = format(selectedBlockDate, "yyyy-MM-dd");
-    return filteredEvents.filter(event => event.date === formattedDate);
-  }, [selectedBlockDate, filteredEvents]);
+  useEffect(() => {
+    if (groupedAndSortedEvents.length > 0) {
+      const firstDateKey = groupedAndSortedEvents[0][0];
+      if (!activeBlockScheduleDateKey || !groupedAndSortedEvents.find(g => g[0] === activeBlockScheduleDateKey)) {
+        setActiveBlockScheduleDateKey(firstDateKey);
+      }
+    } else {
+      setActiveBlockScheduleDateKey(null);
+    }
+  }, [groupedAndSortedEvents, activeBlockScheduleDateKey]);
 
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
@@ -229,7 +224,8 @@ export default function EventsPage() {
         id: `evt${String(events.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
         deliverables: 0,
-        shotRequests: 0, // Initialize with 0, can be updated later
+        shotRequests: 0, 
+        hasOverlap: false,
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -242,13 +238,11 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
-    // Reset logic is handled by useEffect
     setIsEventModalOpen(true);
   };
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
-    // Reset logic for form fields is handled by useEffect
     setIsEventModalOpen(true);
   };
 
@@ -363,6 +357,7 @@ export default function EventsPage() {
                             selected={field.value ? parseISO(field.value) : undefined}
                             onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                             initialFocus
+                            defaultMonth={activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date()}
                           />
                         </PopoverContent>
                       </Popover>
@@ -463,7 +458,7 @@ export default function EventsPage() {
                             </CardTitle>
                             <CardDescription className="flex items-center">
                               {event.time}
-                              {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
+                              {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
                             </CardDescription>
                           </CardHeader>
                           <CardContent className="flex-grow">
@@ -524,7 +519,7 @@ export default function EventsPage() {
                         {!selectedProject && <TableCell>{event.project}</TableCell>}
                         <TableCell className="flex items-center">
                           {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
-                          {(event as any).hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
+                          {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
                         </TableCell>
                         <TableCell>
                           <Badge variant={
@@ -569,50 +564,40 @@ export default function EventsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
               <CardDescription>
-                View events for a selected day laid out on an hourly timeline.
+                View events for a selected day laid out on an hourly timeline. Select a day tab below to view its schedule.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4 p-4 border-b">
-                <Label htmlFor="block-schedule-date" className="whitespace-nowrap">Select Date:</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="block-schedule-date"
-                      variant={"outline"}
-                      className={cn(
-                        "w-[280px] justify-start text-left font-normal",
-                        !selectedBlockDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIconLucide className="mr-2 h-4 w-4" />
-                      {selectedBlockDate ? format(selectedBlockDate, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedBlockDate}
-                      onSelect={setSelectedBlockDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              {selectedBlockDate && eventsForBlockSchedule.length > 0 ? (
-                <BlockScheduleView 
-                  selectedDate={selectedBlockDate} 
-                  eventsForDate={eventsForBlockSchedule} 
-                />
+              {groupedAndSortedEvents.length > 0 && activeBlockScheduleDateKey ? (
+                <Tabs 
+                  value={activeBlockScheduleDateKey} 
+                  onValueChange={setActiveBlockScheduleDateKey}
+                  className="w-full"
+                >
+                  <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
+                    {groupedAndSortedEvents.map(([dateKey, _]) => (
+                      <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
+                        {format(parseISO(dateKey), "EEE, MMM d")}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {groupedAndSortedEvents.map(([dateKey, dayEvents]) => (
+                    <TabsContent key={`content-${dateKey}`} value={dateKey}>
+                      <BlockScheduleView 
+                        selectedDate={parseISO(dateKey)} 
+                        eventsForDate={dayEvents} 
+                      />
+                    </TabsContent>
+                  ))}
+                </Tabs>
               ) : (
                 <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center">
                   <CalendarIconLucide size={48} className="mb-4 text-muted" />
                   <p className="text-lg font-medium">
-                    {selectedBlockDate ? "No events scheduled for this day." : "Please select a date to view the schedule."}
+                    No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display.
                   </p>
                   <p>
-                    {selectedBlockDate ? "You can add events for " + format(selectedBlockDate, "MMMM do, yyyy") + " or choose another date." : ""}
+                    Add some events or adjust your project filter to see the timeline view.
                   </p>
                 </div>
               )}
@@ -623,5 +608,4 @@ export default function EventsPage() {
     </div>
   );
 }
-
     
