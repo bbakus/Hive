@@ -4,10 +4,10 @@
 import { Button } from "@/components/ui/button";
 import { usePhaseContext, PHASES, type Phase } from "@/contexts/PhaseContext";
 import { cn } from "@/lib/utils";
-import { Plan, Video, Scissors, PackageCheck } from 'lucide-react'; // Using more generic icons for phases
+import { ClipboardList, Video, Scissors, PackageCheck } from 'lucide-react'; // Using more generic icons for phases
 
 const phaseIcons: Record<Phase, React.ElementType> = {
-  "Plan": Plan,
+  "Plan": ClipboardList,
   "Shoot": Video,
   "Edit": Scissors,
   "Deliver": PackageCheck,
@@ -46,7 +46,7 @@ export function TopPhaseNavigation() {
 // Placeholder icons if you prefer specific ones:
 // Video, Scissors, PackageCheck are from lucide-react
 // The custom Plan icon below was causing a name collision and is not used.
-// The `Plan` icon from lucide-react is used above.
+// The `ClipboardList` icon from lucide-react is used above.
 /*
 const Plan = (props: any) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -58,3 +58,4 @@ const Plan = (props: any) => (
   </svg>
 );
 */
+
