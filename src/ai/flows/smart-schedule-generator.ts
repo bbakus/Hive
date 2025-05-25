@@ -19,6 +19,7 @@ const GenerateScheduleInputSchema = z.object({
   location: z.string().optional().describe('The specific venue or area of the event, if it has scheduling implications (e.g., "Main Stage", "Hall A", "Outdoor Area").'),
   personnel: z.array(z.string()).describe('The team members to include in the schedule.'),
   eventType: z.string().optional().describe('The type of event (e.g., concert, conference, wedding, photoshoot). This helps determine typical activities and phases.'),
+  projectEventsForDate: z.array(z.object({ name: z.string(), time: z.string() })).optional().describe('A list of specific events already planned for this date and project, including their names and approximate times. The schedule should be built around these listed events.'),
   additionalCriteria: z.string().optional().describe('Crucial constraints, preferences, or specific tasks that must be included or considered (e.g., "Alice needs a 1-hour break around 1pm", "Focus on capturing X specific moment").'),
 });
 export type GenerateScheduleInput = z.infer<typeof GenerateScheduleInputSchema>;
@@ -43,18 +44,29 @@ const prompt = ai.definePrompt({
   Key Information:
   Date: {{{date}}}
   Personnel: {{#each personnel}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+
+  {{#if projectEventsForDate}}
+  Specific Events for Today (Prioritize these):
+  {{#each projectEventsForDate}}
+  - {{{name}}} (around {{{time}}})
+  {{/each}}
+  Focus the schedule on activities supporting these listed events.
+  {{else}}
+  No specific pre-defined events listed for today. Generate a schedule based on event type and other criteria.
+  {{/if}}
+
   {{#if eventType}}
-  Event Type: {{{eventType}}}. Tailor the schedule considering typical activities, phases (e.g., setup, main event, teardown), and personnel roles common to this type of event.
+  Event Type Context: {{{eventType}}}. {{#if projectEventsForDate}}Use this to inform general activities (setup, breaks, teardown) around the specific events.{{else}}Tailor the schedule considering typical activities, phases (e.g., setup, main event, teardown), and personnel roles common to this type of event.{{/if}}
   {{/if}}
 
   {{#if location}}
-  Event Location: {{{location}}}. Consider any logistical implications or specific needs related to this location in your scheduling.
+  Event Location Context: {{{location}}}. Consider any logistical implications or specific needs related to this location in your scheduling.
   {{/if}}
 
   {{#if additionalCriteria}}
   Crucial Constraints and Preferences: {{{additionalCriteria}}}. Adhere to these specific instructions strictly. These are high-priority requirements.
   {{else}}
-  No additional specific criteria provided beyond general event type considerations.
+  No additional specific criteria provided.
   {{/if}}
 
   Output the schedule in a clear, human-readable format. For each person, list their tasks with specific start and end times (e.g., 09:00 - 10:30: Task Description).
@@ -70,7 +82,7 @@ const prompt = ai.definePrompt({
   10:00 - 12:00: Client Meeting
   ...
 
-  Ensure all listed personnel are included in the schedule.
+  Ensure all listed personnel are included in the schedule. If specific events are provided, ensure the schedule primarily supports these events.
   `,
 });
 
@@ -85,4 +97,3 @@ const generateScheduleFlow = ai.defineFlow(
     return output!;
   }
 );
-

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Cpu, Wand2, Loader2, Printer, Info, UserCheck, AlertCircle, ListChecks } from "lucide-react";
+import { Cpu, Wand2, Loader2, Printer, Info, AlertCircle, ListChecks } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { generateSchedule, type GenerateScheduleInput, type GenerateScheduleOutput } from "@/ai/flows/smart-schedule-generator";
@@ -21,8 +21,7 @@ import { useProjectContext } from "@/contexts/ProjectContext";
 import type { Event } from "@/app/(app)/events/page"; 
 import type { ShotRequest } from "@/app/(app)/events/[eventId]/shots/page";
 
-// Mock data - In a real app, this would come from a global store or API
-// This is the full set of potential events for demo purposes.
+// Using a more generic name for the mock data as it's used across the app
 const allEventsDataMock: Event[] = [
     { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20, assignedPersonnelIds: ["user001", "user002", "user006"] },
     { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5, assignedPersonnelIds: ["user003", "user007"] },
@@ -75,7 +74,8 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[]): Par
   
   for (const line of lines) {
     const trimmedLine = line.trim();
-    const personMatch = trimmedLine.match(/^([\w\s]+):$/i); 
+    // Regex to match a person's name (can include spaces, ends with a colon)
+    const personMatch = trimmedLine.match(/^([\w\s.-]+):$/i); 
     
     if (personMatch) { 
       if (currentPerson && currentPerson.items.length > 0) {
@@ -83,15 +83,18 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[]): Par
       }
       currentPerson = { name: personMatch[1].trim(), items: [] };
     } else if (currentPerson) { 
+      // Regex to match time (HH:MM or HH:MM - HH:MM) followed by a task description
       const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i); 
       let taskDescription = itemMatch ? itemMatch[2].trim() : trimmedLine;
       let taskTime = itemMatch ? itemMatch[1].trim() : "General";
       let matchedEventId: string | undefined = undefined;
 
-      for (const event of eventsForDay) {
-        if (taskDescription.toLowerCase().includes(event.name.toLowerCase())) {
-          matchedEventId = event.id;
-          break; 
+      if (eventsForDay && eventsForDay.length > 0) {
+        for (const event of eventsForDay) {
+          if (event.name && taskDescription.toLowerCase().includes(event.name.toLowerCase())) {
+            matchedEventId = event.id;
+            break; 
+          }
         }
       }
       
@@ -102,6 +105,8 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[]): Par
       });
 
     } else if (trimmedLine && !parsed.length && !currentPerson) { 
+        // Handle cases where the schedule might not start with a person's name
+        // Or if it's a single block of text without clear personnel separation.
         currentPerson = { name: "General Schedule Tasks", items: [] };
         const itemMatch = trimmedLine.match(/^(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\s*:\s*(.+)/i);
         if (itemMatch) {
@@ -116,6 +121,7 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[]): Par
     parsed.push(currentPerson);
   }
   
+  // Fallback if no structured parsing happened but there's content
   if (parsed.length === 0 && scheduleString.trim()) { 
     return [{
         name: "Generated Schedule",
@@ -136,7 +142,7 @@ export default function SchedulerPage() {
   const [location, setLocation] = useState("");
   const [selectedPersonnelNames, setSelectedPersonnelNames] = useState<string[]>([]);
   const [eventType, setEventType] = useState(""); 
-  const [additionalCriteria, setAdditionalCriteria] = useState("Ensure regular breaks for all personnel. Prioritize main stage coverage.");
+  const [additionalCriteria, setAdditionalCriteria] = useState("Ensure regular breaks for all personnel. Prioritize main stage coverage if applicable.");
   
   const [isLoading, setIsLoading] = useState(false);
   const [scheduleOutput, setScheduleOutput] = useState<GenerateScheduleOutput | null>(null);
@@ -145,7 +151,7 @@ export default function SchedulerPage() {
   const [projectEventDates, setProjectEventDates] = useState<string[]>([]);
   const [projectPersonnel, setProjectPersonnel] = useState<{ id: string; name: string; role: string }[]>([]);
 
-
+  // Effect to update available dates and personnel when project or demo data status changes
   useEffect(() => {
     if (isLoadingSettings) return;
 
@@ -157,11 +163,13 @@ export default function SchedulerPage() {
       setProjectEventDates(uniqueDates);
       
       if (uniqueDates.length > 0) {
+        // Set selectedDateString only if it's not already set or if the current one isn't in the new list
         if (!selectedDateString || !uniqueDates.includes(selectedDateString)) {
             setSelectedDateString(uniqueDates[0]);
         }
       } else {
         setSelectedDateString(undefined); 
+        setCurrentProjectEvents([]); // No events, so clear currentProjectEvents
       }
 
       const personnelIdsInProjectEvents = new Set<string>();
@@ -171,22 +179,21 @@ export default function SchedulerPage() {
       
       const filteredPersonnel = allAvailablePersonnelMock.filter(p => personnelIdsInProjectEvents.has(p.id));
       setProjectPersonnel(filteredPersonnel);
+      // Keep currently selected personnel if they are still in the filtered list
       setSelectedPersonnelNames(prev => prev.filter(name => filteredPersonnel.some(p => p.name === name)));
 
     } else { 
+      // Reset everything if no project or demo data is off
       setCurrentProjectEvents([]);
       setProjectEventDates([]);
       setProjectPersonnel([]);
       setSelectedDateString(undefined);
       setSelectedPersonnelNames([]);
-      // Optionally reset other fields like eventType, location, additionalCriteria if desired when project changes
-      // setEventType(""); 
-      // setLocation("");
     }
-    // Reset schedule output when project changes
+    // Reset schedule output when project context changes
     setScheduleOutput(null);
     setParsedSchedule([]);
-  }, [selectedProjectId, useDemoData, isLoadingSettings]); 
+  }, [selectedProjectId, useDemoData, isLoadingSettings, selectedDateString]); // Added selectedDateString to dependencies
 
   const eventsForSelectedDate = useMemo(() => {
     if (!selectedDateString || !useDemoData) return [];
@@ -219,11 +226,17 @@ export default function SchedulerPage() {
     setScheduleOutput(null);
     setParsedSchedule([]);
 
+    const projectEventsForDateInput = eventsForSelectedDate.map(event => ({
+      name: event.name,
+      time: event.time,
+    }));
+
     const input: GenerateScheduleInput = {
       date: selectedDateString,
       location: location.trim() || undefined,
       personnel: selectedPersonnelNames,
       eventType: eventType.trim() || undefined,
+      projectEventsForDate: projectEventsForDateInput.length > 0 ? projectEventsForDateInput : undefined,
       additionalCriteria: additionalCriteria.trim() || undefined,
     };
 
@@ -286,7 +299,7 @@ export default function SchedulerPage() {
         <CardHeader>
           <CardTitle>Generate New Schedule</CardTitle>
           <CardDescription>
-            Provide details to generate an optimized schedule. Date and Personnel are populated based on the selected project.
+            Provide details to generate an optimized schedule. Date and Personnel are dynamically populated based on the selected project's events.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -300,7 +313,7 @@ export default function SchedulerPage() {
                   disabled={projectEventDates.length === 0 || isSchedulerFormDisabled}
                 >
                   <SelectTrigger id="date-select" className={!selectedDateString && projectEventDates.length > 0 ? "text-muted-foreground" : ""}>
-                    <SelectValue placeholder={projectEventDates.length > 0 ? "Select a date" : (selectedProject ? "No event dates for project" : "Select a project first")} />
+                    <SelectValue placeholder={projectEventDates.length > 0 ? "Select a date" : (selectedProject && useDemoData ? "No event dates for project" : "Select a project or enable demo data")} />
                   </SelectTrigger>
                   <SelectContent>
                     {projectEventDates.map(dateStr => (
@@ -310,17 +323,17 @@ export default function SchedulerPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Dates are dynamically populated based on events scheduled for the selected project. Choose a relevant date.</p>
+                <p className="text-xs text-muted-foreground mt-1">Select a date with scheduled events for the current project.</p>
               </div>
               <div>
                 <Label htmlFor="location">Location (Optional)</Label>
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" disabled={isSchedulerFormDisabled} />
-                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing"). If scheduling for specific sub-locations or venues from your selected project, reference them in 'Additional Criteria' for more granular AI focus.</p>
+                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing"). If scheduling for specific sub-locations or venues from your selected project's events, reference them in 'Additional Criteria' for more granular AI focus.</p>
               </div>
               <div>
                 <Label htmlFor="eventType">Event Type (Optional)</Label>
                 <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Music Festival Day 1, Conference Keynotes" disabled={isSchedulerFormDisabled}/>
-                <p className="text-xs text-muted-foreground mt-1">Optional. Providing a descriptive type (e.g., "Concert - Main Performances", "Wedding Reception Coverage", "Tech Expo - Booth Setup") helps the AI understand typical activities, phases, and resource needs. Be specific for best results.</p>
+                <p className="text-xs text-muted-foreground mt-1">Optional. Providing a descriptive type (e.g., "Concert - Main Performances", "Wedding Reception Coverage", "Tech Expo - Booth Setup") helps the AI understand typical activities and phases. Be specific for best results.</p>
               </div>
             </div>
 
@@ -346,11 +359,11 @@ export default function SchedulerPage() {
               ) : (
                  <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-[10rem] flex items-center justify-center bg-muted/50">
                     <p className="text-center">
-                      {isSchedulerFormDisabled ? (selectedProject ? "Enable demo data or ensure project has events with assigned personnel." : "Select a project to see available personnel.") : (selectedProject ? "No personnel assigned to events in this project, or no personnel data found for this project." : "Select a project.")}
+                      {isSchedulerFormDisabled ? (selectedProject && useDemoData ? "Enable demo data or ensure project has events with assigned personnel." : "Select a project to see available personnel.") : (selectedProject && useDemoData ? "No personnel assigned to this project's events." : "Select a project and ensure demo data is active.")}
                     </p>
                   </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">Personnel list is dynamically populated based on assignments in the selected project's events. Select all relevant team members.</p>
+              <p className="text-xs text-muted-foreground mt-1">Personnel assigned to events in the selected project. Select all relevant team members for this schedule.</p>
             </div>
             
             <div className="md:col-span-2 space-y-2">
@@ -359,11 +372,11 @@ export default function SchedulerPage() {
                 id="additionalCriteria" 
                 value={additionalCriteria} 
                 onChange={(e) => setAdditionalCriteria(e.target.value)} 
-                placeholder="e.g., 'Alice needs a 1-hour break around 1pm', 'Focus on capturing opening act for Main Stage - Day 1', 'Bob is on setup crew from 8am-10am only', equipment constraints, VIP presence. Be specific for best results." 
+                placeholder="e.g., 'Alice needs a 1-hour break around 1pm', 'Focus on capturing opening act for Main Stage - Day 1', 'Bob is on setup crew from 8am-10am only', equipment constraints, VIP presence. Be specific for best results. Mention specific event names from the selected date if you want to highlight them." 
                 rows={4}
                 disabled={isSchedulerFormDisabled}
               />
-                <p className="text-xs text-muted-foreground mt-1">List any must-have items, strict preferences, or specific tasks. The AI will prioritize these. If scheduling for multiple distinct events on the same day, ensure they are clearly named here if not covered by 'Event Type'.</p>
+                <p className="text-xs text-muted-foreground mt-1">List any must-have items, strict preferences, or specific tasks. The AI will prioritize these. If scheduling for multiple distinct events on the same day (from your project), ensure they are clearly named here or in the 'Event Type' if not covered by 'Specific Events' passed to AI.</p>
             </div>
           </CardContent>
           <CardFooter>
@@ -413,7 +426,7 @@ export default function SchedulerPage() {
                                 <span className="sm:ml-2 flex-grow">{item.task}</span>
                               </div>
                               {eventForTask && shotsForEvent.length > 0 && (
-                                <div className="mt-1.5 pl-4 sm:pl-[calc(10rem+0.5rem)] text-xs">
+                                <div className="mt-1.5 pl-4 sm:pl-[calc(10rem+0.5rem)] text-xs"> {/* Adjusted padding for sm: */}
                                   <p className="font-medium text-muted-foreground flex items-center gap-1.5">
                                     <ListChecks className="h-3.5 w-3.5" /> 
                                     Shot Requests for "{eventForTask.name}":
