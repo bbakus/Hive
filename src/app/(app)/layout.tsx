@@ -113,15 +113,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <AppSidebar />
             <SidebarInset>
               <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:px-6">
-                <SidebarTrigger className="md:hidden" />
-                {/* Placeholder for potential left-aligned header items if needed */}
-                <div className="flex-1"></div> 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4"> {/* Container for left-aligned items */}
+                  <SidebarTrigger className="md:hidden" />
+                  <TopPhaseNavigation />
+                </div>
+                <div className="flex-1"></div> {/* Spacer */}
+                <div className="flex items-center gap-4"> {/* Container for right-aligned items */}
                   <ProjectSelector />
                   <UserNav />
                 </div>
               </header>
-              <TopPhaseNavigation /> {/* New top-level phase navigator */}
+              {/* TopPhaseNavigation was here, now moved into the header */}
               <main className="flex-1 p-4 sm:p-6 md:p-8">
                 {children}
               </main>
