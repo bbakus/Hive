@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -108,21 +108,25 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour); 
   endDate = setMinutes(endDate, endMinute);
 
+  // Handle overnight events or simple end time before start time on same day (e.g. 22:00 - 02:00)
   if (isBefore(endDate, startDate)) {
+     // Assuming if end time is earlier than start time, it's on the next day
     endDate.setDate(endDate.getDate() + 1);
   }
+
 
   return { start: startDate, end: endDate };
 };
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false;
+  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false; // Only check for overlaps on the same day for different events
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false;
+  if (!timesA || !timesB) return false; // If time parsing fails, assume no overlap or handle error
 
+  // Overlap condition: (StartA < EndB) and (EndA > StartB)
   return isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
 };
 
@@ -135,7 +139,10 @@ export default function EventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
+  
   const [activeBlockScheduleDateKey, setActiveBlockScheduleDateKey] = useState<string | null>(null);
+
+
   const { toast } = useToast();
 
   const {
@@ -157,7 +164,15 @@ export default function EventsPage() {
   }, [useDemoData, isLoadingSettings]);
   
   useEffect(() => {
-    const defaultDate = activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date();
+    // Determine a default date for the event form
+    let defaultEventDate = new Date(); // Today
+    if (activeBlockScheduleDateKey) {
+      const parsedKeyDate = parseISO(activeBlockScheduleDateKey);
+      if (isValid(parsedKeyDate)) {
+        defaultEventDate = parsedKeyDate;
+      }
+    }
+    
     if (editingEvent) {
       reset({
         name: editingEvent.name,
@@ -171,7 +186,7 @@ export default function EventsPage() {
       reset({
         name: "",
         projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
-        date: format(defaultDate, "yyyy-MM-dd"),
+        date: format(defaultEventDate, "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
         assignedPersonnelIds: [],
@@ -187,8 +202,9 @@ export default function EventsPage() {
     }
     return currentEvents.map(event => {
       let hasOverlap = false;
+      // Check for overlaps only within the currently filtered set of events
       for (const otherEvent of currentEvents) { 
-        if (event.id !== otherEvent.id && event.date === otherEvent.date) {
+        if (event.id !== otherEvent.id && event.date === otherEvent.date) { // Make sure it's the same day
           if (checkOverlap(event, otherEvent)) {
             hasOverlap = true;
             break;
@@ -196,12 +212,13 @@ export default function EventsPage() {
         }
       }
       return { ...event, hasOverlap };
+    // Sort primarily by date, then by start time within each date
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
   }, [selectedProject, events]);
 
   const groupedAndSortedEvents = useMemo(() => {
     const grouped = filteredEvents.reduce((acc, event) => {
-      const date = event.date;
+      const date = event.date; // Assuming date is 'YYYY-MM-DD'
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -209,6 +226,7 @@ export default function EventsPage() {
       return acc;
     }, {} as Record<string, Event[]>);
 
+    // Sort events within each day by start time
     Object.values(grouped).forEach(dayEvents => {
       dayEvents.sort((a, b) => {
         const timesA = parseEventTimes(a.date, a.time);
@@ -216,20 +234,22 @@ export default function EventsPage() {
         if (timesA && timesB) {
           return timesA.start.getTime() - timesB.start.getTime();
         }
-        return 0;
+        return 0; // Fallback if time parsing fails
       });
     });
+    // Sort the groups (days) by date
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [filteredEvents]);
 
   useEffect(() => {
     if (groupedAndSortedEvents.length > 0) {
       const firstDateKey = groupedAndSortedEvents[0][0];
+      // If there's no active key, or if the current active key is no longer in the sorted list (e.g. due to project filter change)
       if (!activeBlockScheduleDateKey || !groupedAndSortedEvents.find(g => g[0] === activeBlockScheduleDateKey)) {
         setActiveBlockScheduleDateKey(firstDateKey);
       }
     } else {
-      setActiveBlockScheduleDateKey(null);
+      setActiveBlockScheduleDateKey(null); // No events, so no active date
     }
   }, [groupedAndSortedEvents, activeBlockScheduleDateKey]);
 
@@ -250,11 +270,11 @@ export default function EventsPage() {
     } else {
       const newEvent: Event = {
         ...data,
-        id: `evt${String(events.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        id: `evt${String(events.length + initialEventsMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
         deliverables: 0, 
-        shotRequests: 0, 
-        hasOverlap: false, 
+        shotRequests: 0, // New events start with 0 shots defined
+        hasOverlap: false, // Will be recalculated by useMemo
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -267,6 +287,7 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
+    // Date for new event will be set by useEffect based on activeBlockScheduleDateKey or today
     setIsEventModalOpen(true);
   };
 
@@ -277,7 +298,7 @@ export default function EventsPage() {
 
   const closeEventModal = () => {
     setIsEventModalOpen(false);
-    setEditingEvent(null); 
+    setEditingEvent(null); // Reset editing state
   };
 
   const handleDeleteClick = (eventId: string) => {
@@ -321,15 +342,17 @@ export default function EventsPage() {
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
       }}>
-        <DialogContent className="sm:max-w-2xl"> 
+        <DialogContent className="sm:max-w-2xl"> {/* Increased width */}
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Event" : "Add New Event"}</DialogTitle>
             <DialogDescription>
               {editingEvent ? "Update the details for this event." : "Fill in the details below to create a new event."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4"> {/* Increased main gap */}
+            {/* Form content split into two columns on medium screens and up */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"> {/* Column definition and gap */}
+              {/* Left Column: Event Details */}
               <div className="space-y-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
@@ -348,6 +371,8 @@ export default function EventsPage() {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
+                          // Ensure defaultValue is properly set, especially when adding.
+                          // editingEvent might be null, or field.value might not be set yet.
                           defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
                         >
                           <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
@@ -391,7 +416,8 @@ export default function EventsPage() {
                                     selected={field.value ? parseISO(field.value) : undefined}
                                     onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                                     initialFocus
-                                    defaultMonth={activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date()}
+                                    // Default month for calendar to open to:
+                                    defaultMonth={field.value ? parseISO(field.value) : (activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date())}
                                 />
                                 </PopoverContent>
                             </Popover>
@@ -432,13 +458,14 @@ export default function EventsPage() {
                 </div>
               </div>
 
+              {/* Right Column: Assign Personnel */}
               <div className="space-y-2">
                 <Label>Assign Personnel</Label>
                 <ScrollArea className="h-60 w-full rounded-md border p-4">
                   <Controller
                     name="assignedPersonnelIds"
                     control={control}
-                    defaultValue={[]}
+                    defaultValue={[]} // Ensure it has a default value
                     render={({ field }) => (
                       <div className="space-y-2">
                         {availablePersonnelList.map((person) => (
@@ -543,14 +570,20 @@ export default function EventsPage() {
                                 Assigned: {event.assignedPersonnelIds.length}
                               </p>
                             )}
-                            <p className="text-xs text-muted-foreground">Shot Requests: {event.shotRequests}</p>
+                            <Link href={`/events/${event.id}/shots`} className="text-xs text-accent hover:underline flex items-center">
+                                <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                                Shot Requests: {event.shotRequests}
+                            </Link>
                             <p className="text-xs text-muted-foreground">Deliverables: {event.deliverables}</p>
                           </CardContent>
-                          <CardFooter className="border-t pt-3">
-                             <Button variant="outline" size="sm" asChild className="w-full">
+                          <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center gap-2">
+                             <Button variant="outline" size="sm" asChild className="w-full sm:w-auto flex-1">
                                 <Link href={`/events/${event.id}/shots`}>
-                                  <Eye className="mr-2 h-4 w-4" /> View/Manage Shots
+                                  <Eye className="mr-2 h-4 w-4" /> Manage Shots
                                 </Link>
+                              </Button>
+                               <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto flex-1">
+                                <Edit className="mr-2 h-4 w-4" /> Edit Event
                               </Button>
                           </CardFooter>
                         </Card>
@@ -560,7 +593,7 @@ export default function EventsPage() {
                 ))
               ) : (
                 <p className="text-muted-foreground text-center py-8">
-                  No events scheduled {selectedProject ? `for ${selectedProject.name}` : "that match your criteria"}.
+                  No events scheduled {selectedProject ? `for ${selectedProject.name}` : "that match your criteria"}. {useDemoData ? 'Toggle "Load Demo Data" in settings or add an event.' : 'Add an event to get started.'}
                 </p>
               )}
             </CardContent>
@@ -610,7 +643,11 @@ export default function EventsPage() {
                         <TableCell className="text-center">
                           {event.assignedPersonnelIds?.length || 0}
                         </TableCell>
-                        <TableCell>{event.shotRequests}</TableCell>
+                        <TableCell>
+                           <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
+                            {event.shotRequests}
+                          </Link>
+                        </TableCell>
                         <TableCell>{event.deliverables}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
@@ -633,8 +670,8 @@ export default function EventsPage() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-muted-foreground text-center py-8">
-                  No events found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}.
+                 <p className="text-muted-foreground text-center py-8">
+                  No events found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}. {useDemoData ? 'Toggle "Load Demo Data" in settings or add an event.' : 'Add an event to get started.'}
                 </p>
               )}
             </CardContent>
@@ -647,17 +684,18 @@ export default function EventsPage() {
               <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
               <CardDescription>
                 View events for a selected day laid out on an hourly timeline. Select a day tab below to view its schedule.
+                 {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {groupedAndSortedEvents.length > 0 && activeBlockScheduleDateKey ? (
                 <Tabs 
                   value={activeBlockScheduleDateKey} 
-                  onValueChange={setActiveBlockScheduleDateKey}
+                  onValueChange={setActiveBlockScheduleDateKey} // This will update the active key when a tab is clicked
                   className="w-full"
                 >
                   <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
-                    {groupedAndSortedEvents.map(([dateKey, _]) => (
+                    {groupedAndSortedEvents.map(([dateKey, _]) => ( // Iterate over sorted day groups
                       <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
                         {format(parseISO(dateKey), "EEE, MMM d")}
                       </TabsTrigger>
@@ -666,20 +704,20 @@ export default function EventsPage() {
                   {groupedAndSortedEvents.map(([dateKey, dayEvents]) => (
                     <TabsContent key={`content-${dateKey}`} value={dateKey}>
                       <BlockScheduleView 
-                        selectedDate={parseISO(dateKey)} 
-                        eventsForDate={dayEvents} 
+                        selectedDate={parseISO(dateKey)} // Pass the actual Date object
+                        eventsForDate={dayEvents} // Pass only events for this specific day
                       />
                     </TabsContent>
                   ))}
                 </Tabs>
               ) : (
-                <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center">
+                <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
                   <CalendarIconLucide size={48} className="mb-4 text-muted" />
                   <p className="text-lg font-medium">
-                    No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display.
+                    No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display in timeline.
                   </p>
                   <p>
-                    Add some events or adjust your project filter to see the timeline view.
+                    {useDemoData ? 'Add some events for the selected project or adjust your project filter to see the timeline view.' : 'Add events to see the timeline view.'}
                   </p>
                 </div>
               )}
@@ -690,3 +728,4 @@ export default function EventsPage() {
     </div>
   );
 }
+
