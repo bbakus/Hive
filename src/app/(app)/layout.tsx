@@ -4,17 +4,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  FolderKanban,
-  CalendarDays,
-  Users,
-  ClipboardList,
-  Cpu,
-  Settings,
-  LifeBuoy,
-  Film, // New icon for Post-Production
-} from "lucide-react";
-import {
   SidebarProvider,
   Sidebar,
   SidebarHeader,
@@ -31,38 +20,20 @@ import { Button } from "@/components/ui/button";
 import { UserNav } from "@/components/user-nav";
 import { Icons } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react"; // Keep this if NavItem still uses it
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { PhaseProvider, usePhaseContext, constantTopNavItems, constantFooterNavItems, type NavItem } from "@/contexts/PhaseContext";
 import { ProjectSelector } from "@/components/project-selector";
+import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  matchStartsWith?: boolean;
-};
-
-// Updated navItems for phase-based navigation
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true },
-  { href: "/projects", label: "Projects (Plan)", icon: FolderKanban, matchStartsWith: true },
-  { href: "/events", label: "Events (Plan & Shoot)", icon: CalendarDays, matchStartsWith: true },
-  { href: "/personnel", label: "Personnel (Plan)", icon: Users, matchStartsWith: true },
-  { href: "/scheduler", label: "Smart Scheduler (Plan)", icon: Cpu, matchStartsWith: true },
-  { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
-  { href: "/deliverables", label: "Deliverables (Deliver)", icon: ClipboardList, matchStartsWith: true },
-];
-
-// Updated footerNavItems
-const footerNavItems: NavItem[] = [
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/support", label: "Support", icon: LifeBuoy },
-];
 
 function AppSidebar() {
   const pathname = usePathname();
   const { open } = useSidebar();
+  const { activePhase, getNavItemsForPhase } = usePhaseContext();
+
+  const currentPhaseNavItems = getNavItemsForPhase(activePhase);
 
   return (
     <Sidebar collapsible="icon">
@@ -74,8 +45,24 @@ function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="flex-1 p-2">
         <SidebarMenu>
-          {navItems.map((item) => (
+          {constantTopNavItems.map((item) => (
             <SidebarMenuItem key={item.href}>
+               <Link href={item.href} legacyBehavior passHref>
+                <SidebarMenuButton
+                  asChild
+                  isActive={item.matchStartsWith ? pathname.startsWith(item.href) : pathname === item.href}
+                  tooltip={{children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground"}}
+                >
+                  <a>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </a>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          ))}
+          {currentPhaseNavItems.map((item) => (
+            <SidebarMenuItem key={`${activePhase}-${item.href}`}>
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
                   asChild
@@ -94,7 +81,7 @@ function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-sidebar-border">
         <SidebarMenu>
-           {footerNavItems.map((item) => (
+           {constantFooterNavItems.map((item) => (
             <SidebarMenuItem key={item.href}>
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
@@ -121,21 +108,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsProvider>
       <ProjectProvider>
-        <SidebarProvider defaultOpen={true}>
-          <AppSidebar />
-          <SidebarInset>
-            <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
-              <SidebarTrigger className="md:hidden" />
-              <ProjectSelector />
-              <div className="flex items-center gap-4 ml-auto">
-                <UserNav />
-              </div>
-            </header>
-            <main className="flex-1 p-4 sm:p-6 md:p-8">
-              {children}
-            </main>
-          </SidebarInset>
-        </SidebarProvider>
+        <PhaseProvider> {/* PhaseProvider wraps components that need phase context */}
+          <SidebarProvider defaultOpen={true}>
+            <AppSidebar />
+            <SidebarInset>
+              <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:px-6">
+                <SidebarTrigger className="md:hidden" />
+                {/* Placeholder for potential left-aligned header items if needed */}
+                <div className="flex-1"></div> 
+                <div className="flex items-center gap-4">
+                  <ProjectSelector />
+                  <UserNav />
+                </div>
+              </header>
+              <TopPhaseNavigation /> {/* New top-level phase navigator */}
+              <main className="flex-1 p-4 sm:p-6 md:p-8">
+                {children}
+              </main>
+            </SidebarInset>
+          </SidebarProvider>
+        </PhaseProvider>
       </ProjectProvider>
     </SettingsProvider>
   );
