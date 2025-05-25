@@ -12,6 +12,7 @@ import {
   Cpu,
   Settings,
   LifeBuoy,
+  Film, // New icon for Post-Production
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -32,7 +33,7 @@ import { Icons } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import { ProjectProvider } from "@/contexts/ProjectContext";
-import { SettingsProvider } from "@/contexts/SettingsContext"; // Import SettingsProvider
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ProjectSelector } from "@/components/project-selector";
 
 type NavItem = {
@@ -42,16 +43,19 @@ type NavItem = {
   matchStartsWith?: boolean;
 };
 
+// Updated navItems for phase-based navigation
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true },
-  { href: "/events", label: "Events", icon: CalendarDays, matchStartsWith: true },
-  { href: "/personnel", label: "Personnel", icon: Users, matchStartsWith: true },
-  { href: "/deliverables", label: "Deliverables", icon: ClipboardList, matchStartsWith: true },
-  { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true },
+  { href: "/projects", label: "Projects (Plan)", icon: FolderKanban, matchStartsWith: true },
+  { href: "/events", label: "Events (Plan & Shoot)", icon: CalendarDays, matchStartsWith: true },
+  { href: "/personnel", label: "Personnel (Plan)", icon: Users, matchStartsWith: true },
+  { href: "/scheduler", label: "Smart Scheduler (Plan)", icon: Cpu, matchStartsWith: true },
+  { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
+  { href: "/deliverables", label: "Deliverables (Deliver)", icon: ClipboardList, matchStartsWith: true },
 ];
 
+// Updated footerNavItems
 const footerNavItems: NavItem[] = [
-  { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/support", label: "Support", icon: LifeBuoy },
 ];
@@ -73,8 +77,8 @@ function AppSidebar() {
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
                <Link href={item.href} legacyBehavior passHref>
-                <SidebarMenuButton 
-                  asChild 
+                <SidebarMenuButton
+                  asChild
                   isActive={item.matchStartsWith ? pathname.startsWith(item.href) : pathname === item.href}
                   tooltip={{children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground"}}
                 >
@@ -93,8 +97,8 @@ function AppSidebar() {
            {footerNavItems.map((item) => (
             <SidebarMenuItem key={item.href}>
                <Link href={item.href} legacyBehavior passHref>
-                <SidebarMenuButton 
-                  asChild 
+                <SidebarMenuButton
+                  asChild
                   isActive={item.matchStartsWith ? pathname.startsWith(item.href) : pathname === item.href}
                   tooltip={{children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground"}}
                 >
@@ -115,7 +119,7 @@ function AppSidebar() {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SettingsProvider> {/* Wrap with SettingsProvider */}
+    <SettingsProvider>
       <ProjectProvider>
         <SidebarProvider defaultOpen={true}>
           <AppSidebar />
