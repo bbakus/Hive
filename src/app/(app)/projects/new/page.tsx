@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -19,9 +19,9 @@ import { useProjectContext, type KeyPersonnel } from "@/contexts/ProjectContext"
 import { ArrowLeft, ArrowRight, CheckCircle, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-// Simplified type for local use in this wizard
+// Updated type for local use in this wizard, ensuring capabilities is always an array
 type WizardAvailablePersonnel = {
-  id: string; // This will be used as personnelId for the KeyPersonnel objects
+  id: string;
   name: string;
   capabilities: string[];
 };
@@ -50,11 +50,12 @@ const projectWizardSchema = z.object({
   status: z.enum(["Planning", "In Progress", "Completed", "On Hold", "Cancelled"]),
   location: z.string().optional(),
   keyPersonnel: z.array(keyPersonnelSchema).optional(),
-  selectedPersonnelMap: z.record(z.boolean()).optional(),
+  selectedPersonnelMap: z.record(z.boolean()).optional(), // For managing checkbox selections
 });
 
 type ProjectWizardFormDataInternal = z.infer<typeof projectWizardSchema>;
 
+// For ProjectContext, ensure all fields from ProjectFormData (from ProjectContext) are covered
 type ProjectContextInputData = Omit<import('@/contexts/ProjectContext').ProjectFormData, 'organizationId' | 'createdByUserId'> & {
   location?: string;
   keyPersonnel?: KeyPersonnel[];
@@ -80,7 +81,7 @@ export default function NewProjectWizardPage() {
     reset,
   } = useForm<ProjectWizardFormDataInternal>({
     resolver: zodResolver(projectWizardSchema),
-    mode: "onChange",
+    mode: "onChange", // 'onChange' is good for instant feedback
     defaultValues: {
       name: "",
       startDate: new Date().toISOString().split('T')[0],
@@ -94,8 +95,9 @@ export default function NewProjectWizardPage() {
   });
 
   const selectedPersonnelMap = watch("selectedPersonnelMap");
-  const watchedKeyPersonnel = watch("keyPersonnel");
+  const watchedKeyPersonnel = watch("keyPersonnel") || []; // Ensure it's always an array
 
+  // Effect to synchronize selectedPersonnelMap (checkboxes) with keyPersonnel array (form data)
   useEffect(() => {
     if (selectedPersonnelMap === undefined) return;
 
@@ -103,18 +105,18 @@ export default function NewProjectWizardPage() {
     const previousKeyPersonnel = getValues("keyPersonnel") || [];
 
     availablePersonnelList.forEach(person => {
-      if (selectedPersonnelMap[person.id]) { // Check map using person.id
-        const existingEntry = previousKeyPersonnel.find(kp => kp.personnelId === person.id); // Find using person.id
+      if (selectedPersonnelMap[person.id]) { // If person is checked
+        const existingEntry = previousKeyPersonnel.find(kp => kp.personnelId === person.id);
         newKeyPersonnelArray.push({
-          personnelId: person.id, // Store person.id as personnelId
+          personnelId: person.id,
           name: person.name,
-          projectRole: existingEntry?.projectRole || "",
+          projectRole: existingEntry?.projectRole || "", // Preserve role if already set
         });
       }
     });
     
-    const currentKeyPersonnelInForm = getValues("keyPersonnel") || [];
-    if (JSON.stringify(newKeyPersonnelArray) !== JSON.stringify(currentKeyPersonnelInForm)) {
+    // Only update if the array content actually changes to avoid infinite loops
+    if (JSON.stringify(newKeyPersonnelArray) !== JSON.stringify(getValues("keyPersonnel"))) {
         setValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
     }
 
@@ -135,10 +137,11 @@ export default function NewProjectWizardPage() {
         for (let i = 0; i < keyPersonnelValues.length; i++) {
           const kp = keyPersonnelValues[i];
           if (!kp.projectRole || kp.projectRole.trim() === "") {
-            control.setError(`keyPersonnel.${i}.projectRole`, { type: "manual", message: "Role is required." });
+            // Error will be set on the specific select input by the Controller if Zod schema demands it.
+            // Zod schema for keyPersonnelSchema requires projectRole.
+            // We can provide a general toast if any role is missing.
             allRolesValid = false;
-          } else {
-            control.clearErrors(`keyPersonnel.${i}.projectRole`);
+            break; // Exit loop early if one invalid role is found
           }
         }
       }
@@ -148,20 +151,23 @@ export default function NewProjectWizardPage() {
           description: "Please assign a project role to all selected key personnel.",
           variant: "destructive",
         });
-        return;
+        isValidStep = false; // Prevent proceeding
+      } else {
+         // If all manually checked roles are fine, then validate the whole array with Zod
+        isValidStep = await trigger("keyPersonnel");
       }
-      isValidStep = allRolesValid ? await trigger("keyPersonnel") : false;
     } else if (currentStep === 3) {
-      fieldsToValidate.push("location");
-      isValidStep = await trigger(fieldsToValidate);
+      fieldsToValidate.push("location"); // Assuming location is optional, direct trigger might be okay.
+                                       // If it has specific validations, list them.
+      isValidStep = await trigger("location");
     } else {
-        isValidStep = true;
+        isValidStep = true; // For Step 4 (Review), no new validation, just display.
     }
 
     if (isValidStep) {
       setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
-    } else if (currentStep === 1 && errors.name) {
-      toast({ title: "Core Details Incomplete", description: errors.name.message || "Please fill all required fields for Step 1.", variant: "destructive" });
+    } else if (currentStep === 1 && (errors.name || errors.startDate || errors.endDate || errors.status)) {
+      toast({ title: "Core Details Incomplete", description: "Please fill all required fields for Step 1.", variant: "destructive" });
     }
   };
 
@@ -170,7 +176,8 @@ export default function NewProjectWizardPage() {
   };
 
   const onSubmit: SubmitHandler<ProjectWizardFormDataInternal> = (data) => {
-    const finalKeyPersonnel = data.keyPersonnel || [];
+    // Filter out any keyPersonnel entries that might be empty if the form allows (though schema should prevent this)
+    const finalKeyPersonnel = (data.keyPersonnel || []).filter(kp => kp.personnelId && kp.name && kp.projectRole);
 
     const projectDataToSubmit: ProjectContextInputData = {
       name: data.name,
@@ -183,8 +190,8 @@ export default function NewProjectWizardPage() {
     };
 
     // TODO: In a real app, get these from auth context
-    const organizationId = "org_default_demo";
-    const userId = "user_admin_demo";
+    const organizationId = "org_default_demo"; // Example organization ID from user context
+    const userId = "user_admin_demo"; // Example user ID from user context
 
     addProject(projectDataToSubmit, organizationId, userId);
     toast({
@@ -192,7 +199,7 @@ export default function NewProjectWizardPage() {
       description: `Project "${data.name}" has been successfully created.`,
     });
     router.push("/projects");
-    reset();
+    reset(); // Reset form after successful submission
   };
 
   const progressValue = (currentStep / TOTAL_STEPS) * 100;
@@ -271,90 +278,71 @@ export default function NewProjectWizardPage() {
             <>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Step 2: Assign Key Roles &amp; Personnel</CardTitle>
-                <CardDescription>Select team members for this project and assign their project-specific roles from their capabilities. (Optional)</CardDescription>
+                <CardDescription>Select team members for this project and assign their project-specific roles from their capabilities. Roles are required for selected personnel. (Optional step if no personnel)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Label>Select Team Members:</Label>
-                <ScrollArea className="h-40 w-full rounded-md border p-3 mb-4">
-                  {availablePersonnelList.map((person) => (
-                    <div key={person.id} className="flex items-center space-x-2 mb-1">
-                      <Checkbox
-                        id={`person-select-${person.id}`}
-                        checked={!!selectedPersonnelMap?.[person.id]}
-                        onCheckedChange={(checked) => {
-                          setValue(`selectedPersonnelMap.${person.id}`, !!checked, { shouldValidate: true, shouldDirty: true });
-                        }}
-                      />
-                      <Label htmlFor={`person-select-${person.id}`} className="font-normal">{person.name}</Label>
-                    </div>
-                  ))}
-                </ScrollArea>
-
-                {(watchedKeyPersonnel && watchedKeyPersonnel.length > 0) && <Label>Assign Roles to Selected Personnel:</Label>}
-                <ScrollArea className="h-48 w-full space-y-3">
-                  {(watchedKeyPersonnel || []).map((kpMember, index) => {
-                    const personDetails = availablePersonnelList.find(p => p.id === kpMember.personnelId);
-                    if (!personDetails) {
-                      return null;
-                    }
-                    const capabilities = personDetails.capabilities;
+                <Label>Select Team Members & Assign Roles:</Label>
+                <ScrollArea className="h-72 w-full rounded-md border p-3 space-y-3">
+                  {availablePersonnelList.map((person) => {
+                    const isSelected = !!selectedPersonnelMap?.[person.id];
+                    const keyPersonnelEntryIndex = watchedKeyPersonnel.findIndex(kp => kp.personnelId === person.id);
 
                     return (
-                      <div key={kpMember.personnelId} className="grid grid-cols-3 items-center gap-3 p-2 border rounded-md bg-muted/20">
-                        <Label htmlFor={`keyPersonnel.${index}.projectRole`} className="col-span-1 truncate text-sm" title={personDetails.name}>
-                          {personDetails.name}
-                        </Label>
-                        <div className="col-span-2">
-                          <Controller
-                            name={`keyPersonnel.${index}.projectRole`}
-                            control={control}
-                            defaultValue={kpMember.projectRole || ""}
-                            render={({ field }) => (
-                              <Select
-                                onValueChange={field.onChange}
-                                value={field.value}
-                              >
-                                <SelectTrigger className={errors.keyPersonnel?.[index]?.projectRole ? "border-destructive" : ""}>
-                                  <SelectValue placeholder="Select role..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {capabilities && capabilities.length > 0 ? (
-                                    capabilities.map(capability => (
-                                      <SelectItem key={`${kpMember.personnelId}-${capability}`} value={capability}>
-                                        {capability}
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <SelectItem value="" disabled>
-                                      {capabilities === undefined ? "Capabilities N/A" : "No capabilities defined"}
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            )}
+                      <div key={person.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Checkbox
+                            id={`person-select-${person.id}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              setValue(`selectedPersonnelMap.${person.id}`, !!checked, { shouldValidate: true, shouldDirty: true });
+                            }}
                           />
-                          {errors.keyPersonnel?.[index]?.projectRole && (
-                            <p className="text-xs text-destructive mt-1">{errors.keyPersonnel?.[index]?.projectRole?.message}</p>
-                          )}
+                          <Label htmlFor={`person-select-${person.id}`} className="font-normal w-40 truncate" title={person.name}>
+                            {person.name}
+                          </Label>
                         </div>
+                        
+                        {isSelected && keyPersonnelEntryIndex !== -1 && (
+                          <div className="flex-grow sm:ml-4 w-full sm:w-auto">
+                            <Controller
+                              name={`keyPersonnel.${keyPersonnelEntryIndex}.projectRole`}
+                              control={control}
+                              rules={{ required: "Role is required for selected personnel." }} // Add rule here
+                              render={({ field }) => (
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <SelectTrigger className={errors.keyPersonnel?.[keyPersonnelEntryIndex]?.projectRole ? "border-destructive" : ""}>
+                                    <SelectValue placeholder="Select role..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(person.capabilities && person.capabilities.length > 0) ? (
+                                      person.capabilities.map(capability => (
+                                        <SelectItem key={`${person.id}-${capability}`} value={capability}>
+                                          {capability}
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <SelectItem value="" disabled>
+                                        No capabilities defined
+                                      </SelectItem>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                            {errors.keyPersonnel?.[keyPersonnelEntryIndex]?.projectRole && (
+                              <p className="text-xs text-destructive mt-1">{errors.keyPersonnel?.[keyPersonnelEntryIndex]?.projectRole?.message}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-                  {(!watchedKeyPersonnel || watchedKeyPersonnel.length === 0) &&
-                    Object.values(selectedPersonnelMap || {}).some(isSelected => isSelected) && (
-                    <p className="text-sm text-muted-foreground p-2 text-center">
-                        Loading selected personnel for role assignment...
-                    </p>
-                  )}
-                   {(!watchedKeyPersonnel || watchedKeyPersonnel.length === 0) &&
-                    !Object.values(selectedPersonnelMap || {}).some(isSelected => isSelected) && (
-                    <p className="text-sm text-muted-foreground p-2 text-center">
-                        Select team members from the list above to assign their project roles.
-                    </p>
-                  )}
                 </ScrollArea>
                  <p className="text-xs text-muted-foreground">
-                  If key personnel are selected, their roles are required to proceed.
+                  If key personnel are selected, their roles are required to proceed. This step is optional if no personnel are being assigned.
                 </p>
               </CardContent>
             </>
@@ -422,12 +410,12 @@ export default function NewProjectWizardPage() {
                     <p className="text-sm">{getValues("location")}</p>
                   </div>
                 )}
-                {(getValues("keyPersonnel")?.length || 0) > 0 ? (
+                {(watchedKeyPersonnel?.length || 0) > 0 ? (
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Key Personnel &amp; Roles:</h3>
                     <ul className="list-disc list-inside pl-4 mt-1">
-                      {getValues("keyPersonnel")?.map(kp => (
-                        <li key={kp.personnelId} className="text-sm">{kp.name}: <span className="font-semibold">{kp.projectRole}</span></li>
+                      {watchedKeyPersonnel?.map(kp => (
+                        <li key={kp.personnelId} className="text-sm">{kp.name}: <span className="font-semibold">{kp.projectRole || "N/A"}</span></li>
                       ))}
                     </ul>
                   </div>
@@ -444,7 +432,7 @@ export default function NewProjectWizardPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
             )}
-            {currentStep === 1 && <div />}
+            {currentStep === 1 && <div />} {/* Placeholder to keep Next button on the right */}
 
             {currentStep < TOTAL_STEPS && (
               <Button type="button" onClick={handleNextStep}>
@@ -453,6 +441,7 @@ export default function NewProjectWizardPage() {
             )}
 
             {currentStep === TOTAL_STEPS && (
+              // The submit button is enabled if the overall form (checked by Zod) is valid
               <Button type="submit" disabled={!isFormOverallValid}>
                 <CheckCircle className="mr-2 h-4 w-4" /> Create Project
               </Button>
