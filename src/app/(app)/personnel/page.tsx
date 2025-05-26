@@ -35,7 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { initialEventsMock, type Event } from "@/app/(app)/events/page"; 
+import { useEventContext, type Event } from "@/contexts/EventContext"; // Correctly import Event type and useEventContext
 import { format, parseISO } from "date-fns";
 
 // --- Personnel Definitions ---
@@ -66,6 +66,7 @@ const initialPersonnelMock: Personnel[] = [
 
 export default function PersonnelPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const { allEvents, isLoadingEvents } = useEventContext(); // Use events from context
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
@@ -173,9 +174,12 @@ export default function PersonnelPage() {
 
   const handleViewSchedule = (person: Personnel) => {
     setViewingScheduleForPersonnel(person);
-    const assignedEvents = useDemoData ? initialEventsMock.filter(event => 
-        event.assignedPersonnelIds?.includes(person.id)
-    ) : [];
+    let assignedEvents: Event[] = [];
+    if (useDemoData && !isLoadingEvents && allEvents) { // use allEvents from context
+        assignedEvents = allEvents.filter(event => 
+            event.assignedPersonnelIds?.includes(person.id)
+        );
+    }
     setEventsForSelectedPersonnel(assignedEvents);
     setIsViewScheduleModalOpen(true);
   };
@@ -191,8 +195,8 @@ export default function PersonnelPage() {
   }, [personnelList, filterText]);
 
 
-  if (isLoadingSettings) {
-    return <div>Loading personnel data settings...</div>;
+  if (isLoadingSettings || isLoadingEvents) { // Check isLoadingEvents as well
+    return <div>Loading personnel data and event context...</div>;
   }
 
 
@@ -469,15 +473,15 @@ export default function PersonnelPage() {
               <div>
                 <p className="font-semibold">{initialPersonnelMock[0]?.name || "Team Member A"}:</p>
                 <ul className="list-disc list-inside pl-4">
-                  <li>{initialEventsMock[0]?.name || "Event Alpha"} ({initialEventsMock[0]?.date || "YYYY-MM-DD"})</li>
-                  <li>{initialEventsMock[3]?.name || "Event Beta"} ({initialEventsMock[3]?.date || "YYYY-MM-DD"})</li>
+                  <li>{(allEvents && allEvents.length > 0 && allEvents[0]?.name) || "Event Alpha"} ({(allEvents && allEvents.length > 0 && allEvents[0]?.date) || "YYYY-MM-DD"})</li>
+                  <li>{(allEvents && allEvents.length > 3 && allEvents[3]?.name) || "Event Beta"} ({(allEvents && allEvents.length > 3 && allEvents[3]?.date) || "YYYY-MM-DD"})</li>
                 </ul>
               </div>
                <div>
                 <p className="font-semibold">{initialPersonnelMock[1]?.name || "Team Member B"}:</p>
                 <ul className="list-disc list-inside pl-4">
-                  <li>{initialEventsMock[0]?.name || "Event Alpha"} ({initialEventsMock[0]?.date || "YYYY-MM-DD"})</li>
-                  <li>{initialEventsMock[1]?.name || "Event Gamma"} ({initialEventsMock[1]?.date || "YYYY-MM-DD"})</li>
+                   <li>{(allEvents && allEvents.length > 0 && allEvents[0]?.name) || "Event Alpha"} ({(allEvents && allEvents.length > 0 && allEvents[0]?.date) || "YYYY-MM-DD"})</li>
+                   <li>{(allEvents && allEvents.length > 1 && allEvents[1]?.name) || "Event Gamma"} ({(allEvents && allEvents.length > 1 && allEvents[1]?.date) || "YYYY-MM-DD"})</li>
                 </ul>
               </div>
               <p className="italic">... and so on for other team members.</p>
@@ -489,3 +493,6 @@ export default function PersonnelPage() {
   );
 }
 
+    
+
+    
