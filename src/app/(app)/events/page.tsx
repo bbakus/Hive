@@ -36,7 +36,7 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectContext } from "@/contexts/ProjectContext";
+import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,7 +44,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext } from "@/contexts/EventContext"; // Import useEventContext
+import { useEventContext } from "@/contexts/EventContext";
 
 type PersonnelMinimal = {
   id: string;
@@ -73,7 +73,7 @@ const eventSchema = z.object({
   deadline: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)) || val === "", {
     message: "Deadline must be a valid date-time string or empty.",
   }),
-  organizationId: z.string().optional(), // Added organizationId
+  organizationId: z.string().optional(),
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
@@ -84,7 +84,7 @@ export type Event = EventFormData & {
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
-  organizationId?: string; // Ensure this is part of the final Event type
+  organizationId?: string;
 };
 
 
@@ -114,15 +114,25 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   return { start: startDate, end: endDate };
 };
 
-const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false;
+const checkOverlap = (eventA: Event, eventB: Event, allEventsForDay: Event[]): boolean => {
+  if (eventA.id === eventB.id) return false; // An event cannot overlap with itself
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
   if (!timesA || !timesB) return false;
 
-  return isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
+  // Basic overlap check
+  const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
+  if (!basicOverlap) return false;
+
+  // Check for shared personnel if both events are overlapping in time
+  if (eventA.assignedPersonnelIds && eventB.assignedPersonnelIds) {
+    const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
+    return sharedPersonnel; // Only flag as overlap if they also share personnel
+  }
+
+  return false; // No shared personnel, so no actionable conflict for this specific check
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -140,7 +150,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProject,
+    eventsForSelectedProjectAndOrg = [], // Default to empty array
     addEvent,
     updateEvent,
     deleteEvent,
@@ -211,21 +221,26 @@ export default function EventsPage() {
 
 
   const filteredEvents = useMemo(() => {
-    let currentEvents = eventsForSelectedProject; // Already filtered by project ID from context
+    const currentEvents = eventsForSelectedProjectAndOrg || [];
+    const eventsGroupedByDay: Record<string, Event[]> = currentEvents.reduce((acc, event) => {
+        const date = event.date;
+        if (!acc[date]) acc[date] = [];
+        acc[date].push(event);
+        return acc;
+    }, {});
 
     return currentEvents.map(event => {
       let hasOverlap = false;
-      for (const otherEvent of currentEvents) {
-        if (event.id !== otherEvent.id && event.date === otherEvent.date) {
-          if (checkOverlap(event, otherEvent)) {
-            hasOverlap = true;
-            break;
-          }
+      const dayEvents = eventsGroupedByDay[event.date] || [];
+      for (const otherEvent of dayEvents) {
+        if (checkOverlap(event, otherEvent, dayEvents)) {
+          hasOverlap = true;
+          break;
         }
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [eventsForSelectedProject]);
+  }, [eventsForSelectedProjectAndOrg]);
 
   const groupedAndSortedEvents = useMemo(() => {
     const grouped = filteredEvents.reduce((acc, event) => {
@@ -271,20 +286,24 @@ export default function EventsPage() {
 
     const eventPayload = {
       ...data,
-      project: selectedProjInfo.name, // Add project name for display
-      organizationId: selectedProjInfo.organizationId, // Add organizationId
-      // deliverables and shotRequests will be set by context or default
+      project: selectedProjInfo.name, 
+      organizationId: selectedProjInfo.organizationId,
     };
 
     if (editingEvent) {
-      updateEvent(editingEvent.id, eventPayload);
+      // Ensure all properties of Event are included for updateEvent
+      const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
+        ...eventPayload,
+        deliverables: editingEvent.deliverables, // Retain existing values if not changed
+        shotRequests: editingEvent.shotRequests, // Retain existing values if not changed
+      };
+      updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
         title: "Event Updated",
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      // For addEvent, we construct the object that addEvent in Context expects
-      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'hasOverlap'> = {
+      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'> = {
         ...data,
         organizationId: selectedProjInfo.organizationId,
       };
@@ -299,7 +318,6 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
-    // Ensure projectId is set to current selectedProject or first available project
     const currentProjectId = selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : "");
     const projectInfo = allProjects.find(p => p.id === currentProjectId);
     reset({
@@ -344,7 +362,7 @@ export default function EventsPage() {
 
   const confirmDelete = () => {
     if (eventToDeleteId) {
-      const event = eventsForSelectedProject.find(e => e.id === eventToDeleteId);
+      const event = filteredEvents.find(e => e.id === eventToDeleteId);
       deleteEvent(eventToDeleteId);
       toast({
         title: "Event Deleted",
@@ -492,7 +510,6 @@ export default function EventsPage() {
                     {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
                   </div>
                 </div>
-                {/* Quick Turnaround and Deadline */}
                  <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-deadline" className="text-right col-span-1">Deadline</Label>
                   <div className="col-span-3">
@@ -599,7 +616,7 @@ export default function EventsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
               <CardDescription>
-                Visualizes events grouped by day. Events with potential time conflicts are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
+                Visualizes events grouped by day. Events with potential time conflicts (overlapping time and shared personnel) are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
                 {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
               </CardDescription>
             </CardHeader>
@@ -627,7 +644,7 @@ export default function EventsPage() {
                             </CardTitle>
                             <CardDescription className="flex items-center">
                               {event.time}
-                              {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
+                              {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
                             </CardDescription>
                              {event.deadline && (
                               <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -710,7 +727,7 @@ export default function EventsPage() {
                         {!selectedProject && <TableCell>{event.project}</TableCell>}
                         <TableCell className="flex items-center">
                           {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
-                          {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
+                          {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {event.deadline ? formatDeadline(event.deadline) : "N/A"}
