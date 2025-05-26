@@ -92,6 +92,7 @@ export default function ProjectsPage() {
     control: controlEdit,
     setValue: setEditValue,
     watch: watchEdit,
+    getValues, // Added getValues here
     formState: { errors: editErrors },
   } = useForm<ProjectEditFormData>({
     resolver: zodResolver(projectEditSchema),
@@ -401,6 +402,21 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this project? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProjectToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className={cn(buttonVariants({variant: "destructive"}))}>Delete Project</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Card className="shadow-lg">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -512,3 +528,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
