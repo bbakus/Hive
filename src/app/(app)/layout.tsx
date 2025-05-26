@@ -24,7 +24,8 @@ import { cn } from "@/lib/utils";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
-import { PhaseProvider, usePhaseContext, type Phase, PHASES as AppPhasesArray } from "@/contexts/PhaseContext"; // Import PHASES as AppPhasesArray
+import { PhaseProvider, usePhaseContext, type Phase, PHASES as AppPhasesArray } from "@/contexts/PhaseContext";
+import { EventProvider } from "@/contexts/EventContext"; // Import EventProvider
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
@@ -35,7 +36,7 @@ function AppSidebar() {
   const { open } = useSidebar();
   const { activePhase, getNavItemsForPhase, constantFooterNavItems } = usePhaseContext();
 
-  const currentPhaseNavItems = getNavItemsForPhase(activePhase) || []; 
+  const currentPhaseNavItems = getNavItemsForPhase(activePhase) || [];
 
   return (
     <Sidebar collapsible="icon">
@@ -67,7 +68,7 @@ function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-sidebar-border">
         <SidebarMenu>
-           {(constantFooterNavItems || []).map((item) => ( 
+           {(constantFooterNavItems || []).map((item) => (
             <SidebarMenuItem key={item.href}>
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
@@ -91,10 +92,9 @@ function AppSidebar() {
 
 function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activePhase, setActivePhase, PHASES: availablePhasesFromContext } = usePhaseContext(); // renamed to avoid conflict
+  const { activePhase, setActivePhase, PHASES: availablePhasesFromContext } = usePhaseContext();
   const [mounted, setMounted] = useState(false);
 
-  // Use the imported PHASES array directly if context doesn't provide it or for safety
   const availablePhases = availablePhasesFromContext || AppPhasesArray;
 
 
@@ -104,18 +104,15 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let determinedPhase: Phase | null = null;
-    const currentPath = pathname.split('?')[0]; 
+    const currentPath = pathname.split('?')[0];
 
     if (currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')) {
       determinedPhase = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-      if (activePhase === 'Shoot') { // Keep 'Shoot' if already in that phase on events page
-        determinedPhase = 'Shoot';
-      } else {
-        determinedPhase = 'Plan'; // Default /events to 'Plan' otherwise
-      }
+      // Preserve "Shoot" if already in that phase on events page, otherwise default to "Plan"
+      determinedPhase = activePhase === 'Shoot' ? 'Shoot' : 'Plan';
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/scheduler' || currentPath.startsWith('/scheduler/')) {
@@ -124,14 +121,11 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
       determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
-    } else if (currentPath === '/settings' || currentPath.startsWith('/settings/')) {
-      // If settings or support is visited, try to keep the current phase, or default to Dashboard
-      // This prevents changing the main content view just by clicking a footer link
-      determinedPhase = activePhase || 'Dashboard'; 
-    } else if (currentPath === '/support' || currentPath.startsWith('/support/')) {
+    } else if (currentPath === '/settings' || currentPath.startsWith('/support/')) {
+      // For footer items, try to keep the current main content phase, or default to Dashboard
       determinedPhase = activePhase || 'Dashboard';
     }
-    
+
 
     if (determinedPhase && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
       setActivePhase(determinedPhase);
@@ -147,8 +141,8 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
             {mounted && <SidebarTrigger className="md:hidden" />}
             <TopPhaseNavigation />
           </div>
-          <div className="flex-1"></div> 
-          <div className="flex items-center gap-4"> 
+          <div className="flex-1"></div>
+          <div className="flex items-center gap-4">
             <OrganizationSelector />
             <ProjectSelector />
             <UserNav />
@@ -167,9 +161,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SettingsProvider>
       <OrganizationProvider>
         <ProjectProvider>
-          <PhaseProvider>
-            <AppLayoutInternal>{children}</AppLayoutInternal>
-          </PhaseProvider>
+          <EventProvider>
+            <PhaseProvider>
+              <AppLayoutInternal>{children}</AppLayoutInternal>
+            </PhaseProvider>
+          </EventProvider>
         </ProjectProvider>
       </OrganizationProvider>
     </SettingsProvider>
