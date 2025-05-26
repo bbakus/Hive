@@ -11,23 +11,24 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type KeyPersonnel } from "@/contexts/ProjectContext";
-import { ArrowLeft, ArrowRight, CheckCircle, Users, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Users, MapPin, PlusCircle, UserPlus } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 
 // Updated type for local use in this wizard
 type WizardAvailablePersonnel = {
   id: string;
-  name: string;
+  name:string; // Added for consistency, though id is primary key
   capabilities: string[];
 };
 
-// Mock data for available personnel with capabilities
-const availablePersonnelList: WizardAvailablePersonnel[] = [
+// Initial mock data for available personnel with capabilities
+const initialAvailablePersonnelList: WizardAvailablePersonnel[] = [
   { id: "user001", name: "Alice Wonderland", capabilities: ["Director", "Producer", "Lead Camera Op"] },
   { id: "user002", name: "Bob The Builder", capabilities: ["Audio Engineer", "Grip", "Technical Director"] },
   { id: "user003", name: "Charlie Chaplin", capabilities: ["Producer", "Editor", "Writer"] },
@@ -37,9 +38,17 @@ const availablePersonnelList: WizardAvailablePersonnel[] = [
   { id: "user007", name: "George Jetson", capabilities: ["Tech Lead", "IT Support", "Streaming Engineer"] },
 ];
 
+const allPossibleCapabilities = [
+  "Director", "Producer", "Lead Camera Op", "Camera Operator", "Drone Pilot",
+  "Audio Engineer", "Grip", "Technical Director", "Editor", "Writer",
+  "Photographer", "Set Designer", "Coordinator", "Project Manager", "IT Support",
+  "Streaming Engineer", "Assistant"
+];
+
+
 const keyPersonnelSchema = z.object({
   personnelId: z.string(),
-  name: z.string(), // Store name for convenience in review step
+  name: z.string(), 
   projectRole: z.string().min(1, "Role is required."),
 });
 
@@ -51,7 +60,7 @@ const projectWizardSchema = z.object({
   status: z.enum(["Planning", "In Progress", "Completed", "On Hold", "Cancelled"]),
   location: z.string().optional(),
   keyPersonnel: z.array(keyPersonnelSchema).optional(),
-  selectedPersonnelMap: z.record(z.boolean()).optional(), // For checkbox state
+  selectedPersonnelMap: z.record(z.boolean()).optional(), 
 });
 
 type ProjectWizardFormDataInternal = z.infer<typeof projectWizardSchema>;
@@ -70,6 +79,11 @@ export default function NewProjectWizardPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const locationInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  const [currentAvailablePersonnel, setCurrentAvailablePersonnel] = useState<WizardAvailablePersonnel[]>(initialAvailablePersonnelList);
+  const [isAddPersonnelDialogOpen, setIsAddPersonnelDialogOpen] = useState(false);
+  const [newPersonnelName, setNewPersonnelName] = useState("");
+  const [newPersonnelCapabilities, setNewPersonnelCapabilities] = useState<Record<string, boolean>>({});
 
 
   const {
@@ -105,7 +119,7 @@ export default function NewProjectWizardPage() {
     const currentKeyPersonnelInForm = getValues("keyPersonnel") || [];
     const newKeyPersonnelArray: KeyPersonnel[] = [];
 
-    availablePersonnelList.forEach(person => {
+    currentAvailablePersonnel.forEach(person => {
       if (selectedPersonnelMap?.[person.id]) { 
         const existingEntry = currentKeyPersonnelInForm.find(kp => kp.personnelId === person.id);
         newKeyPersonnelArray.push({
@@ -116,23 +130,20 @@ export default function NewProjectWizardPage() {
       }
     });
     
+    // Prevent infinite loops by only setting value if it actually changed
     if (JSON.stringify(newKeyPersonnelArray) !== JSON.stringify(currentKeyPersonnelInForm)) {
       setValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
     }
-  }, [selectedPersonnelMap, getValues, setValue]);
+  }, [selectedPersonnelMap, getValues, setValue, currentAvailablePersonnel]);
 
-  // Effect for Google Places Autocomplete
   useEffect(() => {
-    // Ensure this runs only on the client and when the location input is part of the current step
     if (currentStep === 3 && typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places && locationInputRef.current && !autocompleteRef.current) {
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         locationInputRef.current,
         {
-          types: ["address"], // You can customize types e.g., ['geocode', 'establishment']
-          // componentRestrictions: { country: "us" }, // Optional: restrict to specific countries
+          types: ["address"], 
         }
       );
-
       autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
         if (place && place.formatted_address) {
@@ -140,14 +151,40 @@ export default function NewProjectWizardPage() {
         }
       });
     }
-    // Cleanup if the component unmounts or currentStep changes from 3
-    return () => {
-        if (autocompleteRef.current) {
-            // google.maps.event.clearInstanceListeners(autocompleteRef.current); // More thorough cleanup
-            // autocompleteRef.current = null; // May not be strictly necessary if ref is only set once
-        }
-    };
   }, [currentStep, setValue]);
+
+  const handleAddNewPersonnelToRoster = () => {
+    if (!newPersonnelName.trim()) {
+      toast({ title: "Error", description: "New personnel name cannot be empty.", variant: "destructive" });
+      return;
+    }
+    const selectedCapabilities = Object.entries(newPersonnelCapabilities)
+      .filter(([, isSelected]) => isSelected)
+      .map(([capability]) => capability);
+
+    if (selectedCapabilities.length === 0) {
+      toast({ title: "Error", description: "Please select at least one capability for the new team member.", variant: "destructive" });
+      return;
+    }
+    
+    const newId = `user_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const newPerson: WizardAvailablePersonnel = {
+      id: newId,
+      name: newPersonnelName.trim(),
+      capabilities: selectedCapabilities,
+    };
+
+    setCurrentAvailablePersonnel(prev => [...prev, newPerson]);
+    
+    // Automatically select the newly added person for the project
+    const currentMap = getValues("selectedPersonnelMap") || {};
+    setValue("selectedPersonnelMap", { ...currentMap, [newId]: true }, { shouldDirty: true });
+
+    toast({ title: "Team Member Added", description: `${newPerson.name} added to roster and selected for this project.` });
+    setIsAddPersonnelDialogOpen(false);
+    setNewPersonnelName("");
+    setNewPersonnelCapabilities({});
+  };
 
 
   const handleNextStep = async () => {
@@ -158,7 +195,7 @@ export default function NewProjectWizardPage() {
     } else if (currentStep === 2) {
       const keyPersonnelValues = getValues("keyPersonnel") || [];
       if (keyPersonnelValues.length > 0) {
-        isValidStep = await trigger("keyPersonnel");
+        isValidStep = await trigger("keyPersonnel"); // Zod schema ensures projectRole is present
         if (!isValidStep) {
           toast({
             title: "Missing Roles",
@@ -167,7 +204,7 @@ export default function NewProjectWizardPage() {
           });
         }
       } else {
-        isValidStep = true; 
+        isValidStep = true; // No personnel selected, so this step is valid.
         if (errors.keyPersonnel) {
             clearErrors("keyPersonnel");
         }
@@ -202,7 +239,6 @@ export default function NewProjectWizardPage() {
       keyPersonnel: finalKeyPersonnel,
     };
 
-    // In a real app, these would come from the authenticated user's context/session
     const organizationId = "org_default_demo"; 
     const userId = "user_admin_demo"; 
 
@@ -230,6 +266,57 @@ export default function NewProjectWizardPage() {
       </div>
 
       <Progress value={progressValue} className="w-full mb-4" />
+      
+      {/* Dialog for Adding New Personnel to Roster */}
+      <Dialog open={isAddPersonnelDialogOpen} onOpenChange={setIsAddPersonnelDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Team Member to Roster</DialogTitle>
+            <DialogDescription>
+              Define the new team member's name and their general capabilities. They will be added to the available personnel list for future projects as well.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-personnel-name" className="text-right">Name</Label>
+              <Input
+                id="new-personnel-name"
+                value={newPersonnelName}
+                onChange={(e) => setNewPersonnelName(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label className="text-right pt-1">Capabilities</Label>
+              <ScrollArea className="col-span-3 h-40 rounded-md border p-2">
+                <div className="space-y-1">
+                  {allPossibleCapabilities.map(cap => (
+                    <div key={cap} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`cap-${cap}`}
+                        checked={!!newPersonnelCapabilities[cap]}
+                        onCheckedChange={(checked) => {
+                          setNewPersonnelCapabilities(prev => ({ ...prev, [cap]: !!checked }));
+                        }}
+                      />
+                      <Label htmlFor={`cap-${cap}`} className="font-normal text-sm">{cap}</Label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => {
+              setIsAddPersonnelDialogOpen(false);
+              setNewPersonnelName("");
+              setNewPersonnelCapabilities({});
+            }}>Cancel</Button>
+            <Button type="button" onClick={handleAddNewPersonnelToRoster}>Save New Member</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card className="shadow-lg">
@@ -289,17 +376,22 @@ export default function NewProjectWizardPage() {
 
           {currentStep === 2 && (
             <>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Step 2: Assign Key Roles &amp; Personnel</CardTitle>
-                <CardDescription>Select team members for this project and assign their project-specific roles. Roles are required for selected personnel. (Optional step if no personnel are assigned).</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Step 2: Assign Key Roles &amp; Personnel</CardTitle>
+                  <CardDescription>Select team members for this project and assign their project-specific roles. Roles are required for selected personnel.</CardDescription>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => setIsAddPersonnelDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" /> Add New to Roster
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Label>Select Team Members & Assign Roles from their Capabilities:</Label>
                 <ScrollArea className="h-72 w-full rounded-md border p-3 space-y-1">
-                  {availablePersonnelList.map((person) => {
+                  {currentAvailablePersonnel.map((person) => {
                     const isSelected = !!selectedPersonnelMap?.[person.id];
                     const keyPersonnelEntryIndex = watchedKeyPersonnel.findIndex(kp => kp.personnelId === person.id);
-
+                    
                     return (
                       <div key={person.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors min-h-[40px]">
                         <Checkbox
@@ -307,17 +399,15 @@ export default function NewProjectWizardPage() {
                           checked={isSelected}
                           onCheckedChange={(checked) => {
                             const currentMap = getValues("selectedPersonnelMap") || {};
-                            const newMap = { ...currentMap, [person.id]: !!checked };
-                            setValue("selectedPersonnelMap", newMap, { shouldDirty: true });
+                            setValue("selectedPersonnelMap", { ...currentMap, [person.id]: !!checked }, { shouldDirty: true });
                           }}
                         />
                         <Label htmlFor={`person-select-${person.id}`} className="font-normal flex-grow w-40 truncate" title={person.name}>
                           {person.name}
                         </Label>
                         
-                        {isSelected && (
+                        {isSelected && keyPersonnelEntryIndex !== -1 && watchedKeyPersonnel[keyPersonnelEntryIndex] && (
                           <div className="w-60">
-                            {keyPersonnelEntryIndex !== -1 && watchedKeyPersonnel[keyPersonnelEntryIndex] ? (
                               <>
                                 <Controller
                                   name={`keyPersonnel.${keyPersonnelEntryIndex}.projectRole`}
@@ -353,17 +443,15 @@ export default function NewProjectWizardPage() {
                                   </p>
                                 )}
                               </>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">Loading role...</span>
-                            )}
                           </div>
                         )}
+                        {isSelected && keyPersonnelEntryIndex === -1 && <span className="text-xs text-muted-foreground italic w-60 text-center">Loading role assignment...</span>}
                       </div>
                     );
                   })}
                 </ScrollArea>
                  <p className="text-xs text-muted-foreground">
-                  If key personnel are selected, their roles (chosen from their capabilities) are required to proceed.
+                  If key personnel are selected, their project-specific roles (chosen from their general capabilities) are required to proceed. Add new members to the general roster if needed.
                 </p>
               </CardContent>
             </>
@@ -379,23 +467,16 @@ export default function NewProjectWizardPage() {
                 <div className="space-y-2">
                   <Label htmlFor="location">Project Location</Label>
                   <Input
-                    id="location-input" // Specific ID for the ref
-                    ref={locationInputRef} // Assign the ref here
-                    {...register("location")} // Register with react-hook-form
+                    id="location-input" 
+                    ref={locationInputRef} 
+                    {...register("location")} 
                     placeholder="e.g., City Conference Center, Remote, Multiple Venues"
                     className={errors.location ? "border-destructive" : ""}
                   />
                   {errors.location && <p className="text-xs text-destructive mt-1">{errors.location.message}</p>}
                    <p className="text-xs text-muted-foreground mt-1">
-                    Start typing to see address suggestions. (Google Maps Autocomplete placeholder - API key required for full functionality).
+                    Start typing to see address suggestions. (Google Maps Autocomplete requires API key and setup).
                   </p>
-                  {/*
-                  A real implementation would require a Google Maps API key and proper script loading.
-                  This is a symbolic placeholder. Ensure you have the Google Maps JavaScript API
-                  script loaded in your application, usually in `src/app/layout.tsx` or a similar global spot.
-                  Example script tag: <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places"></script>
-                  Replace YOUR_API_KEY with your actual key.
-                  */}
                 </div>
               </CardContent>
             </>
@@ -480,3 +561,4 @@ export default function NewProjectWizardPage() {
   );
 }
     
+
