@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Video, Camera } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +48,7 @@ import { useEventContext } from "@/contexts/EventContext";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 
 
-const eventSchema = z.object({
+export const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
   projectId: z.string().min(1, { message: "Please select a project." }),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date must be YYYY-MM-DD." }),
@@ -60,17 +60,19 @@ const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
+  discipline: z.enum(["Video", "Photography", "Both", "" ]).optional(),
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventFormData & {
   id: string;
-  project?: string; 
+  project?: string;
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
   organizationId?: string;
+  discipline?: "Video" | "Photography" | "Both" | "";
 };
 
 
@@ -93,7 +95,7 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  if (isBefore(endDate, startDate)) { 
+  if (isBefore(endDate, startDate)) {
     endDate.setDate(endDate.getDate() + 1);
   }
 
@@ -101,7 +103,7 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 };
 
 const checkOverlap = (eventA: Event, eventB: Event, allEventsForDay: Event[]): boolean => {
-  if (eventA.id === eventB.id) return false; 
+  if (eventA.id === eventB.id) return false;
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
@@ -113,9 +115,9 @@ const checkOverlap = (eventA: Event, eventB: Event, allEventsForDay: Event[]): b
 
   if (eventA.assignedPersonnelIds && eventB.assignedPersonnelIds) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
-    return sharedPersonnel; 
+    return sharedPersonnel;
   }
-  return false; 
+  return false;
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -133,7 +135,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], 
+    eventsForSelectedProjectAndOrg = [],
     addEvent,
     updateEvent,
     deleteEvent,
@@ -150,6 +152,8 @@ export default function EventsPage() {
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
+  const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
+
 
   const { toast } = useToast();
 
@@ -167,6 +171,7 @@ export default function EventsPage() {
       isQuickTurnaround: false,
       deadline: "",
       assignedPersonnelIds: [],
+      discipline: "",
     }
   });
 
@@ -190,6 +195,7 @@ export default function EventsPage() {
         isQuickTurnaround: editingEvent.isQuickTurnaround || false,
         deadline: editingEvent.deadline || "",
         organizationId: editingEvent.organizationId || "",
+        discipline: editingEvent.discipline || "",
       });
     } else {
       const firstProjectForOrg = selectedProject ? selectedProject : (allProjects.length > 0 ? allProjects[0] : null);
@@ -203,6 +209,7 @@ export default function EventsPage() {
         isQuickTurnaround: false,
         deadline: "",
         organizationId: firstProjectForOrg?.organizationId || "",
+        discipline: "",
       });
     }
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
@@ -241,7 +248,15 @@ export default function EventsPage() {
     if (filterAssignedMemberId !== "all") {
       filtered = filtered.filter(event => event.assignedPersonnelIds?.includes(filterAssignedMemberId));
     }
-    
+
+    if (filterDiscipline !== "all") {
+      filtered = filtered.filter(event => {
+        if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
+        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
+        return true; // Should not happen if filterDiscipline is "all"
+      });
+    }
+
     const eventsGroupedByDay: Record<string, Event[]> = filtered.reduce((acc, event) => {
         const date = event.date;
         if (!acc[date]) acc[date] = [];
@@ -260,7 +275,7 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId]);
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline]);
 
 
   const groupedAndSortedEventsForDisplay = useMemo(() => {
@@ -307,15 +322,16 @@ export default function EventsPage() {
 
     const eventPayload = {
       ...data,
-      project: selectedProjInfo.name, 
+      project: selectedProjInfo.name,
       organizationId: selectedProjInfo.organizationId,
+      discipline: data.discipline || "", // Ensure discipline is set
     };
 
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables, 
-        shotRequests: editingEvent.shotRequests, 
+        deliverables: editingEvent.deliverables,
+        shotRequests: editingEvent.shotRequests,
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -326,6 +342,7 @@ export default function EventsPage() {
       const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'> = {
         ...data,
         organizationId: selectedProjInfo.organizationId,
+        discipline: data.discipline || "", // Ensure discipline is set
       };
       addEvent(newEventDataForContext);
       toast({
@@ -350,6 +367,7 @@ export default function EventsPage() {
       isQuickTurnaround: false,
       deadline: "",
       organizationId: projectInfo?.organizationId || "",
+      discipline: "",
     });
     setIsEventModalOpen(true);
   };
@@ -366,6 +384,7 @@ export default function EventsPage() {
       isQuickTurnaround: event.isQuickTurnaround || false,
       deadline: event.deadline || "",
       organizationId: event.organizationId || "",
+      discipline: event.discipline || "",
     });
     setIsEventModalOpen(true);
   };
@@ -394,6 +413,14 @@ export default function EventsPage() {
     setIsDeleteDialogOpen(false);
   };
 
+  const getDisciplineIcon = (discipline?: Event['discipline']) => {
+    if (discipline === "Video") return <Video className="h-3.5 w-3.5 opacity-80" />;
+    if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
+    if (discipline === "Both") return <><Video className="h-3.5 w-3.5 opacity-80" /><Camera className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
+    return null;
+  };
+
+
   if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents) {
       return <div>Loading event data and filters...</div>;
   }
@@ -418,11 +445,11 @@ export default function EventsPage() {
             <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
             <CardDescription>Refine the events shown across all views below.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="flex items-center space-x-2">
-                <Checkbox 
-                    id="filter-quick-turnaround" 
-                    checked={filterQuickTurnaround} 
+                <Checkbox
+                    id="filter-quick-turnaround"
+                    checked={filterQuickTurnaround}
                     onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
                 />
                 <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround Only</Label>
@@ -453,6 +480,19 @@ export default function EventsPage() {
                             <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                         ))}
                          {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel assigned in current project/org.</p>}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div>
+                <Label htmlFor="filter-discipline">Discipline</Label>
+                <Select value={filterDiscipline} onValueChange={setFilterDiscipline}>
+                    <SelectTrigger id="filter-discipline">
+                        <SelectValue placeholder="Filter by discipline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Disciplines</SelectItem>
+                        <SelectItem value="Video">Video Only</SelectItem>
+                        <SelectItem value="Photography">Photography Only</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -574,6 +614,29 @@ export default function EventsPage() {
                       )}
                     />
                     {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
+                  </div>
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-discipline" className="text-right col-span-1">Discipline</Label>
+                  <div className="col-span-3">
+                    <Controller
+                      name="discipline"
+                      control={control}
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || ""}>
+                          <SelectTrigger className={errors.discipline ? "border-destructive" : ""}>
+                            <SelectValue placeholder="Select discipline (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">N/A</SelectItem>
+                            <SelectItem value="Video">Video</SelectItem>
+                            <SelectItem value="Photography">Photography</SelectItem>
+                            <SelectItem value="Both">Both</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {errors.discipline && <p className="text-xs text-destructive mt-1">{errors.discipline.message}</p>}
                   </div>
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
@@ -718,21 +781,25 @@ export default function EventsPage() {
                               </p>
                             )}
                           </CardHeader>
-                          <CardContent className="flex-grow space-y-1">
+                          <CardContent className="flex-grow space-y-1 text-xs">
                             {!selectedProject && event.project && (
-                              <p className="text-xs text-muted-foreground">Project: {event.project}</p>
+                              <p className="text-muted-foreground">Project: {event.project}</p>
                             )}
                              {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                              <p className="text-xs text-muted-foreground flex items-center">
+                              <p className="text-muted-foreground flex items-center">
                                 <Users className="mr-1.5 h-3.5 w-3.5 opacity-80" />
                                 Assigned: {event.assignedPersonnelIds.length}
                               </p>
                             )}
-                             <Link href={`/events/${event.id}/shots`} className="text-xs text-accent hover:underline flex items-center">
+                             <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center">
                                 <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
                                 Shot Requests: {event.shotRequests}
                             </Link>
-                            <p className="text-xs text-muted-foreground">Deliverables: {event.deliverables}</p>
+                             <p className="text-muted-foreground flex items-center gap-1">
+                              {getDisciplineIcon(event.discipline)}
+                              {event.discipline ? event.discipline : 'N/A'}
+                            </p>
+                            <p className="text-muted-foreground">Deliverables: {event.deliverables}</p>
                           </CardContent>
                           <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center gap-2">
                              <Button variant="outline" size="sm" asChild className="w-full sm:w-auto flex-1">
@@ -776,6 +843,7 @@ export default function EventsPage() {
                       {!selectedProject && <TableHead>Project</TableHead>}
                       <TableHead>Date & Time</TableHead>
                       <TableHead>Deadline</TableHead>
+                      <TableHead>Discipline</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Assigned</TableHead>
                       <TableHead>Shot Requests</TableHead>
@@ -797,6 +865,10 @@ export default function EventsPage() {
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {event.deadline ? formatDeadline(event.deadline) : "N/A"}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground flex items-center gap-1">
+                          {getDisciplineIcon(event.discipline)}
+                          {event.discipline || "N/A"}
                         </TableCell>
                         <TableCell>
                           <Badge variant={
@@ -895,5 +967,4 @@ export default function EventsPage() {
     </div>
   );
 }
-
     
