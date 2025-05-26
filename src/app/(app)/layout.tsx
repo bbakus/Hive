@@ -21,12 +21,12 @@ import { Button } from "@/components/ui/button";
 import { UserNav } from "@/components/user-nav";
 import { Icons } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import { OrganizationProvider } from "@/contexts/OrganizationContext"; // Import OrganizationProvider
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
-import { PhaseProvider, usePhaseContext, PHASES, type Phase } from "@/contexts/PhaseContext";
+import { PhaseProvider, usePhaseContext, type Phase, PHASES as AppPhasesArray } from "@/contexts/PhaseContext"; // Import PHASES as AppPhasesArray
 import { ProjectSelector } from "@/components/project-selector";
-import { OrganizationSelector } from "@/components/organization-selector"; // Import OrganizationSelector
+import { OrganizationSelector } from "@/components/organization-selector";
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
 
@@ -91,8 +91,12 @@ function AppSidebar() {
 
 function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activePhase, setActivePhase, PHASES: availablePhases } = usePhaseContext();
+  const { activePhase, setActivePhase, PHASES: availablePhasesFromContext } = usePhaseContext(); // renamed to avoid conflict
   const [mounted, setMounted] = useState(false);
+
+  // Use the imported PHASES array directly if context doesn't provide it or for safety
+  const availablePhases = availablePhasesFromContext || AppPhasesArray;
+
 
   useEffect(() => {
     setMounted(true);
@@ -102,17 +106,15 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     let determinedPhase: Phase | null = null;
     const currentPath = pathname.split('?')[0]; 
 
-    // This logic needs to be robust. Consider the order of checks.
     if (currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')) {
       determinedPhase = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-       // If already in "Shoot" phase and on /events, keep it. Otherwise, default /events to "Plan".
-      if (activePhase === 'Shoot') {
+      if (activePhase === 'Shoot') { // Keep 'Shoot' if already in that phase on events page
         determinedPhase = 'Shoot';
       } else {
-        determinedPhase = 'Plan';
+        determinedPhase = 'Plan'; // Default /events to 'Plan' otherwise
       }
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
@@ -122,6 +124,12 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
       determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
+    } else if (currentPath === '/settings' || currentPath.startsWith('/settings/')) {
+      // If settings or support is visited, try to keep the current phase, or default to Dashboard
+      // This prevents changing the main content view just by clicking a footer link
+      determinedPhase = activePhase || 'Dashboard'; 
+    } else if (currentPath === '/support' || currentPath.startsWith('/support/')) {
+      determinedPhase = activePhase || 'Dashboard';
     }
     
 
@@ -141,7 +149,7 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex-1"></div> 
           <div className="flex items-center gap-4"> 
-            <OrganizationSelector /> {/* Added OrganizationSelector */}
+            <OrganizationSelector />
             <ProjectSelector />
             <UserNav />
           </div>
@@ -157,7 +165,7 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsProvider>
-      <OrganizationProvider> {/* OrganizationProvider wraps ProjectProvider */}
+      <OrganizationProvider>
         <ProjectProvider>
           <PhaseProvider>
             <AppLayoutInternal>{children}</AppLayoutInternal>

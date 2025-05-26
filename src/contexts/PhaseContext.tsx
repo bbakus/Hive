@@ -28,9 +28,7 @@ export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"]
 
 // Define sidebar navigation items for each phase
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [
-    // No items in the sidebar when Dashboard phase is active
-  ],
+  "Dashboard": [], // No items in the sidebar when Dashboard phase is active in top nav
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -62,6 +60,7 @@ type PhaseContextType = {
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
   constantFooterNavItems: NavItem[];
+  PHASES: Phase[]; // Add PHASES array to the context type
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
@@ -70,9 +69,8 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
   const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    // If the phase is "Dashboard", return an empty array for the main sidebar section.
     if (phase === "Dashboard") {
-      return [];
+      return []; // Return empty array if Dashboard is active phase for the main sidebar section
     }
     return phaseNavConfigs[phase] || []; // Default to an empty array if config is missing
   };
@@ -82,6 +80,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
     setActivePhase,
     getNavItemsForPhase,
     constantFooterNavItems,
+    PHASES, // Provide PHASES array in the context value
   }), [activePhase]);
 
   return (
