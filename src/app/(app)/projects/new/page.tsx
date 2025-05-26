@@ -19,17 +19,21 @@ import { useProjectContext, type KeyPersonnel } from "@/contexts/ProjectContext"
 import { ArrowLeft, ArrowRight, CheckCircle, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-// Enhanced available personnel list with capabilities
-// Ensure 'id' is used for checkbox mapping and 'personnelId' for the KeyPersonnel object.
-// For simplicity in mock, id and personnelId can be the same.
-const availablePersonnelList: (Omit<KeyPersonnel, 'projectRole'> & { id: string; capabilities: string[] })[] = [
-  { id: "user001", personnelId: "user001", name: "Alice Wonderland", capabilities: ["Director", "Producer", "Lead Camera Op"] },
-  { id: "user002", personnelId: "user002", name: "Bob The Builder", capabilities: ["Audio Engineer", "Grip", "Technical Director"] },
-  { id: "user003", personnelId: "user003", name: "Charlie Chaplin", capabilities: ["Producer", "Editor", "Writer"] },
-  { id: "user004", personnelId: "user004", name: "Diana Prince", capabilities: ["Drone Pilot", "Photographer", "Camera Operator"] },
-  { id: "user005", personnelId: "user005", name: "Edward Scissorhands", capabilities: ["Grip", "Set Designer", "Editor"] },
-  { id: "user006", personnelId: "user006", name: "Fiona Gallagher", capabilities: ["Coordinator", "Project Manager"] },
-  { id: "user007", personnelId: "user007", name: "George Jetson", capabilities: ["Tech Lead", "IT Support", "Streaming Engineer"] },
+// Simplified type for local use in this wizard
+type WizardAvailablePersonnel = {
+  id: string; // This will be used as personnelId for the KeyPersonnel objects
+  name: string;
+  capabilities: string[];
+};
+
+const availablePersonnelList: WizardAvailablePersonnel[] = [
+  { id: "user001", name: "Alice Wonderland", capabilities: ["Director", "Producer", "Lead Camera Op"] },
+  { id: "user002", name: "Bob The Builder", capabilities: ["Audio Engineer", "Grip", "Technical Director"] },
+  { id: "user003", name: "Charlie Chaplin", capabilities: ["Producer", "Editor", "Writer"] },
+  { id: "user004", name: "Diana Prince", capabilities: ["Drone Pilot", "Photographer", "Camera Operator"] },
+  { id: "user005", name: "Edward Scissorhands", capabilities: ["Grip", "Set Designer", "Editor"] },
+  { id: "user006", name: "Fiona Gallagher", capabilities: ["Coordinator", "Project Manager"] },
+  { id: "user007", name: "George Jetson", capabilities: ["Tech Lead", "IT Support", "Streaming Engineer"] },
 ];
 
 const keyPersonnelSchema = z.object({
@@ -51,10 +55,9 @@ const projectWizardSchema = z.object({
 
 type ProjectWizardFormDataInternal = z.infer<typeof projectWizardSchema>;
 
-// Type for data submitted to ProjectContext, ensuring all fields from Project type are covered
 type ProjectContextInputData = Omit<import('@/contexts/ProjectContext').ProjectFormData, 'organizationId' | 'createdByUserId'> & {
   location?: string;
-  keyPersonnel?: KeyPersonnel[]; 
+  keyPersonnel?: KeyPersonnel[];
 };
 
 const TOTAL_STEPS = 4;
@@ -77,7 +80,7 @@ export default function NewProjectWizardPage() {
     reset,
   } = useForm<ProjectWizardFormDataInternal>({
     resolver: zodResolver(projectWizardSchema),
-    mode: "onChange", // "onBlur" or "onChange" for more immediate validation feedback
+    mode: "onChange",
     defaultValues: {
       name: "",
       startDate: new Date().toISOString().split('T')[0],
@@ -100,20 +103,21 @@ export default function NewProjectWizardPage() {
     const previousKeyPersonnel = getValues("keyPersonnel") || [];
 
     availablePersonnelList.forEach(person => {
-      if (selectedPersonnelMap[person.id]) {
-        const existingEntry = previousKeyPersonnel.find(kp => kp.personnelId === person.personnelId);
+      if (selectedPersonnelMap[person.id]) { // Check map using person.id
+        const existingEntry = previousKeyPersonnel.find(kp => kp.personnelId === person.id); // Find using person.id
         newKeyPersonnelArray.push({
-          personnelId: person.personnelId,
+          personnelId: person.id, // Store person.id as personnelId
           name: person.name,
           projectRole: existingEntry?.projectRole || "",
         });
       }
     });
-
+    
     const currentKeyPersonnelInForm = getValues("keyPersonnel") || [];
     if (JSON.stringify(newKeyPersonnelArray) !== JSON.stringify(currentKeyPersonnelInForm)) {
         setValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
     }
+
   }, [selectedPersonnelMap, getValues, setValue]);
 
 
@@ -144,19 +148,19 @@ export default function NewProjectWizardPage() {
           description: "Please assign a project role to all selected key personnel.",
           variant: "destructive",
         });
-        return; 
+        return;
       }
-      isValidStep = await trigger("keyPersonnel"); // Zod validation for the array structure and item content
+      isValidStep = allRolesValid ? await trigger("keyPersonnel") : false;
     } else if (currentStep === 3) {
-      fieldsToValidate.push("location"); 
+      fieldsToValidate.push("location");
       isValidStep = await trigger(fieldsToValidate);
-    } else { 
-        isValidStep = true; // Step 4 is review, should be valid if previous steps were
+    } else {
+        isValidStep = true;
     }
 
     if (isValidStep) {
       setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
-    } else if (currentStep === 1 && errors.name) { // Example of specific feedback for step 1
+    } else if (currentStep === 1 && errors.name) {
       toast({ title: "Core Details Incomplete", description: errors.name.message || "Please fill all required fields for Step 1.", variant: "destructive" });
     }
   };
@@ -179,8 +183,8 @@ export default function NewProjectWizardPage() {
     };
 
     // TODO: In a real app, get these from auth context
-    const organizationId = "org_default_demo"; 
-    const userId = "user_admin_demo"; 
+    const organizationId = "org_default_demo";
+    const userId = "user_admin_demo";
 
     addProject(projectDataToSubmit, organizationId, userId);
     toast({
@@ -188,7 +192,7 @@ export default function NewProjectWizardPage() {
       description: `Project "${data.name}" has been successfully created.`,
     });
     router.push("/projects");
-    reset(); 
+    reset();
   };
 
   const progressValue = (currentStep / TOTAL_STEPS) * 100;
@@ -289,12 +293,10 @@ export default function NewProjectWizardPage() {
                 {(watchedKeyPersonnel && watchedKeyPersonnel.length > 0) && <Label>Assign Roles to Selected Personnel:</Label>}
                 <ScrollArea className="h-48 w-full space-y-3">
                   {(watchedKeyPersonnel || []).map((kpMember, index) => {
-                    const personDetails = availablePersonnelList.find(p => p.personnelId === kpMember.personnelId);
+                    const personDetails = availablePersonnelList.find(p => p.id === kpMember.personnelId);
                     if (!personDetails) {
-                      console.warn(`Wizard Step 2: Person details not found for ID ${kpMember.personnelId}`);
-                      return null; 
+                      return null;
                     }
-                    
                     const capabilities = personDetails.capabilities;
 
                     return (
@@ -338,7 +340,7 @@ export default function NewProjectWizardPage() {
                       </div>
                     );
                   })}
-                  {(!watchedKeyPersonnel || watchedKeyPersonnel.length === 0) && 
+                  {(!watchedKeyPersonnel || watchedKeyPersonnel.length === 0) &&
                     Object.values(selectedPersonnelMap || {}).some(isSelected => isSelected) && (
                     <p className="text-sm text-muted-foreground p-2 text-center">
                         Loading selected personnel for role assignment...
@@ -351,8 +353,8 @@ export default function NewProjectWizardPage() {
                     </p>
                   )}
                 </ScrollArea>
-                <p className="text-xs text-muted-foreground">
-                  Roles are required for all selected key personnel if you proceed to the next step.
+                 <p className="text-xs text-muted-foreground">
+                  If key personnel are selected, their roles are required to proceed.
                 </p>
               </CardContent>
             </>
@@ -442,7 +444,7 @@ export default function NewProjectWizardPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
             )}
-            {currentStep === 1 && <div />} 
+            {currentStep === 1 && <div />}
 
             {currentStep < TOTAL_STEPS && (
               <Button type="button" onClick={handleNextStep}>
@@ -451,7 +453,7 @@ export default function NewProjectWizardPage() {
             )}
 
             {currentStep === TOTAL_STEPS && (
-              <Button type="submit" disabled={!isFormOverallValid}> 
+              <Button type="submit" disabled={!isFormOverallValid}>
                 <CheckCircle className="mr-2 h-4 w-4" /> Create Project
               </Button>
             )}
@@ -461,6 +463,4 @@ export default function NewProjectWizardPage() {
     </div>
   );
 }
-    
-
     
