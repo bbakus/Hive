@@ -82,7 +82,7 @@ export type Event = EventFormData & {
   hasOverlap?: boolean;
 };
 
-const initialEventsMock: Event[] = [
+export const initialEventsMock: Event[] = [
     { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00" },
     { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003"], deadline: "2024-09-15T12:00" },
     { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false },
@@ -778,3 +778,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
+    
