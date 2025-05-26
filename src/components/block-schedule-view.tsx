@@ -1,22 +1,22 @@
 
 "use client";
 
-import type { Event } from "@/app/(app)/events/page"; 
-import { parseEventTimes } from "@/app/(app)/events/page"; 
+import type { Event } from "@/app/(app)/events/page";
+import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Import Button
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Users, Settings } from "lucide-react"; // Import Users and Settings icon
+import { Users, Settings, Zap } from "lucide-react";
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
   eventsForDate: Event[];
-  onEditEvent?: (event: Event) => void; // New prop for handling edit
+  onEditEvent?: (event: Event) => void;
 }
 
-const HOUR_ROW_HEIGHT_REM = 4; 
+const HOUR_ROW_HEIGHT_REM = 4;
 const TOTAL_HOURS = 24;
 
 const getPriorityColor = (priority: Event['priority']): string => {
@@ -36,9 +36,9 @@ const getPriorityColor = (priority: Event['priority']): string => {
 
 
 export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: BlockScheduleViewProps) {
-  const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i); 
+  const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i);
 
-  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; 
+  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16;
   const pixelsPerMinute = hourRowHeightPx / 60;
 
   const getEventStyle = (event: Event): React.CSSProperties => {
@@ -47,13 +47,13 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
 
     const startHour = times.start.getHours();
     const startMinute = times.start.getMinutes();
-    
+
     let durationInMinutes = ((times.end.getTime() - times.start.getTime()) / (1000 * 60));
-    if (durationInMinutes <=0) durationInMinutes = 15; // Min duration for visibility (e.g. 15 mins)
+    if (durationInMinutes <=0) durationInMinutes = 15;
 
     const top = (startHour * hourRowHeightPx) + (startMinute * pixelsPerMinute);
     const height = durationInMinutes * pixelsPerMinute;
-    
+
     const concurrentEvents = eventsForDate.filter(e => {
         if (e.id === event.id) return false;
         const eTimes = parseEventTimes(e.date, e.time);
@@ -70,18 +70,18 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
       })
       .sort((a,b) => (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) || a.id.localeCompare(b.id))
       .findIndex(e => e.id === event.id);
-      
-    const widthPercentage = 98 / numberOfOverlapping; 
+
+    const widthPercentage = 98 / numberOfOverlapping;
     const leftPercentage = eventIndexAmongConcurrent * (widthPercentage + (2 / numberOfOverlapping));
 
 
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 30)}px`, // Minimum height for visibility and basic text
+      height: `${Math.max(height, 45)}px`, // Increased min height slightly for new info
       left: `${leftPercentage}%`,
-      width: `${widthPercentage}%`, 
-      zIndex: startMinute + 10, 
+      width: `${widthPercentage}%`,
+      zIndex: startMinute + 10,
       overflow: 'hidden',
     };
   };
@@ -94,7 +94,6 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
         </h3>
       </div>
       <div className="flex flex-grow overflow-hidden">
-        {/* Hour Labels */}
         <div className="w-20 text-xs text-muted-foreground shrink-0">
           {hours.map((hour) => (
             <div
@@ -107,9 +106,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
           ))}
         </div>
 
-        {/* Timeline Grid & Events */}
         <div className="flex-grow relative overflow-y-auto">
-          {/* Background Hour Lines */}
           {hours.map((hour) => (
             <div
               key={`grid-${hour}`}
@@ -120,13 +117,12 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
             </div>
           ))}
 
-          {/* Event Blocks */}
           {eventsForDate.map((event) => (
             <div
               key={event.id}
               style={getEventStyle(event)}
               className={cn(
-                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group", // Added group for hover state
+                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
                 getPriorityColor(event.priority)
               )}
               title={`${event.name} (${event.time}) - Project: ${event.project}`}
@@ -137,7 +133,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
                   size="icon"
                   className="absolute top-0 right-0 h-6 w-6 p-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70"
                   onClick={(e) => {
-                    e.stopPropagation(); // Prevent event bubbling
+                    e.stopPropagation();
                     onEditEvent(event);
                   }}
                   aria-label="Edit event"
@@ -146,18 +142,25 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
                 </Button>
               )}
               <div>
-                <p className="text-xs font-semibold truncate leading-tight">{event.name}</p>
-                <p className="text-[10px] truncate opacity-80 leading-tight">{event.time}</p>
+                <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
+                    {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0" titleAccess="Quick Turnaround"/>}
+                    {event.name}
+                </p>
+                <p className="opacity-80 truncate leading-tight">{event.time}</p>
               </div>
               <div className="mt-0.5 space-y-0.5">
-                {event.project && <p className="text-[10px] truncate opacity-70 leading-tight">Proj: {event.project}</p>}
+                {event.project && <p className="opacity-70 truncate leading-tight">Proj: {event.project}</p>}
                 {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                  <p className="text-[10px] truncate opacity-70 leading-tight flex items-center">
+                  <p className="opacity-70 truncate leading-tight flex items-center">
                     <Users className="mr-1 h-3 w-3 shrink-0" />
                     {event.assignedPersonnelIds.length} Assigned
                   </p>
                 )}
-                <p className="text-[10px] truncate opacity-70 leading-tight">Contact: J. Doe (Ex.)</p>
+                {event.deadline && (
+                  <p className="text-amber-700 dark:text-amber-500 opacity-90 truncate leading-tight">
+                    Due: {formatDeadline(event.deadline)}
+                  </p>
+                )}
               </div>
             </div>
           ))}

@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -37,22 +37,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import { useSettingsContext } from "@/contexts/SettingsContext"; // Import useSettingsContext
+import { useSettingsContext } from "@/contexts/SettingsContext";
 import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { BlockScheduleView } from "@/components/block-schedule-view"; 
+import { BlockScheduleView } from "@/components/block-schedule-view";
 
-// Minimal Personnel type for assignment
 type PersonnelMinimal = {
   id: string;
   name: string;
   role: string;
 };
 
-// Mock available personnel (ideally from context or API)
 const availablePersonnelList: PersonnelMinimal[] = [
   { id: "user001", name: "Alice Wonderland", role: "Lead Camera Op" },
   { id: "user002", name: "Bob The Builder", role: "Audio Engineer" },
@@ -68,24 +66,28 @@ const eventSchema = z.object({
   time: z.string().regex(/^\d{2}:\d{2} - \d{2}:\d{2}$/, { message: "Time must be HH:MM - HH:MM." }),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
   assignedPersonnelIds: z.array(z.string()).optional(),
+  isQuickTurnaround: z.boolean().optional(),
+  deadline: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), {
+    message: "Deadline must be a valid date-time.",
+  }),
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventFormData & {
   id: string;
-  project?: string; 
+  project?: string;
   deliverables: number;
   shotRequests: number;
-  hasOverlap?: boolean; 
+  hasOverlap?: boolean;
 };
 
 const initialEventsMock: Event[] = [
-    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002"] },
-    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003"] },
-    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [] },
+    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00" },
+    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003"], deadline: "2024-09-15T12:00" },
+    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false },
     { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004"] },
-    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"] },
+    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59" },
 ];
 
 
@@ -102,34 +104,40 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
   if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
 
-  let startDate = setHours(startOfDay(baseDate), startHour); 
+  let startDate = setHours(startOfDay(baseDate), startHour);
   startDate = setMinutes(startDate, startMinute);
 
-  let endDate = setHours(startOfDay(baseDate), endHour); 
+  let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  // Handle overnight events or simple end time before start time on same day (e.g. 22:00 - 02:00)
   if (isBefore(endDate, startDate)) {
-     // Assuming if end time is earlier than start time, it's on the next day
     endDate.setDate(endDate.getDate() + 1);
   }
-
 
   return { start: startDate, end: endDate };
 };
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false; // Only check for overlaps on the same day for different events
+  if (eventA.date !== eventB.date || eventA.id === eventB.id) return false;
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; // If time parsing fails, assume no overlap or handle error
+  if (!timesA || !timesB) return false;
 
-  // Overlap condition: (StartA < EndB) and (EndA > StartB)
   return isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
 };
 
+export function formatDeadline(deadlineString?: string): string | null {
+  if (!deadlineString) return null;
+  try {
+    const date = parseISO(deadlineString);
+    if (!isValid(date)) return "Invalid Date";
+    return format(date, "MMM d, yyyy 'at' h:mm a");
+  } catch (e) {
+    return "Invalid Date";
+  }
+}
 
 export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
@@ -139,9 +147,7 @@ export default function EventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
-  
   const [activeBlockScheduleDateKey, setActiveBlockScheduleDateKey] = useState<string | null>(null);
-
 
   const { toast } = useToast();
 
@@ -155,6 +161,10 @@ export default function EventsPage() {
     watch
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
+    defaultValues: {
+      isQuickTurnaround: false,
+      deadline: "",
+    }
   });
 
   useEffect(() => {
@@ -162,17 +172,16 @@ export default function EventsPage() {
         setEvents(useDemoData ? initialEventsMock : []);
     }
   }, [useDemoData, isLoadingSettings]);
-  
+
   useEffect(() => {
-    // Determine a default date for the event form
-    let defaultEventDate = new Date(); // Today
+    let defaultEventDate = new Date();
     if (activeBlockScheduleDateKey) {
       const parsedKeyDate = parseISO(activeBlockScheduleDateKey);
       if (isValid(parsedKeyDate)) {
         defaultEventDate = parsedKeyDate;
       }
     }
-    
+
     if (editingEvent) {
       reset({
         name: editingEvent.name,
@@ -181,6 +190,8 @@ export default function EventsPage() {
         time: editingEvent.time,
         priority: editingEvent.priority as EventFormData['priority'],
         assignedPersonnelIds: editingEvent.assignedPersonnelIds || [],
+        isQuickTurnaround: editingEvent.isQuickTurnaround || false,
+        deadline: editingEvent.deadline || "",
       });
     } else {
       reset({
@@ -190,6 +201,8 @@ export default function EventsPage() {
         time: "09:00 - 17:00",
         priority: "Medium",
         assignedPersonnelIds: [],
+        isQuickTurnaround: false,
+        deadline: "",
       });
     }
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
@@ -202,9 +215,8 @@ export default function EventsPage() {
     }
     return currentEvents.map(event => {
       let hasOverlap = false;
-      // Check for overlaps only within the currently filtered set of events
-      for (const otherEvent of currentEvents) { 
-        if (event.id !== otherEvent.id && event.date === otherEvent.date) { // Make sure it's the same day
+      for (const otherEvent of currentEvents) {
+        if (event.id !== otherEvent.id && event.date === otherEvent.date) {
           if (checkOverlap(event, otherEvent)) {
             hasOverlap = true;
             break;
@@ -212,13 +224,12 @@ export default function EventsPage() {
         }
       }
       return { ...event, hasOverlap };
-    // Sort primarily by date, then by start time within each date
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
   }, [selectedProject, events]);
 
   const groupedAndSortedEvents = useMemo(() => {
     const grouped = filteredEvents.reduce((acc, event) => {
-      const date = event.date; // Assuming date is 'YYYY-MM-DD'
+      const date = event.date;
       if (!acc[date]) {
         acc[date] = [];
       }
@@ -226,7 +237,6 @@ export default function EventsPage() {
       return acc;
     }, {} as Record<string, Event[]>);
 
-    // Sort events within each day by start time
     Object.values(grouped).forEach(dayEvents => {
       dayEvents.sort((a, b) => {
         const timesA = parseEventTimes(a.date, a.time);
@@ -234,22 +244,20 @@ export default function EventsPage() {
         if (timesA && timesB) {
           return timesA.start.getTime() - timesB.start.getTime();
         }
-        return 0; // Fallback if time parsing fails
+        return 0;
       });
     });
-    // Sort the groups (days) by date
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [filteredEvents]);
 
   useEffect(() => {
     if (groupedAndSortedEvents.length > 0) {
       const firstDateKey = groupedAndSortedEvents[0][0];
-      // If there's no active key, or if the current active key is no longer in the sorted list (e.g. due to project filter change)
       if (!activeBlockScheduleDateKey || !groupedAndSortedEvents.find(g => g[0] === activeBlockScheduleDateKey)) {
         setActiveBlockScheduleDateKey(firstDateKey);
       }
     } else {
-      setActiveBlockScheduleDateKey(null); // No events, so no active date
+      setActiveBlockScheduleDateKey(null);
     }
   }, [groupedAndSortedEvents, activeBlockScheduleDateKey]);
 
@@ -260,7 +268,7 @@ export default function EventsPage() {
     if (editingEvent) {
       setEvents(prevEvents => prevEvents.map(evt =>
         evt.id === editingEvent.id
-        ? { ...evt, ...data, project: selectedProjInfo?.name || "Unknown Project" }
+        ? { ...editingEvent, ...data, project: selectedProjInfo?.name || editingEvent.project || "Unknown Project" }
         : evt
       ));
       toast({
@@ -272,9 +280,9 @@ export default function EventsPage() {
         ...data,
         id: `evt${String(events.length + initialEventsMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         project: selectedProjInfo?.name || "Unknown Project",
-        deliverables: 0, 
-        shotRequests: 0, // New events start with 0 shots defined
-        hasOverlap: false, // Will be recalculated by useMemo
+        deliverables: 0,
+        shotRequests: 0,
+        hasOverlap: false,
       };
       setEvents((prevEvents) => [...prevEvents, newEvent]);
       toast({
@@ -287,7 +295,6 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
-    // Date for new event will be set by useEffect based on activeBlockScheduleDateKey or today
     setIsEventModalOpen(true);
   };
 
@@ -298,7 +305,7 @@ export default function EventsPage() {
 
   const closeEventModal = () => {
     setIsEventModalOpen(false);
-    setEditingEvent(null); // Reset editing state
+    setEditingEvent(null);
   };
 
   const handleDeleteClick = (eventId: string) => {
@@ -342,18 +349,17 @@ export default function EventsPage() {
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
       }}>
-        <DialogContent className="sm:max-w-2xl"> {/* Increased width */}
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Event" : "Add New Event"}</DialogTitle>
             <DialogDescription>
               {editingEvent ? "Update the details for this event." : "Fill in the details below to create a new event."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4"> {/* Increased main gap */}
-            {/* Form content split into two columns on medium screens and up */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"> {/* Column definition and gap */}
-              {/* Left Column: Event Details */}
+          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div className="space-y-4">
+                {/* Event Details Fields */}
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
                   <div className="col-span-3">
@@ -371,8 +377,6 @@ export default function EventsPage() {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
-                          // Ensure defaultValue is properly set, especially when adding.
-                          // editingEvent might be null, or field.value might not be set yet.
                           defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
                         >
                           <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
@@ -416,7 +420,6 @@ export default function EventsPage() {
                                     selected={field.value ? parseISO(field.value) : undefined}
                                     onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                                     initialFocus
-                                    // Default month for calendar to open to:
                                     defaultMonth={field.value ? parseISO(field.value) : (activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date())}
                                 />
                                 </PopoverContent>
@@ -456,16 +459,47 @@ export default function EventsPage() {
                     {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
                   </div>
                 </div>
+                {/* Quick Turnaround and Deadline */}
+                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-deadline" className="text-right col-span-1">Deadline</Label>
+                  <div className="col-span-3">
+                    <Input
+                      id="event-deadline"
+                      type="datetime-local"
+                      {...register("deadline")}
+                      className={errors.deadline ? "border-destructive" : ""}
+                    />
+                    {errors.deadline && <p className="text-xs text-destructive mt-1">{errors.deadline.message}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-quickTurnaround" className="text-right col-span-1">Quick Turn</Label>
+                  <div className="col-span-3 flex items-center">
+                    <Controller
+                        name="isQuickTurnaround"
+                        control={control}
+                        render={({ field }) => (
+                            <Checkbox
+                            id="event-quickTurnaround"
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="mr-2"
+                            />
+                        )}
+                    />
+                    <Label htmlFor="event-quickTurnaround" className="font-normal text-sm">Mark as high priority with a tight deadline.</Label>
+                    {errors.isQuickTurnaround && <p className="text-xs text-destructive mt-1">{errors.isQuickTurnaround.message}</p>}
+                  </div>
+                </div>
               </div>
 
-              {/* Right Column: Assign Personnel */}
               <div className="space-y-2">
                 <Label>Assign Personnel</Label>
                 <ScrollArea className="h-60 w-full rounded-md border p-4">
                   <Controller
                     name="assignedPersonnelIds"
                     control={control}
-                    defaultValue={[]} // Ensure it has a default value
+                    defaultValue={[]}
                     render={({ field }) => (
                       <div className="space-y-2">
                         {availablePersonnelList.map((person) => (
@@ -548,7 +582,10 @@ export default function EventsPage() {
                         <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
                           <CardHeader className="pb-3">
                             <CardTitle className="text-lg flex items-center justify-between">
-                              {event.name}
+                              <span className="flex items-center gap-1.5">
+                                {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" titleAccess="Quick Turnaround"/>}
+                                {event.name}
+                              </span>
                               <Badge variant={
                                 event.priority === "Critical" ? "destructive" :
                                 event.priority === "High" ? "secondary" :
@@ -559,6 +596,11 @@ export default function EventsPage() {
                               {event.time}
                               {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict" />}
                             </CardDescription>
+                             {event.deadline && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400">
+                                Deadline: {formatDeadline(event.deadline)}
+                              </p>
+                            )}
                           </CardHeader>
                           <CardContent className="flex-grow space-y-1">
                             {!selectedProject && event.project && (
@@ -617,6 +659,7 @@ export default function EventsPage() {
                       <TableHead>Event Name</TableHead>
                       {!selectedProject && <TableHead>Project</TableHead>}
                       <TableHead>Date & Time</TableHead>
+                      <TableHead>Deadline</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Assigned</TableHead>
                       <TableHead>Shot Requests</TableHead>
@@ -627,11 +670,17 @@ export default function EventsPage() {
                   <TableBody>
                     {filteredEvents.map((event) => (
                       <TableRow key={event.id}>
-                        <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell className="font-medium flex items-center gap-1.5">
+                           {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" titleAccess="Quick Turnaround"/>}
+                          {event.name}
+                        </TableCell>
                         {!selectedProject && <TableCell>{event.project}</TableCell>}
                         <TableCell className="flex items-center">
                           {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
                           {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict"/>}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {event.deadline ? formatDeadline(event.deadline) : "N/A"}
                         </TableCell>
                         <TableCell>
                           <Badge variant={
@@ -689,13 +738,13 @@ export default function EventsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {groupedAndSortedEvents.length > 0 && activeBlockScheduleDateKey ? (
-                <Tabs 
-                  value={activeBlockScheduleDateKey} 
-                  onValueChange={setActiveBlockScheduleDateKey} // This will update the active key when a tab is clicked
+                <Tabs
+                  value={activeBlockScheduleDateKey}
+                  onValueChange={setActiveBlockScheduleDateKey}
                   className="w-full"
                 >
                   <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
-                    {groupedAndSortedEvents.map(([dateKey, _]) => ( // Iterate over sorted day groups
+                    {groupedAndSortedEvents.map(([dateKey, _]) => (
                       <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
                         {format(parseISO(dateKey), "EEE, MMM d")}
                       </TabsTrigger>
@@ -703,10 +752,10 @@ export default function EventsPage() {
                   </TabsList>
                   {groupedAndSortedEvents.map(([dateKey, dayEvents]) => (
                     <TabsContent key={`content-${dateKey}`} value={dateKey}>
-                      <BlockScheduleView 
-                        selectedDate={parseISO(dateKey)} // Pass the actual Date object
-                        eventsForDate={dayEvents} // Pass only events for this specific day
-                        onEditEvent={openEditEventModal} // Pass the edit handler
+                      <BlockScheduleView
+                        selectedDate={parseISO(dateKey)}
+                        eventsForDate={dayEvents}
+                        onEditEvent={openEditEventModal}
                       />
                     </TabsContent>
                   ))}
