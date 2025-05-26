@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,7 +34,9 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useSettingsContext } from "@/contexts/SettingsContext"; // Import useSettingsContext
+import { useSettingsContext } from "@/contexts/SettingsContext";
+import { initialEventsMock, type Event } from "@/app/(app)/events/page"; // Import Event type and mock data
+import { format } from "date-fns";
 
 // --- Personnel Definitions ---
 const personnelSchema = z.object({
@@ -56,6 +58,9 @@ const initialPersonnelMock: Personnel[] = [
   { id: "user002", name: "Bob The Builder", role: "Audio Engineer", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
   { id: "user003", name: "Charlie Chaplin", role: "Producer", status: "Available", avatar: "https://placehold.co/40x40.png" },
   { id: "user004", name: "Diana Prince", role: "Drone Pilot", status: "On Leave", avatar: "https://placehold.co/40x40.png" },
+  { id: "user005", name: "Edward Scissorhands", role: "Grip", status: "Assigned" },
+  { id: "user006", name: "Fiona Gallagher", role: "Coordinator", status: "Available" },
+  { id: "user007", name: "George Jetson", role: "Tech Lead", status: "Assigned" },
 ];
 // --- End Personnel Definitions ---
 
@@ -66,6 +71,11 @@ export default function PersonnelPage() {
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [personnelToDeleteId, setPersonnelToDeleteId] = useState<string | null>(null);
+  
+  const [isViewScheduleModalOpen, setIsViewScheduleModalOpen] = useState(false);
+  const [viewingScheduleForPersonnel, setViewingScheduleForPersonnel] = useState<Personnel | null>(null);
+  const [eventsForSelectedPersonnel, setEventsForSelectedPersonnel] = useState<Event[]>([]);
+
   const { toast } = useToast();
 
   const {
@@ -160,6 +170,16 @@ export default function PersonnelPage() {
     setIsDeleteDialogOpen(false);
   };
 
+  const handleViewSchedule = (person: Personnel) => {
+    setViewingScheduleForPersonnel(person);
+    const assignedEvents = useDemoData ? initialEventsMock.filter(event => 
+        event.assignedPersonnelIds?.includes(person.id)
+    ) : [];
+    setEventsForSelectedPersonnel(assignedEvents);
+    setIsViewScheduleModalOpen(true);
+  };
+
+
   if (isLoadingSettings) {
     return <div>Loading personnel data settings...</div>;
   }
@@ -178,6 +198,7 @@ export default function PersonnelPage() {
         </Button>
       </div>
 
+      {/* Add/Edit Personnel Modal */}
       <Dialog open={isPersonnelModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closePersonnelModal(); else setIsPersonnelModalOpen(true);
       }}>
@@ -242,6 +263,7 @@ export default function PersonnelPage() {
           </DialogContent>
         </Dialog>
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -256,6 +278,54 @@ export default function PersonnelPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Schedule Modal */}
+      {viewingScheduleForPersonnel && (
+        <Dialog open={isViewScheduleModalOpen} onOpenChange={setIsViewScheduleModalOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Schedule for {viewingScheduleForPersonnel.name}</DialogTitle>
+              <DialogDescription>
+                List of events {viewingScheduleForPersonnel.name} is assigned to.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 max-h-[60vh] overflow-y-auto">
+              {eventsForSelectedPersonnel.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event Name</TableHead>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Time</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {eventsForSelectedPersonnel.map((event) => (
+                      <TableRow key={event.id}>
+                        <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell>{event.project}</TableCell>
+                        <TableCell>{format(new Date(event.date), "PPP")}</TableCell>
+                        <TableCell>{event.time}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-center">
+                  No events currently assigned to {viewingScheduleForPersonnel.name}.
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Close</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -294,7 +364,7 @@ export default function PersonnelPage() {
                       }>{member.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => handleViewSchedule(member)}>
                         <CalendarDays className="h-4 w-4" />
                         <span className="sr-only">View Schedule</span>
                       </Button>
@@ -348,3 +418,6 @@ export default function PersonnelPage() {
     </div>
   );
 }
+
+
+    
