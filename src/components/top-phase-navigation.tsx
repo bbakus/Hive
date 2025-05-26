@@ -2,60 +2,71 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { usePhaseContext, PHASES, type Phase } from "@/contexts/PhaseContext";
 import { cn } from "@/lib/utils";
-import { ClipboardList, Video, Scissors, PackageCheck } from 'lucide-react'; // Using more generic icons for phases
-
-// This mapping is not used if icons are removed, but kept for context or future use.
-const phaseIcons: Record<Phase, React.ElementType> = {
-  "Plan": ClipboardList,
-  "Shoot": Video,
-  "Edit": Scissors,
-  "Deliver": PackageCheck,
-};
 
 export function TopPhaseNavigation() {
   const { activePhase, setActivePhase } = usePhaseContext();
   const [mounted, setMounted] = React.useState(false);
+  const router = useRouter(); // Initialize useRouter
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handlePhaseClick = (phase: Phase) => {
+    setActivePhase(phase); // Update the active phase in context
+
+    // Navigate to a default route for the selected phase
+    switch (phase) {
+      case 'Dashboard':
+        router.push('/dashboard');
+        break;
+      case 'Plan':
+        router.push('/projects'); // Default to /projects for Plan
+        break;
+      case 'Shoot':
+        router.push('/events'); // Default to /events for Shoot
+        break;
+      case 'Edit':
+        router.push('/post-production');
+        break;
+      case 'Deliver':
+        router.push('/deliverables');
+        break;
+      default:
+        router.push('/dashboard'); // Fallback, should not be reached if PHASES is correct
+    }
+  };
 
   return (
     <nav className="flex items-center">
       <div className="flex items-center gap-x-1 sm:gap-x-2 md:gap-x-3">
         {PHASES.map((phase) => {
           const isActive = activePhase === phase;
-          // const Icon = phaseIcons[phase]; // Icon no longer used based on new requirements
-
           return (
             <Button
               key={phase}
               variant="ghost"
-              onClick={() => setActivePhase(phase)}
-              // Apply consistent base styles for server and initial client render.
-              // Dynamic/responsive styles are applied only after mount.
+              onClick={() => handlePhaseClick(phase)} // Use the new handler
               className={cn(
-                "uppercase font-semibold tracking-wider", // Base typography
-                "!hover:bg-transparent focus-visible:!ring-0 focus-visible:!ring-offset-0", // Base interaction overrides
-
-                // Styles applied only after client-side mounting
+                "uppercase font-semibold tracking-wider",
+                "!hover:bg-transparent focus-visible:!ring-0 focus-visible:!ring-offset-0",
                 mounted
                   ? [
-                      "px-2.5 py-1.5 h-auto sm:px-3", // Responsive padding & height
-                      "text-xs sm:text-sm",          // Responsive text size
-                      isActive ? "text-accent" : "text-muted-foreground hover:text-foreground" // Active/inactive colors
+                      "px-2.5 py-1.5 h-auto sm:px-3",
+                      "text-xs sm:text-sm",
+                      isActive ? "text-accent" : "text-muted-foreground hover:text-foreground"
                     ]
                   : [
-                      "px-2.5 py-1.5 h-auto", // Base padding & height for SSR & initial client
-                      "text-xs",              // Base text size for SSR & initial client
-                      "text-muted-foreground" // Base color for SSR & initial client
+                      "px-2.5 py-1.5 h-auto",
+                      "text-xs",
+                      "text-muted-foreground"
                     ]
               )}
             >
-              {/* <Icon className="mr-2 h-4 w-4" /> Icon removed based on new requirements */}
               <span>{phase}</span>
             </Button>
           );
