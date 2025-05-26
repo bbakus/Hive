@@ -25,16 +25,14 @@ export type NavItem = {
   matchStartsWith?: boolean;
 };
 
-// Add "Dashboard" as a Phase
 export type Phase = "Dashboard" | "Plan" | "Shoot" | "Edit" | "Deliver";
 
-// Add "Dashboard" to the PHASES array, typically first
 export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"];
 
 // Define sidebar navigation items for each phase
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   "Dashboard": [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true },
+    // This is now empty. When "Dashboard" is active, no items will show in the main sidebar section.
   ],
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
@@ -43,18 +41,13 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true },
   ],
   "Shoot": [
-    // "Events" is a good entry point for seeing schedules during the "Shoot" phase.
-    // Users can navigate to specific event shot lists from there.
     { href: "/events", label: "Event Schedules", icon: CalendarDays, matchStartsWith: true },
-    // { href: "/shot-tracker", label: "Active Shot Tracker", icon: Target, matchStartsWith: true }, // Example for future
   ],
   "Edit": [
     { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
-    // { href: "/editing-board", label: "Editing Board", icon: Edit3, matchStartsWith: true }, // Example for future
   ],
   "Deliver": [
     { href: "/deliverables", label: "Deliverables", icon: ClipboardList, matchStartsWith: true },
-    // { href: "/client-review", label: "Client Review", icon: Send, matchStartsWith: true }, // Example for future
   ],
 };
 
@@ -76,7 +69,6 @@ type PhaseContextType = {
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  // Default active phase is now "Dashboard"
   const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
