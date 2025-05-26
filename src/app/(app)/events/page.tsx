@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -38,29 +38,15 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay } from "date-fns";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
 import { useEventContext } from "@/contexts/EventContext";
+import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 
-type PersonnelMinimal = {
-  id: string;
-  name: string;
-  role: string;
-};
-
-const availablePersonnelList: PersonnelMinimal[] = [
-  { id: "user001", name: "Alice Wonderland", role: "Lead Camera Op" },
-  { id: "user002", name: "Bob The Builder", role: "Audio Engineer" },
-  { id: "user003", name: "Charlie Chaplin", role: "Producer" },
-  { id: "user004", name: "Diana Prince", role: "Drone Pilot" },
-  { id: "user005", name: "Edward Scissorhands", role: "Grip" },
-  { id: "user006", name: "Fiona Gallagher", role: "Coordinator" },
-  { id: "user007", name: "George Jetson", role: "Tech Lead" },
-];
 
 const eventSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -80,7 +66,7 @@ type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventFormData & {
   id: string;
-  project?: string; // Project name for display
+  project?: string; 
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
@@ -107,7 +93,7 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  if (isBefore(endDate, startDate)) {
+  if (isBefore(endDate, startDate)) { 
     endDate.setDate(endDate.getDate() + 1);
   }
 
@@ -115,24 +101,21 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 };
 
 const checkOverlap = (eventA: Event, eventB: Event, allEventsForDay: Event[]): boolean => {
-  if (eventA.id === eventB.id) return false; // An event cannot overlap with itself
+  if (eventA.id === eventB.id) return false; 
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
   if (!timesA || !timesB) return false;
 
-  // Basic overlap check
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  // Check for shared personnel if both events are overlapping in time
   if (eventA.assignedPersonnelIds && eventB.assignedPersonnelIds) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
-    return sharedPersonnel; // Only flag as overlap if they also share personnel
+    return sharedPersonnel; 
   }
-
-  return false; // No shared personnel, so no actionable conflict for this specific check
+  return false; 
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -150,7 +133,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], // Default to empty array
+    eventsForSelectedProjectAndOrg = [], 
     addEvent,
     updateEvent,
     deleteEvent,
@@ -162,6 +145,11 @@ export default function EventsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
   const [activeBlockScheduleDateKey, setActiveBlockScheduleDateKey] = useState<string | null>(null);
+
+  // Filters State
+  const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
+  const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
+  const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
 
   const { toast } = useToast();
 
@@ -220,16 +208,48 @@ export default function EventsPage() {
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
 
 
-  const filteredEvents = useMemo(() => {
-    const currentEvents = eventsForSelectedProjectAndOrg || [];
-    const eventsGroupedByDay: Record<string, Event[]> = currentEvents.reduce((acc, event) => {
+  const assignedPersonnelForFilter = useMemo(() => {
+    if (isLoadingContextEvents || !eventsForSelectedProjectAndOrg) return [];
+    const personnelIds = new Set<string>();
+    eventsForSelectedProjectAndOrg.forEach(event => {
+      event.assignedPersonnelIds?.forEach(id => personnelIds.add(id));
+    });
+    return initialPersonnelMock.filter(person => personnelIds.has(person.id));
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents]);
+
+
+  const displayableEvents = useMemo(() => {
+    if (isLoadingContextEvents) return [];
+    let filtered = eventsForSelectedProjectAndOrg || [];
+
+    if (filterQuickTurnaround) {
+      filtered = filtered.filter(event => event.isQuickTurnaround);
+    }
+
+    if (filterTimeStatus !== "all") {
+      const now = new Date();
+      filtered = filtered.filter(event => {
+        const times = parseEventTimes(event.date, event.time);
+        if (!times) return false;
+        if (filterTimeStatus === "upcoming") return isAfter(times.start, now);
+        if (filterTimeStatus === "past") return isBefore(times.end, now);
+        if (filterTimeStatus === "now") return isWithinInterval(now, { start: times.start, end: times.end });
+        return true;
+      });
+    }
+
+    if (filterAssignedMemberId !== "all") {
+      filtered = filtered.filter(event => event.assignedPersonnelIds?.includes(filterAssignedMemberId));
+    }
+    
+    const eventsGroupedByDay: Record<string, Event[]> = filtered.reduce((acc, event) => {
         const date = event.date;
         if (!acc[date]) acc[date] = [];
         acc[date].push(event);
         return acc;
     }, {});
 
-    return currentEvents.map(event => {
+    return filtered.map(event => {
       let hasOverlap = false;
       const dayEvents = eventsGroupedByDay[event.date] || [];
       for (const otherEvent of dayEvents) {
@@ -240,10 +260,11 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [eventsForSelectedProjectAndOrg]);
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId]);
 
-  const groupedAndSortedEvents = useMemo(() => {
-    const grouped = filteredEvents.reduce((acc, event) => {
+
+  const groupedAndSortedEventsForDisplay = useMemo(() => {
+    const grouped = displayableEvents.reduce((acc, event) => {
       const date = event.date;
       if (!acc[date]) {
         acc[date] = [];
@@ -263,18 +284,18 @@ export default function EventsPage() {
       });
     });
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
-  }, [filteredEvents]);
+  }, [displayableEvents]);
 
   useEffect(() => {
-    if (groupedAndSortedEvents.length > 0) {
-      const firstDateKey = groupedAndSortedEvents[0][0];
-      if (!activeBlockScheduleDateKey || !groupedAndSortedEvents.find(g => g[0] === activeBlockScheduleDateKey)) {
+    if (groupedAndSortedEventsForDisplay.length > 0) {
+      const firstDateKey = groupedAndSortedEventsForDisplay[0][0];
+      if (!activeBlockScheduleDateKey || !groupedAndSortedEventsForDisplay.find(g => g[0] === activeBlockScheduleDateKey)) {
         setActiveBlockScheduleDateKey(firstDateKey);
       }
     } else {
       setActiveBlockScheduleDateKey(null);
     }
-  }, [groupedAndSortedEvents, activeBlockScheduleDateKey]);
+  }, [groupedAndSortedEventsForDisplay, activeBlockScheduleDateKey]);
 
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
@@ -291,11 +312,10 @@ export default function EventsPage() {
     };
 
     if (editingEvent) {
-      // Ensure all properties of Event are included for updateEvent
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables, // Retain existing values if not changed
-        shotRequests: editingEvent.shotRequests, // Retain existing values if not changed
+        deliverables: editingEvent.deliverables, 
+        shotRequests: editingEvent.shotRequests, 
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -362,7 +382,7 @@ export default function EventsPage() {
 
   const confirmDelete = () => {
     if (eventToDeleteId) {
-      const event = filteredEvents.find(e => e.id === eventToDeleteId);
+      const event = displayableEvents.find(e => e.id === eventToDeleteId);
       deleteEvent(eventToDeleteId);
       toast({
         title: "Event Deleted",
@@ -375,7 +395,7 @@ export default function EventsPage() {
   };
 
   if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents) {
-      return <div>Loading event data settings...</div>;
+      return <div>Loading event data and filters...</div>;
   }
 
   return (
@@ -392,6 +412,52 @@ export default function EventsPage() {
           Add New Event
         </Button>
       </div>
+
+      <Card className="shadow-md">
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
+            <CardDescription>Refine the events shown across all views below.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="flex items-center space-x-2">
+                <Checkbox 
+                    id="filter-quick-turnaround" 
+                    checked={filterQuickTurnaround} 
+                    onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+                />
+                <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround Only</Label>
+            </div>
+            <div>
+                <Label htmlFor="filter-time-status">Time Status</Label>
+                <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
+                    <SelectTrigger id="filter-time-status">
+                        <SelectValue placeholder="Filter by time status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Time Statuses</SelectItem>
+                        <SelectItem value="upcoming">Upcoming</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
+                        <SelectItem value="now">Happening Now</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div>
+                <Label htmlFor="filter-assigned-member">Assigned Team Member</Label>
+                <Select value={filterAssignedMemberId} onValueChange={setFilterAssignedMemberId} disabled={assignedPersonnelForFilter.length === 0}>
+                    <SelectTrigger id="filter-assigned-member">
+                        <SelectValue placeholder="Filter by team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Team Members</SelectItem>
+                        {assignedPersonnelForFilter.map(person => (
+                            <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
+                        ))}
+                         {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel assigned in current project/org.</p>}
+                    </SelectContent>
+                </Select>
+            </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
@@ -552,7 +618,7 @@ export default function EventsPage() {
                     defaultValue={[]}
                     render={({ field }) => (
                       <div className="space-y-2">
-                        {availablePersonnelList.map((person) => (
+                        {initialPersonnelMock.map((person) => (
                           <div key={person.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`person-${person.id}`}
@@ -621,8 +687,8 @@ export default function EventsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {groupedAndSortedEvents.length > 0 ? (
-                groupedAndSortedEvents.map(([date, dayEvents]) => (
+              {groupedAndSortedEventsForDisplay.length > 0 ? (
+                groupedAndSortedEventsForDisplay.map(([date, dayEvents]) => (
                   <div key={date}>
                     <h3 className="text-xl font-semibold mb-3 border-b pb-2">
                       {format(parseISO(date), "EEEE, MMMM do, yyyy")}
@@ -685,7 +751,7 @@ export default function EventsPage() {
                 ))
               ) : (
                 <p className="text-muted-foreground text-center py-8">
-                  No events scheduled {selectedProject ? `for ${selectedProject.name}` : "that match your criteria"}. {useDemoData ? 'Toggle "Load Demo Data" in settings or add an event.' : 'Add an event to get started.'}
+                  No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
                 </p>
               )}
             </CardContent>
@@ -698,11 +764,11 @@ export default function EventsPage() {
               <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
               <CardDescription>
                 {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
-                ({filteredEvents.length} events)
+                ({displayableEvents.length} events found)
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {filteredEvents.length > 0 ? (
+              {displayableEvents.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -718,7 +784,7 @@ export default function EventsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredEvents.map((event) => (
+                    {displayableEvents.map((event) => (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium flex items-center gap-1.5">
                            {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
@@ -770,7 +836,7 @@ export default function EventsPage() {
                 </Table>
               ) : (
                  <p className="text-muted-foreground text-center py-8">
-                  No events found {selectedProject ? `for ${selectedProject.name}` : "matching your criteria"}. {useDemoData ? 'Toggle "Load Demo Data" in settings or add an event.' : 'Add an event to get started.'}
+                  No events found {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
                 </p>
               )}
             </CardContent>
@@ -784,23 +850,24 @@ export default function EventsPage() {
               <CardDescription>
                 View events for a selected day laid out on an hourly timeline. Select a day tab below to view its schedule.
                  {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
+                 ({displayableEvents.length} total events matching filters)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {groupedAndSortedEvents.length > 0 && activeBlockScheduleDateKey ? (
+              {groupedAndSortedEventsForDisplay.length > 0 && activeBlockScheduleDateKey ? (
                 <Tabs
                   value={activeBlockScheduleDateKey}
                   onValueChange={setActiveBlockScheduleDateKey}
                   className="w-full"
                 >
                   <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
-                    {groupedAndSortedEvents.map(([dateKey, _]) => (
+                    {groupedAndSortedEventsForDisplay.map(([dateKey, _]) => (
                       <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
                         {format(parseISO(dateKey), "EEE, MMM d")}
                       </TabsTrigger>
                     ))}
                   </TabsList>
-                  {groupedAndSortedEvents.map(([dateKey, dayEvents]) => (
+                  {groupedAndSortedEventsForDisplay.map(([dateKey, dayEvents]) => (
                     <TabsContent key={`content-${dateKey}`} value={dateKey}>
                       <BlockScheduleView
                         selectedDate={parseISO(dateKey)}
@@ -814,10 +881,10 @@ export default function EventsPage() {
                 <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
                   <CalendarIconLucide size={48} className="mb-4 text-muted" />
                   <p className="text-lg font-medium">
-                    No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display in timeline.
+                    No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display in timeline based on current filters.
                   </p>
                   <p>
-                    {useDemoData ? 'Add some events for the selected project or adjust your project filter to see the timeline view.' : 'Add events to see the timeline view.'}
+                    {useDemoData ? 'Add some events for the selected project, adjust your project/event filters, or ensure demo data is loaded.' : 'Add events or adjust filters to see the timeline view.'}
                   </p>
                 </div>
               )}
@@ -828,3 +895,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
+    

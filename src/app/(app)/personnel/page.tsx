@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare } from "lucide-react";
+import { UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event } from "@/contexts/EventContext"; // Correctly import Event type and useEventContext
+import { useEventContext, type Event } from "@/contexts/EventContext"; 
 import { format, parseISO } from "date-fns";
 
 // --- Personnel Definitions ---
@@ -53,7 +53,7 @@ export type Personnel = PersonnelFormData & {
 };
 
 // Initial Mock data
-const initialPersonnelMock: Personnel[] = [
+export const initialPersonnelMock: Personnel[] = [
   { id: "user001", name: "Alice Wonderland", role: "Lead Camera Operator", status: "Available", avatar: "https://placehold.co/40x40.png" },
   { id: "user002", name: "Bob The Builder", role: "Audio Engineer", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
   { id: "user003", name: "Charlie Chaplin", role: "Producer", status: "Available", avatar: "https://placehold.co/40x40.png" },
@@ -66,7 +66,7 @@ const initialPersonnelMock: Personnel[] = [
 
 export default function PersonnelPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { allEvents, isLoadingEvents } = useEventContext(); // Use events from context
+  const { allEvents, isLoadingEvents } = useEventContext(); 
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
@@ -175,7 +175,7 @@ export default function PersonnelPage() {
   const handleViewSchedule = (person: Personnel) => {
     setViewingScheduleForPersonnel(person);
     let assignedEvents: Event[] = [];
-    if (useDemoData && !isLoadingEvents && allEvents) { // use allEvents from context
+    if (!isLoadingEvents && allEvents) { 
         assignedEvents = allEvents.filter(event => 
             event.assignedPersonnelIds?.includes(person.id)
         );
@@ -195,7 +195,7 @@ export default function PersonnelPage() {
   }, [personnelList, filterText]);
 
 
-  if (isLoadingSettings || isLoadingEvents) { // Check isLoadingEvents as well
+  if (isLoadingSettings || isLoadingEvents) { 
     return <div>Loading personnel data and event context...</div>;
   }
 
@@ -492,7 +492,5 @@ export default function PersonnelPage() {
     </div>
   );
 }
-
-    
 
     
