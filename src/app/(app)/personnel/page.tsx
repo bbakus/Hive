@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon } from "lucide-react";
+import { PlusCircle, UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { initialEventsMock, type Event } from "@/app/(app)/events/page"; 
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 // --- Personnel Definitions ---
 const personnelSchema = z.object({
@@ -316,7 +316,7 @@ export default function PersonnelPage() {
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
                         <TableCell>{event.project}</TableCell>
-                        <TableCell>{format(new Date(event.date), "PPP")}</TableCell>
+                        <TableCell>{event.date ? format(parseISO(event.date), "PPP") : "N/A"}</TableCell>
                         <TableCell>{event.time}</TableCell>
                       </TableRow>
                     ))}
@@ -424,25 +424,68 @@ export default function PersonnelPage() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Personnel Assignment Interface</CardTitle>
-            <CardDescription>Assign team members based on availability.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment Interface (Concept)</CardTitle>
+            <CardDescription>Assign team members based on availability and project needs.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Drag-and-drop or selection interface for assigning personnel to events. (Coming Soon)</p>
-            <img src="https://placehold.co/600x400.png" alt="Assignment Interface Placeholder" className="w-full h-auto mt-4 rounded-md" data-ai-hint="assignment board schedule" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Future: This section will feature a visual interface to assign personnel to events and specific roles. 
+              Users will be able to see availability, skills, and current assignments to make informed decisions.
+            </p>
+            <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30 min-h-[200px]">
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Available Team Members</h4>
+                <ul className="space-y-1 text-xs">
+                  {initialPersonnelMock.slice(0, 3).map(p => <li key={`assign-avail-${p.id}`} className="p-1.5 bg-background rounded-sm shadow-sm">{p.name} ({p.role})</li>)}
+                   <li>... more</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Project Events / Roles</h4>
+                 <ul className="space-y-1 text-xs">
+                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Main Stage - Day 1: Camera Op 1</li>
+                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Keynote Speech: Audio Lead</li>
+                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Workshop Alpha: Videographer</li>
+                  <li>... more</li>
+                </ul>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              (Conceptual UI: Drag-and-drop or selection-based assignment)
+            </p>
           </CardContent>
         </Card>
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Team Schedule Visualization</CardTitle>
-            <CardDescription>Visualize team member schedules (e.g., Gantt chart, calendar).</CardDescription>
+            <CardTitle className="flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization (Concept)</CardTitle>
+            <CardDescription>Visualize team member schedules and event commitments.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Visual representation of team schedules. (Coming Soon)</p>
-            <img src="https://placehold.co/600x400.png" alt="Schedule Visualization Placeholder" className="w-full h-auto mt-4 rounded-md" data-ai-hint="gantt chart team" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Future: A visual timeline (e.g., Gantt chart or calendar view) will display team schedules, 
+              event assignments, and potential conflicts or overlaps.
+            </p>
+            <div className="p-4 border rounded-md bg-muted/30 text-xs space-y-2">
+              <div>
+                <p className="font-semibold">{initialPersonnelMock[0]?.name || "Team Member A"}:</p>
+                <ul className="list-disc list-inside pl-4">
+                  <li>{initialEventsMock[0]?.name || "Event Alpha"} ({initialEventsMock[0]?.date || "YYYY-MM-DD"})</li>
+                  <li>{initialEventsMock[3]?.name || "Event Beta"} ({initialEventsMock[3]?.date || "YYYY-MM-DD"})</li>
+                </ul>
+              </div>
+               <div>
+                <p className="font-semibold">{initialPersonnelMock[1]?.name || "Team Member B"}:</p>
+                <ul className="list-disc list-inside pl-4">
+                  <li>{initialEventsMock[0]?.name || "Event Alpha"} ({initialEventsMock[0]?.date || "YYYY-MM-DD"})</li>
+                  <li>{initialEventsMock[1]?.name || "Event Gamma"} ({initialEventsMock[1]?.date || "YYYY-MM-DD"})</li>
+                </ul>
+              </div>
+              <p className="italic">... and so on for other team members.</p>
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
