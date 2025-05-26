@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, type FormEvent, useMemo, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, Cal
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
-import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
+import { useSettingsContext } from "@/contexts/SettingsContext";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,16 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -45,7 +55,7 @@ type DeliverableFormData = z.infer<typeof deliverableSchema>;
 
 export type Deliverable = DeliverableFormData & {
   id: string;
-  projectName: string; 
+  projectName: string;
 };
 
 const initialDeliverablesMock: Deliverable[] = [
@@ -63,7 +73,12 @@ export default function DeliverablesPage() {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [summaryResult, setSummaryResult] = useState<DeliverableSummaryOutput | null>(null);
   const [eventNameForSummary, setEventNameForSummary] = useState("All Projects");
-  const [isAddDeliverableDialogOpen, setIsAddDeliverableDialogOpen] = useState(false);
+  
+  const [isDeliverableModalOpen, setIsDeliverableModalOpen] = useState(false);
+  const [editingDeliverable, setEditingDeliverable] = useState<Deliverable | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deliverableToDeleteId, setDeliverableToDeleteId] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -89,6 +104,29 @@ export default function DeliverablesPage() {
       type: "",
     },
   });
+  
+  useEffect(() => {
+    if (isDeliverableModalOpen && editingDeliverable) {
+      resetDeliverableForm({
+        name: editingDeliverable.name,
+        event: editingDeliverable.event,
+        projectId: editingDeliverable.projectId,
+        dueDate: editingDeliverable.dueDate,
+        status: editingDeliverable.status,
+        type: editingDeliverable.type,
+      });
+    } else if (isDeliverableModalOpen && !editingDeliverable) {
+      resetDeliverableForm({
+        name: "",
+        event: "",
+        projectId: selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : ""),
+        dueDate: new Date(),
+        status: "Pending",
+        type: "",
+      });
+    }
+  }, [isDeliverableModalOpen, editingDeliverable, resetDeliverableForm, selectedProject, allProjectsFromContext]);
+
 
   const filteredDeliverables = useMemo(() => {
     if (!selectedProject) {
@@ -106,20 +144,66 @@ export default function DeliverablesPage() {
     setSummaryResult(null); 
   }, [selectedProject]);
 
-  const handleAddDeliverableSubmit: SubmitHandler<DeliverableFormData> = (data) => {
+  const handleDeliverableSubmit: SubmitHandler<DeliverableFormData> = (data) => {
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
-    const newDeliverable: Deliverable = {
-      ...data,
-      id: `del${String(deliverablesList.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-      projectName: selectedProjInfo?.name || "Unknown Project",
-    };
-    setDeliverablesList((prevList) => [...prevList, newDeliverable]);
-    toast({
-      title: "Deliverable Added",
-      description: `"${data.name}" has been successfully added.`,
-    });
-    resetDeliverableForm();
-    setIsAddDeliverableDialogOpen(false);
+    
+    if (editingDeliverable) {
+      setDeliverablesList(prevList => 
+        prevList.map(d => 
+          d.id === editingDeliverable.id ? { ...editingDeliverable, ...data, projectName: selectedProjInfo?.name || "Unknown Project" } : d
+        )
+      );
+      toast({
+        title: "Deliverable Updated",
+        description: `"${data.name}" has been successfully updated.`,
+      });
+    } else {
+      const newDeliverable: Deliverable = {
+        ...data,
+        id: `del${String(deliverablesList.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        projectName: selectedProjInfo?.name || "Unknown Project",
+      };
+      setDeliverablesList((prevList) => [...prevList, newDeliverable]);
+      toast({
+        title: "Deliverable Added",
+        description: `"${data.name}" has been successfully added.`,
+      });
+    }
+    closeDeliverableModal();
+  };
+  
+  const openAddDeliverableModal = () => {
+    setEditingDeliverable(null);
+    setIsDeliverableModalOpen(true);
+  };
+
+  const openEditDeliverableModal = (deliverable: Deliverable) => {
+    setEditingDeliverable(deliverable);
+    setIsDeliverableModalOpen(true);
+  };
+
+  const closeDeliverableModal = () => {
+    setIsDeliverableModalOpen(false);
+    setEditingDeliverable(null);
+  };
+
+  const handleDeleteDeliverableClick = (id: string) => {
+    setDeliverableToDeleteId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteDeliverable = () => {
+    if (deliverableToDeleteId) {
+      const deliverable = deliverablesList.find(d => d.id === deliverableToDeleteId);
+      setDeliverablesList(prevList => prevList.filter(d => d.id !== deliverableToDeleteId));
+      toast({
+        title: "Deliverable Deleted",
+        description: `Deliverable "${deliverable?.name}" has been deleted.`,
+        variant: "destructive"
+      });
+      setDeliverableToDeleteId(null);
+    }
+    setIsDeleteDialogOpen(false);
   };
 
   const handleGenerateSummary = async (e: FormEvent<HTMLFormElement>) => {
@@ -170,21 +254,23 @@ export default function DeliverablesPage() {
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
           </p>
         </div>
-        <Dialog open={isAddDeliverableDialogOpen} onOpenChange={setIsAddDeliverableDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-5 w-5" />
-              Add New Deliverable
-            </Button>
-          </DialogTrigger>
+        <Button onClick={openAddDeliverableModal}>
+          <PlusCircle className="mr-2 h-5 w-5" />
+          Add New Deliverable
+        </Button>
+      </div>
+
+      <Dialog open={isDeliverableModalOpen} onOpenChange={(isOpen) => {
+        if (!isOpen) closeDeliverableModal(); else setIsDeliverableModalOpen(true);
+      }}>
           <DialogContent className="sm:max-w-[525px]">
             <DialogHeader>
-              <DialogTitle>Add New Deliverable</DialogTitle>
+              <DialogTitle>{editingDeliverable ? "Edit Deliverable" : "Add New Deliverable"}</DialogTitle>
               <DialogDescription>
-                Fill in the details for the new deliverable.
+                {editingDeliverable ? "Update details for this deliverable." : "Fill in the details for the new deliverable."}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmitDeliverable(handleAddDeliverableSubmit)} className="grid gap-4 py-4">
+            <form onSubmit={handleSubmitDeliverable(handleDeliverableSubmit)} className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="deliverable-name" className="text-right">Name</Label>
                 <div className="col-span-3">
@@ -206,7 +292,7 @@ export default function DeliverablesPage() {
                     name="projectId"
                     control={controlDeliverable}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || (selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : ""))}>
                         <SelectTrigger className={deliverableErrors.projectId ? "border-destructive" : ""}>
                           <SelectValue placeholder="Select project" />
                         </SelectTrigger>
@@ -263,7 +349,7 @@ export default function DeliverablesPage() {
                     name="status"
                     control={controlDeliverable}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                         <SelectTrigger className={deliverableErrors.status ? "border-destructive" : ""}>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
@@ -287,14 +373,28 @@ export default function DeliverablesPage() {
               </div>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
+                  <Button type="button" variant="outline" onClick={closeDeliverableModal}>Cancel</Button>
                 </DialogClose>
-                <Button type="submit">Add Deliverable</Button>
+                <Button type="submit">{editingDeliverable ? "Save Changes" : "Add Deliverable"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Deliverable?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this deliverable? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeliverableToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteDeliverable} className={buttonVariants({ variant: "destructive" })}>Delete Deliverable</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -339,11 +439,11 @@ export default function DeliverablesPage() {
                         <UploadCloud className="h-4 w-4" />
                         <span className="sr-only">Upload</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditDeliverableModal(item)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteDeliverableClick(item.id)}>
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>
                       </Button>
@@ -400,3 +500,6 @@ export default function DeliverablesPage() {
     </div>
   );
 }
+
+
+    
