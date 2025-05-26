@@ -5,14 +5,14 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useProjectContext } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
-import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext'; // Import OrganizationContext
-import type { Event as EventTypeDefinition } from '@/app/(app)/events/page'; // Use existing type
+import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
+import type { Event as EventTypeDefinition } from '@/app/(app)/events/page'; 
 
-export type Event = EventTypeDefinition; // This will now include organizationId and discipline
+export type Event = EventTypeDefinition; 
 
 type EventContextType = {
-  allEvents: Event[]; // All events, unfiltered by project or org
-  eventsForSelectedProjectAndOrg: Event[]; // Filtered by selected org AND project
+  allEvents: Event[]; 
+  eventsForSelectedProjectAndOrg: Event[]; 
   addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'>) => void;
   updateEvent: (eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => void;
   deleteEvent: (eventId: string) => void;
@@ -55,6 +55,7 @@ const generateG9eSummitEvents = (): Event[] => {
         discipline: morningDiscipline,
         isQuickTurnaround: (dayIndex + photographerIndex) % 3 === 0,
         deadline: (dayIndex + photographerIndex) % 3 === 0 ? `${day}T18:00` : undefined,
+        isCovered: true, // Most sessions are covered
       });
 
       summitEvents.push({
@@ -70,6 +71,7 @@ const generateG9eSummitEvents = (): Event[] => {
         shotRequests: 0,
         organizationId: g9eOrgId,
         discipline: "",
+        isCovered: false, // Lunch breaks are not "coverage"
       });
 
       summitEvents.push({
@@ -85,7 +87,28 @@ const generateG9eSummitEvents = (): Event[] => {
         shotRequests: 5,
         organizationId: g9eOrgId,
         discipline: afternoonDiscipline,
+        isCovered: true,
       });
+      
+      // Simulate some internal project meetings not requiring external coverage
+      if (dayIndex === 0 && photographerIndex < 2) {
+         summitEvents.push({
+            id: `evt_summit_internal_prep_${photographerIndex}_${eventIdCounter++}`,
+            name: `Internal Prep Meeting - Team ${String.fromCharCode(65 + photographerIndex)}`,
+            projectId: g9eSummitProjectId,
+            project: "G9e Corporate Summit 2024",
+            date: day,
+            time: "08:00 - 08:45",
+            priority: "Medium",
+            assignedPersonnelIds: [photographerId, "user007"], // Add a lead
+            deliverables: 0,
+            shotRequests: 0,
+            organizationId: g9eOrgId,
+            discipline: "",
+            isCovered: false, 
+        });
+      }
+
 
       if (photographerIndex % 2 === 0) {
         summitEvents.push({
@@ -102,6 +125,7 @@ const generateG9eSummitEvents = (): Event[] => {
           organizationId: g9eOrgId,
           discipline: eveningDiscipline,
           isQuickTurnaround: (dayIndex + photographerIndex) % 4 === 0,
+          isCovered: true,
         });
       }
     });
@@ -111,12 +135,12 @@ const generateG9eSummitEvents = (): Event[] => {
 
 
 const initialMockEvents: Event[] = [
-    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002", "user006"], isQuickTurnaround: true, deadline: "2024-07-16T10:00", organizationId: "org_g9e", discipline: "Video" },
-    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00", organizationId: "org_damion_hamilton", discipline: "Both" },
-    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography" },
-    { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004", "user006"], organizationId: "org_g9e", discipline: "Photography" },
-    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59", organizationId: "org_damion_hamilton", discipline: "Video" },
-    { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Both"},
+    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002", "user006"], isQuickTurnaround: true, deadline: "2024-07-16T10:00", organizationId: "org_g9e", discipline: "Video", isCovered: true },
+    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00", organizationId: "org_damion_hamilton", discipline: "Both", isCovered: true },
+    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: false },
+    { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004", "user006"], organizationId: "org_g9e", discipline: "Photography", isCovered: true },
+    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59", organizationId: "org_damion_hamilton", discipline: "Video", isCovered: true },
+    { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Both", isCovered: true},
   ...generateG9eSummitEvents(),
 ];
 
@@ -149,6 +173,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         shotRequests: 0,
         hasOverlap: false,
         discipline: eventData.discipline || "",
+        isCovered: eventData.isCovered === undefined ? true : eventData.isCovered,
       };
       return [...prevEvents, newEvent];
     });
@@ -168,7 +193,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
     setAllEventsState((prevEvents) =>
       prevEvents.map((evt) =>
-        evt.id === eventId ? { ...evt, ...eventData, project: projectName || evt.project, organizationId: orgId || evt.organizationId, discipline: eventData.discipline !== undefined ? eventData.discipline : evt.discipline } : evt
+        evt.id === eventId ? { ...evt, ...eventData, project: projectName || evt.project, organizationId: orgId || evt.organizationId, discipline: eventData.discipline !== undefined ? eventData.discipline : evt.discipline, isCovered: eventData.isCovered !== undefined ? eventData.isCovered : evt.isCovered } : evt
       )
     );
   }, [projects]);

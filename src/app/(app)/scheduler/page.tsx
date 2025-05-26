@@ -18,29 +18,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import type { Event } from "@/app/(app)/events/page";
+import { useEventContext, type Event } from "@/contexts/EventContext"; 
 import type { ShotRequest } from "@/app/(app)/events/[eventId]/shots/page";
+import { initialPersonnelMock } from "@/app/(app)/personnel/page"; 
 
 // Using a more generic name for the mock data as it's used across the app
 // This data is filtered by project context on the scheduler page
+// This specific mock is less relevant now that EventContext is used for real data, but keep for shot requests
 const allEventsDataMockForScheduler: Event[] = [
-    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002", "user006"] },
-    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"] },
-    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user003"] },
-    { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004", "user006"] },
-    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"] },
-    { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"]},
+    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002", "user006"], isCovered: true },
+    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"], isCovered: true },
 ];
 
-const allAvailablePersonnelMockForScheduler: { id: string; name: string; role: string }[] = [
-  { id: "user001", name: "Alice Wonderland", role: "Lead Camera Op" },
-  { id: "user002", name: "Bob The Builder", role: "Audio Engineer" },
-  { id: "user003", name: "Charlie Chaplin", role: "Producer" },
-  { id: "user004", name: "Diana Prince", role: "Drone Pilot" },
-  { id: "user005", name: "Edward Scissorhands", role: "Grip" },
-  { id: "user006", name: "Fiona Gallagher", role: "Coordinator" },
-  { id: "user007", name: "George Jetson", role: "Tech Lead" },
-];
+const allAvailablePersonnelMockForScheduler: { id: string; name: string; role: string }[] = initialPersonnelMock;
 
 const initialShotRequestsMockForScheduler: ShotRequest[] = [
   { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd (Main Stage D1)", shotType: "Wide", priority: "High", status: "Planned", notes: "Get this as gates open" },
@@ -131,6 +121,7 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[]): Par
 export default function SchedulerPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { selectedProjectId, selectedProject } = useProjectContext();
+  const { eventsForSelectedProjectAndOrg: allProjectEvents, isLoadingEvents: isLoadingContextEvents, updateEvent } = useEventContext();
   const { toast } = useToast();
 
   const [currentProjectEvents, setCurrentProjectEvents] = useState<Event[]>([]);
@@ -149,45 +140,46 @@ export default function SchedulerPage() {
   const [projectPersonnel, setProjectPersonnel] = useState<{ id: string; name: string; role: string }[]>([]);
 
   useEffect(() => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettings || isLoadingContextEvents) return;
     setScheduleOutput(null);
     setParsedSchedule([]);
     setIsScheduleApplied(false);
 
-    if (selectedProjectId && useDemoData) {
-      const eventsForProject = allEventsDataMockForScheduler.filter(event => event.projectId === selectedProjectId);
-      setCurrentProjectEvents(eventsForProject);
-
-      const uniqueDates = Array.from(new Set(eventsForProject.map(event => event.date))).sort();
-      setProjectEventDates(uniqueDates);
-
-      if (uniqueDates.length > 0) {
-        if (!selectedDateString || !uniqueDates.includes(selectedDateString)) {
-            setSelectedDateString(uniqueDates[0]);
-        }
-      } else {
-        setSelectedDateString(undefined);
-      }
-
-      const personnelIdsInProjectEvents = new Set<string>();
-      eventsForProject.forEach(event => {
-        event.assignedPersonnelIds?.forEach(id => personnelIdsInProjectEvents.add(id));
-      });
-
-      const filteredPersonnel = allAvailablePersonnelMockForScheduler.filter(p => personnelIdsInProjectEvents.has(p.id));
-      setProjectPersonnel(filteredPersonnel);
-      setSelectedPersonnelNames(prev => prev.filter(name => filteredPersonnel.some(p => p.name === name)));
-
+    let relevantEvents = allProjectEvents;
+    if(selectedProjectId && useDemoData) {
+      relevantEvents = allProjectEvents.filter(event => event.projectId === selectedProjectId && event.isCovered);
+    } else if (!useDemoData) {
+      relevantEvents = allProjectEvents.filter(event => event.isCovered); // show non-demo covered events
     } else {
-      setCurrentProjectEvents([]);
-      setProjectEventDates([]);
-      setProjectPersonnel([]);
-      setSelectedDateString(undefined);
-      setSelectedPersonnelNames([]);
+      relevantEvents = [];
     }
-  }, [selectedProjectId, useDemoData, isLoadingSettings]); // Removed selectedDateString dependency for initialization
+    setCurrentProjectEvents(relevantEvents);
 
-   // Effect to update selectedDateString if the current one becomes invalid due to project change
+
+    const uniqueDates = Array.from(new Set(relevantEvents.map(event => event.date))).sort();
+    setProjectEventDates(uniqueDates);
+
+    if (uniqueDates.length > 0) {
+      if (!selectedDateString || !uniqueDates.includes(selectedDateString)) {
+          setSelectedDateString(uniqueDates[0]);
+      }
+    } else {
+      setSelectedDateString(undefined);
+    }
+
+    const personnelIdsInProjectEvents = new Set<string>();
+    relevantEvents.forEach(event => {
+      event.assignedPersonnelIds?.forEach(id => personnelIdsInProjectEvents.add(id));
+    });
+
+    const filteredPersonnel = allAvailablePersonnelMockForScheduler.filter(p => personnelIdsInProjectEvents.has(p.id));
+    setProjectPersonnel(filteredPersonnel);
+    // Preserve selection if still valid, otherwise clear (or select all/default)
+    setSelectedPersonnelNames(prev => prev.filter(name => filteredPersonnel.some(p => p.name === name)));
+
+
+  }, [selectedProjectId, useDemoData, isLoadingSettings, allProjectEvents, isLoadingContextEvents]);
+
    useEffect(() => {
     if (projectEventDates.length > 0 && (!selectedDateString || !projectEventDates.includes(selectedDateString))) {
       setSelectedDateString(projectEventDates[0]);
@@ -198,9 +190,9 @@ export default function SchedulerPage() {
 
 
   const eventsForSelectedDate = useMemo(() => {
-    if (!selectedDateString || !useDemoData) return [];
-    return currentProjectEvents.filter(event => event.date === selectedDateString);
-  }, [selectedDateString, currentProjectEvents, useDemoData]);
+    if (!selectedDateString) return [];
+    return currentProjectEvents.filter(event => event.date === selectedDateString && event.isCovered);
+  }, [selectedDateString, currentProjectEvents]);
 
 
   const handlePersonnelChange = (personnelName: string, checked: boolean) => {
@@ -230,10 +222,12 @@ export default function SchedulerPage() {
     setIsScheduleApplied(false);
 
 
-    const projectEventsForDateInput = eventsForSelectedDate.map(event => ({
-      name: event.name,
-      time: event.time,
-    }));
+    const projectEventsForDateInput = eventsForSelectedDate
+      .filter(event => event.isCovered) // Ensure only covered events are sent to AI
+      .map(event => ({
+        name: event.name,
+        time: event.time,
+      }));
 
     const input: GenerateScheduleInput = {
       date: selectedDateString,
@@ -273,44 +267,51 @@ export default function SchedulerPage() {
     }
 
     let assignmentsMadeCount = 0;
-    const updatedEvents = currentProjectEvents.map(event => {
-        let eventAssignmentsChanged = false;
-        const newAssignedIds = new Set(event.assignedPersonnelIds || []);
+    const updatedEventsMap = new Map<string, Event>();
+    currentProjectEvents.forEach(ev => updatedEventsMap.set(ev.id, { ...ev, assignedPersonnelIds: [...(ev.assignedPersonnelIds || [])] }));
 
-        parsedSchedule.forEach(person => {
-            const personnel = allAvailablePersonnelMockForScheduler.find(p => p.name === person.name);
-            if (!personnel) return;
 
-            person.items.forEach(item => {
-                if (item.matchedEventId === event.id) {
-                    if (!newAssignedIds.has(personnel.id)) {
-                        newAssignedIds.add(personnel.id);
-                        eventAssignmentsChanged = true;
+    parsedSchedule.forEach(person => {
+        const personnel = allAvailablePersonnelMockForScheduler.find(p => p.name === person.name);
+        if (!personnel) return;
+
+        person.items.forEach(item => {
+            if (item.matchedEventId) {
+                const eventToUpdate = updatedEventsMap.get(item.matchedEventId);
+                if (eventToUpdate) {
+                    if (!eventToUpdate.assignedPersonnelIds?.includes(personnel.id)) {
+                        eventToUpdate.assignedPersonnelIds = [...(eventToUpdate.assignedPersonnelIds || []), personnel.id];
                         assignmentsMadeCount++;
+                        updatedEventsMap.set(item.matchedEventId, eventToUpdate); // Ensure map has updated version
                     }
                 }
-            });
+            }
         });
-
-        if (eventAssignmentsChanged) {
-            return { ...event, assignedPersonnelIds: Array.from(newAssignedIds) };
-        }
-        return event;
     });
+    
+    updatedEventsMap.forEach(updatedEvent => {
+        const originalEvent = allProjectEvents.find(e => e.id === updatedEvent.id);
+        // Check if assignments actually changed before calling updateEvent
+        const originalAssignments = JSON.stringify((originalEvent?.assignedPersonnelIds || []).sort());
+        const newAssignments = JSON.stringify((updatedEvent.assignedPersonnelIds || []).sort());
 
-    setCurrentProjectEvents(updatedEvents); // This updates the local scheduler's view of events
+        if(originalAssignments !== newAssignments) {
+           updateEvent(updatedEvent.id, { assignedPersonnelIds: updatedEvent.assignedPersonnelIds });
+        }
+    });
+    
     setIsScheduleApplied(true);
 
     if (assignmentsMadeCount > 0) {
         toast({
-            title: "Schedule Applied (Locally)",
-            description: `${assignmentsMadeCount} new assignment(s) reflected in this scheduler's data. Please update events on the main Events page manually for global changes.`,
+            title: "Schedule Applied (Locally to Context)",
+            description: `${assignmentsMadeCount} new assignment(s) reflected. These changes affect the shared EventContext and will be visible on other pages like the Events page.`,
             duration: 7000,
         });
     } else {
         toast({
-            title: "Schedule Applied (Locally)",
-            description: "No new assignments were made based on the schedule. Existing assignments checked. Manual updates on Events page may still be needed.",
+            title: "Schedule Reviewed (Locally to Context)",
+            description: "No new personnel assignments were made based on the schedule. Existing assignments checked.",
             duration: 7000,
         });
     }
@@ -320,11 +321,11 @@ export default function SchedulerPage() {
     window.print();
   };
 
-  if (isLoadingSettings) {
-    return <div className="p-4">Loading scheduler settings...</div>;
+  if (isLoadingSettings || isLoadingContextEvents) {
+    return <div className="p-4">Loading scheduler settings and event data...</div>;
   }
 
-  const isSchedulerFormDisabled = !selectedProjectId || !useDemoData;
+  const isSchedulerFormDisabled = !selectedProjectId || (!useDemoData && allProjectEvents.filter(e=>e.isCovered).length === 0);
 
 
   return (
@@ -335,16 +336,19 @@ export default function SchedulerPage() {
         </h1>
         <p className="text-muted-foreground">
           {selectedProject ? `Generating schedule for ${selectedProject.name}. ` : "Select a project to begin. "}
-           Dynamically generate per-day and per-person schedule views using AI.
+           Dynamically generate per-day and per-person schedule views using AI for events marked as "Covered".
         </p>
       </div>
 
       {isSchedulerFormDisabled && (
         <Alert variant="default" className="mt-4">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Scheduler Disabled</AlertTitle>
+          <AlertTitle>Scheduler Disabled or No Covered Events</AlertTitle>
           <AlertDescription>
-            {!useDemoData ? "Demo data is currently turned off. Please enable it in settings to use the scheduler with sample data." : "Please select a project from the main navigation to enable the scheduler."}
+            {!useDemoData && allProjectEvents.filter(e=>e.isCovered).length === 0 && selectedProjectId
+                ? "The selected project has no events marked for production coverage. Please mark events as 'covered' on the Events page to use the scheduler."
+                : (!useDemoData ? "Demo data is currently turned off. Please enable it in settings or ensure your selected project has covered events." : "Please select a project from the main navigation to enable the scheduler.")
+            }
           </AlertDescription>
         </Alert>
       )}
@@ -353,7 +357,7 @@ export default function SchedulerPage() {
         <CardHeader>
           <CardTitle>Generate New Schedule</CardTitle>
           <CardDescription>
-            Provide details to generate an optimized schedule. Date and Personnel are dynamically populated based on the selected project's events.
+            Provide details to generate an optimized schedule for covered events. Date and Personnel are dynamically populated based on the selected project's covered events.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -367,7 +371,7 @@ export default function SchedulerPage() {
                   disabled={projectEventDates.length === 0 || isSchedulerFormDisabled}
                 >
                   <SelectTrigger id="date-select" className={(!selectedDateString && projectEventDates.length > 0) ? "text-muted-foreground" : ""}>
-                    <SelectValue placeholder={projectEventDates.length > 0 ? "Select a date" : (selectedProject && useDemoData ? "No event dates for this project" : "Select project or enable demo data")} />
+                    <SelectValue placeholder={projectEventDates.length > 0 ? "Select a date" : (selectedProject ? "No covered event dates for this project" : "Select project")} />
                   </SelectTrigger>
                   <SelectContent>
                     {projectEventDates.map(dateStr => (
@@ -377,17 +381,17 @@ export default function SchedulerPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">Select a date that has events scheduled for the current project to generate the most relevant schedule.</p>
+                <p className="text-xs text-muted-foreground mt-1">Select a date that has covered events scheduled for the current project.</p>
               </div>
               <div>
                 <Label htmlFor="location">Location (Optional)</Label>
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" disabled={isSchedulerFormDisabled} />
-                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing"). If scheduling for specific sub-locations, reference them in 'Additional Criteria' for more granular AI focus.</p>
+                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing"). If scheduling for specific sub-locations, reference them in 'Additional Criteria'.</p>
               </div>
               <div>
                 <Label htmlFor="eventType">Event Type (Optional)</Label>
                 <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Music Festival Day 1, Conference Keynotes" disabled={isSchedulerFormDisabled}/>
-                <p className="text-xs text-muted-foreground mt-1">Optional. Providing a descriptive type (e.g., "Concert - Main Performances", "Wedding Reception Coverage", "Tech Expo - Booth Setup") helps the AI understand typical activities and phases. Be specific for best results.</p>
+                <p className="text-xs text-muted-foreground mt-1">Optional. Providing a descriptive type (e.g., "Concert - Main Performances", "Wedding Reception Coverage") helps the AI understand typical activities and phases. Be specific for best results.</p>
               </div>
             </div>
 
@@ -414,13 +418,13 @@ export default function SchedulerPage() {
                  <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-[10rem] flex items-center justify-center bg-muted/50">
                     <p className="text-center">
                       {isSchedulerFormDisabled
-                        ? (selectedProject && useDemoData ? "No personnel assigned to this project's events for dynamic listing." : "Select a project to see available personnel based on event assignments.")
-                        : (selectedProject && useDemoData ? "No personnel assigned to this project's events." : "Select a project and ensure demo data is active for personnel list.")
+                        ? (selectedProject ? "No personnel assigned to covered events for this project." : "Select a project to see available personnel.")
+                        : (selectedProject ? "No personnel assigned to covered events in this project." : "Select a project.")
                       }
                     </p>
                   </div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">Personnel assigned to events in the selected project will be listed here. Select all relevant team members for this schedule.</p>
+              <p className="text-xs text-muted-foreground mt-1">Personnel assigned to covered events in the selected project will be listed here. Select all relevant team members for this schedule.</p>
             </div>
 
             <div className="md:col-span-2 space-y-2">
@@ -433,11 +437,11 @@ export default function SchedulerPage() {
                 rows={4}
                 disabled={isSchedulerFormDisabled}
               />
-                <p className="text-xs text-muted-foreground mt-1">List any must-have items, strict preferences, or specific tasks. The AI will prioritize these. If scheduling for multiple distinct events on the same day (from your project), ensure they are clearly named here or in the 'Event Type' if not covered by 'Specific Events' passed to AI.</p>
+                <p className="text-xs text-muted-foreground mt-1">List any must-have items, strict preferences, or specific tasks. The AI will prioritize these.</p>
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading || isSchedulerFormDisabled || selectedPersonnelNames.length === 0 || !selectedDateString }>
+            <Button type="submit" disabled={isLoading || isSchedulerFormDisabled || selectedPersonnelNames.length === 0 || !selectedDateString || eventType.trim() === "" }>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Generate Schedule
             </Button>
@@ -460,7 +464,7 @@ export default function SchedulerPage() {
             <div className="flex gap-2">
                 <Button onClick={handleApplySchedule} variant="outline" disabled={isScheduleApplied || !parsedSchedule.length}>
                     <CheckSquare className="mr-2 h-4 w-4" />
-                    {isScheduleApplied ? "Schedule Applied (Locally)" : "Apply Schedule to Event Data"}
+                    {isScheduleApplied ? "Schedule Applied (Context Updated)" : "Apply Schedule to Event Data"}
                 </Button>
                 <Button onClick={handlePrint} variant="outline">
                     <Printer className="mr-2 h-4 w-4" />
@@ -472,12 +476,10 @@ export default function SchedulerPage() {
             {isScheduleApplied && (
                 <Alert variant="default" className="mt-4">
                     <Info className="h-4 w-4" />
-                    <AlertTitle>Assignments Applied Locally</AlertTitle>
+                    <AlertTitle>Assignments Applied to Event Context</AlertTitle>
                     <AlertDescription>
-                        Personnel assignments based on this schedule have been updated in the scheduler's local data view.
-                        These changes are <span className="font-semibold">NOT YET SAVED</span> to the main Events page or global database.
-                        Please review the generated schedule and, if satisfied, manually update the personnel assignments for each event on the '/events' page to make them permanent.
-                        Future enhancements will allow direct global updates from here.
+                        Personnel assignments based on this schedule have been updated in the shared EventContext.
+                        These changes will be reflected on other pages like the Events page. Review the Events page to see the updated assignments.
                     </AlertDescription>
                 </Alert>
             )}
@@ -537,7 +539,7 @@ export default function SchedulerPage() {
               <AlertTitle>Exporting & Applying Schedule</AlertTitle>
               <AlertDescription>
                 To export this schedule as a PDF, please use your browser's "Print" function (Ctrl/Cmd + P) and choose "Save as PDF" as the destination.
-                The "Apply Schedule" button updates this scheduler's local view of event assignments based on the AI output. <span className="font-semibold">These changes are not yet global.</span> Manually update assignments on the main Events page to persist them.
+                The "Apply Schedule" button updates the shared EventContext with new personnel assignments based on the AI output. These changes will be reflected across the application.
               </AlertDescription>
             </Alert>
           </CardContent>

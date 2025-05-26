@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Users, Settings, Zap } from "lucide-react";
+import { Users, Settings, Zap, Focus } from "lucide-react"; // Added Focus
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
@@ -78,7 +78,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 45)}px`, // Increased min height slightly for new info
+      height: `${Math.max(height, 45)}px`, 
       left: `${leftPercentage}%`,
       width: `${widthPercentage}%`,
       zIndex: startMinute + 10,
@@ -123,9 +123,10 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
               style={getEventStyle(event)}
               className={cn(
                 "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
-                getPriorityColor(event.priority)
+                getPriorityColor(event.priority),
+                event.isCovered === false && "opacity-60 bg-muted/50 border-muted-foreground/30 hover:opacity-90" 
               )}
-              title={`${event.name} (${event.time}) - Project: ${event.project}`}
+              title={`${event.name} (${event.time}) - Project: ${event.project} ${event.isCovered === false ? '- Not Covered' : '- Covered'}`}
             >
               {onEditEvent && (
                 <Button
@@ -144,6 +145,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
               <div>
                 <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
                     {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0" title="Quick Turnaround"/>}
+                    {event.isCovered && <Focus className="h-3 w-3 text-accent flex-shrink-0" title="Covered Event"/>}
+                    {!event.isCovered && <Eye className="h-3 w-3 text-muted-foreground flex-shrink-0" title="Not Covered"/>}
                     {event.name}
                 </p>
                 <p className="opacity-80 truncate leading-tight">{event.time}</p>

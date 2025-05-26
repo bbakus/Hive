@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Video, Camera } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Video, Camera, Focus } from "lucide-react"; // Added Focus
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, isSameDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,6 +55,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import type { DateRange } from "react-day-picker";
 
 
 export const eventSchema = z.object({
@@ -70,6 +71,7 @@ export const eventSchema = z.object({
   }),
   organizationId: z.string().optional(),
   discipline: z.enum(["Video", "Photography", "Both", "" ]).optional(),
+  isCovered: z.boolean().optional(), // New field
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
@@ -82,6 +84,7 @@ export type Event = EventFormData & {
   hasOverlap?: boolean;
   organizationId?: string;
   discipline?: "Video" | "Photography" | "Both" | "";
+  isCovered?: boolean; // New field
 };
 
 
@@ -167,6 +170,7 @@ export default function EventsPage() {
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
   const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
   const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
+  const [filterCoverageStatus, setFilterCoverageStatus] = useState<"all" | "covered" | "not_covered">("all");
 
 
   const { toast } = useToast();
@@ -186,6 +190,7 @@ export default function EventsPage() {
       deadline: "",
       assignedPersonnelIds: [],
       discipline: "",
+      isCovered: true, // Default new events to covered
     }
   });
 
@@ -210,6 +215,7 @@ export default function EventsPage() {
         deadline: editingEvent.deadline || "",
         organizationId: editingEvent.organizationId || "",
         discipline: editingEvent.discipline || "",
+        isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
       });
     } else {
       const firstProjectForOrg = selectedProject ? selectedProject : (allProjects.length > 0 ? allProjects[0] : null);
@@ -224,6 +230,7 @@ export default function EventsPage() {
         deadline: "",
         organizationId: firstProjectForOrg?.organizationId || "",
         discipline: "",
+        isCovered: true,
       });
     }
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
@@ -271,6 +278,14 @@ export default function EventsPage() {
       });
     }
     
+    if (filterCoverageStatus !== "all") {
+      if (filterCoverageStatus === "covered") {
+        filtered = filtered.filter(event => event.isCovered === true);
+      } else if (filterCoverageStatus === "not_covered") {
+        filtered = filtered.filter(event => event.isCovered === false || event.isCovered === undefined);
+      }
+    }
+
     if (selectedEventDates.length > 0) {
       filtered = filtered.filter(event => selectedEventDates.includes(event.date));
     }
@@ -294,7 +309,7 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, selectedEventDates]);
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, selectedEventDates, filterCoverageStatus]);
 
 
   const groupedAndSortedEventsForDisplay = useMemo(() => {
@@ -321,7 +336,7 @@ export default function EventsPage() {
   }, [displayableEvents]);
 
   const uniqueEventDatesForFilter = useMemo(() => {
-    const dates = new Set(eventsForSelectedProjectAndOrg.map(event => event.date));
+    const dates = new Set((eventsForSelectedProjectAndOrg || []).map(event => event.date));
     return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   }, [eventsForSelectedProjectAndOrg]);
 
@@ -350,6 +365,7 @@ export default function EventsPage() {
       project: selectedProjInfo.name,
       organizationId: selectedProjInfo.organizationId,
       discipline: data.discipline || "", 
+      isCovered: data.isCovered === undefined ? true : data.isCovered, // Ensure default
     };
 
     if (editingEvent) {
@@ -368,6 +384,7 @@ export default function EventsPage() {
         ...data,
         organizationId: selectedProjInfo.organizationId,
         discipline: data.discipline || "",
+        isCovered: data.isCovered === undefined ? true : data.isCovered,
       };
       addEvent(newEventDataForContext);
       toast({
@@ -393,6 +410,7 @@ export default function EventsPage() {
       deadline: "",
       organizationId: projectInfo?.organizationId || "",
       discipline: "",
+      isCovered: true,
     });
     setIsEventModalOpen(true);
   };
@@ -410,6 +428,7 @@ export default function EventsPage() {
       deadline: event.deadline || "",
       organizationId: event.organizationId || "",
       discipline: event.discipline || "",
+      isCovered: event.isCovered === undefined ? true : event.isCovered,
     });
     setIsEventModalOpen(true);
   };
@@ -442,6 +461,11 @@ export default function EventsPage() {
     if (discipline === "Video") return <Video className="h-3.5 w-3.5 opacity-80" />;
     if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
     if (discipline === "Both") return <><Video className="h-3.5 w-3.5 opacity-80" /><Camera className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
+    return null;
+  };
+
+  const getCoverageIcon = (isCovered?: boolean) => {
+    if (isCovered === true) return <Focus className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
     return null;
   };
 
@@ -518,6 +542,19 @@ export default function EventsPage() {
                         <SelectItem value="all">All Disciplines</SelectItem>
                         <SelectItem value="Video">Video Only</SelectItem>
                         <SelectItem value="Photography">Photography Only</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div>
+                <Label htmlFor="filter-coverage-status">Coverage Status</Label>
+                <Select value={filterCoverageStatus} onValueChange={(value) => setFilterCoverageStatus(value as any)}>
+                    <SelectTrigger id="filter-coverage-status">
+                        <SelectValue placeholder="Filter by coverage status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Events</SelectItem>
+                        <SelectItem value="covered">Covered Events Only</SelectItem>
+                        <SelectItem value="not_covered">Non-Covered Events Only</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -727,6 +764,25 @@ export default function EventsPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="event-isCovered" className="text-right col-span-1">Coverage</Label>
+                  <div className="col-span-3 flex items-center">
+                    <Controller
+                        name="isCovered"
+                        control={control}
+                        render={({ field }) => (
+                            <Checkbox
+                            id="event-isCovered"
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="mr-2"
+                            />
+                        )}
+                    />
+                    <Label htmlFor="event-isCovered" className="font-normal text-sm">This event requires production coverage.</Label>
+                    {errors.isCovered && <p className="text-xs text-destructive mt-1">{errors.isCovered.message}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-quickTurnaround" className="text-right col-span-1">Quick Turn</Label>
                   <div className="col-span-3 flex items-center">
                     <Controller
@@ -839,6 +895,7 @@ export default function EventsPage() {
                             <CardTitle className="text-lg flex items-center justify-between">
                               <span className="flex items-center gap-1.5">
                                 {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" title="Quick Turnaround"/>}
+                                {getCoverageIcon(event.isCovered)}
                                 {event.name}
                               </span>
                               <Badge variant={
@@ -932,6 +989,7 @@ export default function EventsPage() {
                       <TableRow key={event.id}>
                         <TableCell className="font-medium flex items-center gap-1.5">
                            {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
+                           {getCoverageIcon(event.isCovered)}
                           {event.name}
                         </TableCell>
                         {!selectedProject && <TableCell>{event.project}</TableCell>}
