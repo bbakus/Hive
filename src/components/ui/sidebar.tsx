@@ -33,7 +33,7 @@ type SidebarContext = {
   setOpen: (open: boolean) => void
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
-  isMobile: boolean | undefined; // Allow undefined during initialization
+  isMobile: boolean | undefined;
   toggleSidebar: () => void
 }
 
@@ -68,9 +68,14 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobileHookValue = useIsMobile() // This can be undefined initially
+    const isMobileHookValue = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
     const [clientIsMobile, setClientIsMobile] = React.useState<boolean | undefined>(undefined);
+    const [mounted, setMounted] = React.useState(false); // For deferring 'has' selector class
+
+    React.useEffect(() => {
+      setMounted(true);
+    }, []);
 
     React.useEffect(() => {
       setClientIsMobile(isMobileHookValue);
@@ -145,7 +150,8 @@ const SidebarProvider = React.forwardRef<
               } as React.CSSProperties
             }
             className={cn(
-              "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
+              "group/sidebar-wrapper flex min-h-svh w-full",
+              mounted && "has-[[data-variant=inset]]:bg-sidebar", // Apply 'has' dependent class only when mounted
               className
             )}
             ref={ref}
@@ -182,8 +188,6 @@ const Sidebar = React.forwardRef<
     const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
     if (isMobile === undefined) {
-      // Render null or a consistent placeholder during hydration mismatch phase
-      // This ensures server and initial client render for this slot match.
       return null;
     }
 
@@ -571,7 +575,7 @@ const SidebarMenuButton = React.forwardRef<
       }
     }
 
-    const hideTooltip = state !== "collapsed" || (isMobile === undefined ? true : isMobile);
+    const hideTooltip = isMobile === undefined || state !== "collapsed" || isMobile;
 
 
     return (
@@ -758,5 +762,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
-    
