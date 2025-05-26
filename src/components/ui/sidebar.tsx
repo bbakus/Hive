@@ -71,7 +71,7 @@ const SidebarProvider = React.forwardRef<
     const isMobileHookValue = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
     const [clientIsMobile, setClientIsMobile] = React.useState<boolean | undefined>(undefined);
-    const [mounted, setMounted] = React.useState(false); // For deferring 'has' selector class
+    const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
       setMounted(true);
@@ -151,13 +151,13 @@ const SidebarProvider = React.forwardRef<
             }
             className={cn(
               "group/sidebar-wrapper flex min-h-svh w-full",
-              mounted && "has-[[data-variant=inset]]:bg-sidebar", // Apply 'has' dependent class only when mounted
+              mounted && "has-[[data-variant=inset]]:bg-sidebar",
               className
             )}
             ref={ref}
             {...props}
           >
-            {children}
+            {mounted ? children : null}
           </div>
         </TooltipProvider>
       </SidebarContext.Provider>
@@ -762,3 +762,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+    
