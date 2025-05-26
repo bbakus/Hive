@@ -13,9 +13,6 @@ import {
   LifeBuoy,
   Film,
   ClipboardList,
-  // Target, // Example for future
-  // Edit3,  // Example for future
-  // Send    // Example for future
 } from "lucide-react";
 
 export type NavItem = {
@@ -32,7 +29,9 @@ export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"]
 // Define sidebar navigation items for each phase
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   "Dashboard": [
-    // This is now empty. When "Dashboard" is active, no items will show in the main sidebar section.
+    // When "Dashboard" is active, only the dashboard link itself should show,
+    // handled by getNavItemsForPhase ensuring Dashboard is present if active.
+    // For now, if activePhase is Dashboard, we will return a specific item for it.
   ],
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
@@ -51,9 +50,6 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
 };
 
-// Items always visible at the top of the main nav group (now empty)
-export const constantTopNavItems: NavItem[] = [];
-
 // Items always visible in the footer nav group
 export const constantFooterNavItems: NavItem[] = [
   { href: "/settings", label: "Settings", icon: Settings, matchStartsWith: true },
@@ -64,6 +60,7 @@ type PhaseContextType = {
   activePhase: Phase;
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
+  constantFooterNavItems: NavItem[]; // Added this
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
@@ -72,13 +69,17 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
   const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    return phaseNavConfigs[phase] || [];
+    if (phase === "Dashboard") {
+      return [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true }];
+    }
+    return phaseNavConfigs[phase] || []; // Ensure this always returns an array
   };
 
   const value = useMemo(() => ({
     activePhase,
     setActivePhase,
     getNavItemsForPhase,
+    constantFooterNavItems, // Provide it here
   }), [activePhase]);
 
   return (
