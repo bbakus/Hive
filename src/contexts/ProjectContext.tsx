@@ -26,26 +26,24 @@ export type Project = {
 };
 
 export type ProjectFormData = Omit<Project, 'id' | 'organizationId' | 'createdByUserId'> & { // Exclude IDs managed by system
-  // Ensure new fields are part of the form data type if they are user-editable during creation/update
   location?: string;
   keyPersonnel?: KeyPersonnel[];
 };
 
 
 type ProjectContextType = {
-  selectedProjectId: string | null; // null means "All Projects"
+  selectedProjectId: string | null; 
   setSelectedProjectId: (projectId: string | null) => void;
-  projects: Project[]; // List of all available projects
-  addProject: (projectData: ProjectFormData, organizationId: string, userId?: string) => void; // Pass orgId and userId
-  updateProject: (projectId: string, projectData: Partial<ProjectFormData>) => void; // Function to update a project
-  deleteProject: (projectId: string) => void; // Function to delete a project
-  selectedProject: Project | null; // The full selected project object
+  projects: Project[]; 
+  addProject: (projectData: ProjectFormData, organizationId: string, userId?: string) => void; 
+  updateProject: (projectId: string, projectData: Partial<ProjectFormData>) => void; 
+  deleteProject: (projectId: string) => void; 
+  selectedProject: Project | null; 
   isLoadingProjects: boolean;
 };
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-// TODO: In a real multi-tenant app, this initial data would be fetched based on the user's organization.
 const initialMockProjects: Project[] = [
   {
     id: "proj001",
@@ -59,8 +57,8 @@ const initialMockProjects: Project[] = [
       { personnelId: "user001", name: "Alice Wonderland", projectRole: "Festival Director" },
       { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Production Manager" },
     ],
-    organizationId: "org_default_demo", // Example organization ID
-    createdByUserId: "user_admin_demo", // Example user ID
+    organizationId: "org_default_demo", 
+    createdByUserId: "user_admin_demo", 
   },
   {
     id: "proj002",
@@ -85,7 +83,7 @@ const initialMockProjects: Project[] = [
     description: "Annual corporate fundraising gala.",
     location: "The Grand Ballroom",
     keyPersonnel: [],
-    organizationId: "org_another_demo", // Example for a different organization
+    organizationId: "org_another_demo", 
     createdByUserId: "user_other_admin_demo",
   },
 ];
@@ -93,24 +91,37 @@ const initialMockProjects: Project[] = [
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
+  const setSelectedProjectId = useCallback((projectId: string | null) => {
+    setSelectedProjectIdState(projectId);
+  }, []);
+
   useEffect(() => {
     if (!isLoadingSettings) {
-      // TODO: In a real multi-tenant app, fetch projects for the current user's organization.
-      // For now, we filter the mock data if we had a current organization ID.
-      // Assuming a hypothetical currentOrganizationId for demo filtering:
-      // const currentOrganizationId = "org_default_demo";
-      // const orgProjects = useDemoData ? initialMockProjects.filter(p => p.organizationId === currentOrganizationId) : [];
-      // setProjects(orgProjects);
-
-      // Simpler approach for now: just load based on demo data toggle, no org filtering in context yet.
-      setProjects(useDemoData ? initialMockProjects : []);
+      const loadedProjects = useDemoData ? initialMockProjects : [];
+      setProjects(loadedProjects);
       setIsLoadingProjects(false);
     }
   }, [useDemoData, isLoadingSettings]);
+
+  // Effect to handle default project selection
+  useEffect(() => {
+    if (!isLoadingProjects) { // Ensure projects are loaded
+      if (projects.length > 0) {
+        const currentSelectionIsValid = selectedProjectId && projects.some(p => p.id === selectedProjectId);
+        if (!currentSelectionIsValid) {
+          // If no project is selected, or the selected one no longer exists, select the first project.
+          setSelectedProjectIdState(projects[0].id);
+        }
+      } else {
+        // If there are no projects, ensure no project is selected.
+        setSelectedProjectIdState(null);
+      }
+    }
+  }, [projects, selectedProjectId, isLoadingProjects]);
 
 
   const addProject = useCallback((projectData: ProjectFormData, organizationId: string, userId?: string) => {
@@ -119,7 +130,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         ...projectData,
         id: `proj${String(prevProjects.length + initialMockProjects.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
         keyPersonnel: projectData.keyPersonnel || [],
-        organizationId: organizationId, // Assign the organization ID
+        organizationId: organizationId, 
         createdByUserId: userId,
       };
       return [...prevProjects, newProject];
@@ -129,7 +140,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const updateProject = useCallback((projectId: string, projectData: Partial<ProjectFormData>) => {
     setProjects((prevProjects) =>
       prevProjects.map((proj) =>
-        proj.id === projectId ? { ...proj, ...projectData } : proj
+        proj.id === projectId ? { ...proj, ...projectData, keyPersonnel: projectData.keyPersonnel || proj.keyPersonnel } : proj
       )
     );
   }, []);
@@ -138,14 +149,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setProjects((prevProjects) =>
       prevProjects.filter((proj) => proj.id !== projectId)
     );
-    if (selectedProjectId === projectId) {
-      setSelectedProjectId(null);
-    }
-  }, [selectedProjectId]);
+    // If the deleted project was the selected one, selectedProjectId will be handled by the default selection useEffect.
+  }, []);
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId) return null;
-    // TODO: Ensure selected project belongs to current user's organization.
     return projects.find(p => p.id === selectedProjectId) || null;
   }, [selectedProjectId, projects]);
 
@@ -158,7 +166,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     deleteProject,
     selectedProject,
     isLoadingProjects,
-  }), [selectedProjectId, projects, addProject, updateProject, deleteProject, selectedProject, isLoadingProjects]);
+  }), [selectedProjectId, setSelectedProjectId, projects, addProject, updateProject, deleteProject, selectedProject, isLoadingProjects]);
 
   return (
     <ProjectContext.Provider value={value}>
