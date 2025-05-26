@@ -583,7 +583,7 @@ export default function EventsPage() {
                           <CardHeader className="pb-3">
                             <CardTitle className="text-lg flex items-center justify-between">
                               <span className="flex items-center gap-1.5">
-                                {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" titleAccess="Quick Turnaround"/>}
+                                {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" title="Quick Turnaround"/>}
                                 {event.name}
                               </span>
                               <Badge variant={
@@ -671,7 +671,7 @@ export default function EventsPage() {
                     {filteredEvents.map((event) => (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium flex items-center gap-1.5">
-                           {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" titleAccess="Quick Turnaround"/>}
+                           {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
                           {event.name}
                         </TableCell>
                         {!selectedProject && <TableCell>{event.project}</TableCell>}
@@ -778,5 +778,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-    

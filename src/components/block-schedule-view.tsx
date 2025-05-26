@@ -143,7 +143,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
               )}
               <div>
                 <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
-                    {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0" titleAccess="Quick Turnaround"/>}
+                    {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0" title="Quick Turnaround"/>}
                     {event.name}
                 </p>
                 <p className="opacity-80 truncate leading-tight">{event.time}</p>
