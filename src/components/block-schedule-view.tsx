@@ -5,13 +5,15 @@ import type { Event } from "@/app/(app)/events/page";
 import { parseEventTimes } from "@/app/(app)/events/page"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button"; // Import Button
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Users } from "lucide-react"; // Import Users icon
+import { Users, Settings } from "lucide-react"; // Import Users and Settings icon
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
   eventsForDate: Event[];
+  onEditEvent?: (event: Event) => void; // New prop for handling edit
 }
 
 const HOUR_ROW_HEIGHT_REM = 4; 
@@ -33,7 +35,7 @@ const getPriorityColor = (priority: Event['priority']): string => {
 };
 
 
-export function BlockScheduleView({ selectedDate, eventsForDate }: BlockScheduleViewProps) {
+export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: BlockScheduleViewProps) {
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i); 
 
   const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; 
@@ -124,11 +126,25 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
               key={event.id}
               style={getEventStyle(event)}
               className={cn(
-                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between", 
+                "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group", // Added group for hover state
                 getPriorityColor(event.priority)
               )}
               title={`${event.name} (${event.time}) - Project: ${event.project}`}
             >
+              {onEditEvent && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-0 right-0 h-6 w-6 p-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent event bubbling
+                    onEditEvent(event);
+                  }}
+                  aria-label="Edit event"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <div>
                 <p className="text-xs font-semibold truncate leading-tight">{event.name}</p>
                 <p className="text-[10px] truncate opacity-80 leading-tight">{event.time}</p>
@@ -141,8 +157,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate }: BlockSchedule
                     {event.assignedPersonnelIds.length} Assigned
                   </p>
                 )}
-                 {/* Placeholder for contact, can be removed or made dynamic later */}
-                {/* <p className="text-[10px] truncate opacity-70 leading-tight">Contact: J. Doe (Ex.)</p> */}
+                <p className="text-[10px] truncate opacity-70 leading-tight">Contact: J. Doe (Ex.)</p>
               </div>
             </div>
           ))}

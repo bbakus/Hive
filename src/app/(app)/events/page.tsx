@@ -706,6 +706,7 @@ export default function EventsPage() {
                       <BlockScheduleView 
                         selectedDate={parseISO(dateKey)} // Pass the actual Date object
                         eventsForDate={dayEvents} // Pass only events for this specific day
+                        onEditEvent={openEditEventModal} // Pass the edit handler
                       />
                     </TabsContent>
                   ))}
@@ -728,4 +729,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
