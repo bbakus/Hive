@@ -21,10 +21,12 @@ import { Button } from "@/components/ui/button";
 import { UserNav } from "@/components/user-nav";
 import { Icons } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { OrganizationProvider } from "@/contexts/OrganizationContext"; // Import OrganizationProvider
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { PhaseProvider, usePhaseContext, PHASES, type Phase } from "@/contexts/PhaseContext";
 import { ProjectSelector } from "@/components/project-selector";
+import { OrganizationSelector } from "@/components/organization-selector"; // Import OrganizationSelector
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
 
@@ -33,7 +35,7 @@ function AppSidebar() {
   const { open } = useSidebar();
   const { activePhase, getNavItemsForPhase, constantFooterNavItems } = usePhaseContext();
 
-  const currentPhaseNavItems = getNavItemsForPhase(activePhase) || []; // Fallback to empty array
+  const currentPhaseNavItems = getNavItemsForPhase(activePhase) || []; 
 
   return (
     <Sidebar collapsible="icon">
@@ -46,7 +48,7 @@ function AppSidebar() {
       <SidebarContent className="flex-1 p-2">
         <SidebarMenu>
           {(currentPhaseNavItems).map((item) => (
-            <SidebarMenuItem key={`${activePhase}-${item.href}`}>
+            <SidebarMenuItem key={`${activePhase}-${item.href}`}> {/* Ensure key is unique across phase changes */}
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
                   asChild
@@ -65,7 +67,7 @@ function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-sidebar-border">
         <SidebarMenu>
-           {(constantFooterNavItems || []).map((item) => ( // Fallback to empty array
+           {(constantFooterNavItems || []).map((item) => ( 
             <SidebarMenuItem key={item.href}>
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
@@ -89,7 +91,7 @@ function AppSidebar() {
 
 function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activePhase, setActivePhase } = usePhaseContext();
+  const { activePhase, setActivePhase, PHASES: availablePhases } = usePhaseContext();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -98,17 +100,19 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let determinedPhase: Phase | null = null;
-    const currentPath = pathname.split('?')[0]; // Ignore query params for phase determination
+    const currentPath = pathname.split('?')[0]; 
 
+    // This logic needs to be robust. Consider the order of checks.
     if (currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')) {
       determinedPhase = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-      if (activePhase === 'Shoot' && (currentPath === '/events' || currentPath.startsWith('/events/'))) {
+       // If already in "Shoot" phase and on /events, keep it. Otherwise, default /events to "Plan".
+      if (activePhase === 'Shoot') {
         determinedPhase = 'Shoot';
       } else {
-         determinedPhase = 'Plan'; // Default /events to "Plan" unless "Shoot" is already active contextually
+        determinedPhase = 'Plan';
       }
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
@@ -119,12 +123,12 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
     }
-    // Utility pages like /settings or /support do not change the content area's activePhase.
+    
 
-    if (determinedPhase && determinedPhase !== activePhase) {
+    if (determinedPhase && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
       setActivePhase(determinedPhase);
     }
-  }, [pathname, activePhase, setActivePhase]);
+  }, [pathname, activePhase, setActivePhase, availablePhases]);
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -135,8 +139,9 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
             {mounted && <SidebarTrigger className="md:hidden" />}
             <TopPhaseNavigation />
           </div>
-          <div className="flex-1"></div> {/* Spacer */}
-          <div className="flex items-center gap-4"> {/* Container for right-aligned items */}
+          <div className="flex-1"></div> 
+          <div className="flex items-center gap-4"> 
+            <OrganizationSelector /> {/* Added OrganizationSelector */}
             <ProjectSelector />
             <UserNav />
           </div>
@@ -152,11 +157,13 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsProvider>
-      <ProjectProvider>
-        <PhaseProvider>
-          <AppLayoutInternal>{children}</AppLayoutInternal>
-        </PhaseProvider>
-      </ProjectProvider>
+      <OrganizationProvider> {/* OrganizationProvider wraps ProjectProvider */}
+        <ProjectProvider>
+          <PhaseProvider>
+            <AppLayoutInternal>{children}</AppLayoutInternal>
+          </PhaseProvider>
+        </ProjectProvider>
+      </OrganizationProvider>
     </SettingsProvider>
   );
 }

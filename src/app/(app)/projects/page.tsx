@@ -2,12 +2,12 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link"; // Import Link
+import Link from "next/link"; 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, Filter } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Filter, Briefcase } from "lucide-react"; // Added Briefcase
 import {
   Dialog,
   DialogContent,
@@ -36,26 +36,26 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project, type KeyPersonnel } from "@/contexts/ProjectContext";
+import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; // Import
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
-// Mock available personnel for the edit modal (similar to wizard)
-// TODO: In a multi-tenant app, this list should be fetched for the current user's organization.
-const availablePersonnelListForEdit = [
-  { id: "user001", name: "Alice Wonderland" },
-  { id: "user002", name: "Bob The Builder" },
-  { id: "user003", name: "Charlie Chaplin" },
-  { id: "user004", name: "Diana Prince" },
-  { id: "user005", name: "Edward Scissorhands" },
-  { id: "user006", name: "Fiona Gallagher" },
-  { id: "user007", name: "George Jetson" },
+
+const availablePersonnelListForEdit: { id: string; name: string; capabilities: string[] }[] = [
+  { id: "user001", name: "Alice Wonderland", capabilities: ["Director", "Producer", "Lead Camera Op"] },
+  { id: "user002", name: "Bob The Builder", capabilities: ["Audio Engineer", "Grip", "Technical Director"] },
+  { id: "user003", name: "Charlie Chaplin", capabilities: ["Producer", "Editor", "Writer"] },
+  { id: "user004", name: "Diana Prince", capabilities: ["Drone Pilot", "Photographer", "Camera Operator"] },
+  { id: "user005", name: "Edward Scissorhands", capabilities: ["Grip", "Set Designer", "Editor"] },
+  { id: "user006", name: "Fiona Gallagher", capabilities: ["Coordinator", "Project Manager"] },
+  { id: "user007", name: "George Jetson", capabilities: ["Tech Lead", "IT Support", "Streaming Engineer"] },
 ];
 
 const keyPersonnelEditSchema = z.object({
   personnelId: z.string(),
   name: z.string(),
-  projectRole: z.string().min(1, "Role is required if personnel is selected.").max(50, "Role too long"),
+  projectRole: z.string().min(1, "Role is required").max(50, "Role too long"),
 });
 
 const projectEditSchema = z.object({
@@ -64,9 +64,10 @@ const projectEditSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "End date must be YYYY-MM-DD." }),
   description: z.string().optional(),
   status: z.enum(["Planning", "In Progress", "Completed", "On Hold", "Cancelled"]),
+  organizationId: z.string().min(1, { message: "Organization is required." }), // Added organizationId
   location: z.string().optional(),
   keyPersonnel: z.array(keyPersonnelEditSchema).optional(),
-  selectedPersonnelMap: z.record(z.boolean()).optional(), // For managing selections in edit form
+  selectedPersonnelMap: z.record(z.boolean()).optional(),
 });
 
 type ProjectEditFormData = z.infer<typeof projectEditSchema>;
@@ -74,8 +75,8 @@ const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Can
 
 
 export default function ProjectsPage() {
-  // TODO: In a multi-tenant app, filter projects by current user's organizationId.
   const { projects, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
+  const { organizations, selectedOrganizationId, isLoadingOrganizations } = useOrganizationContext();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -100,13 +101,14 @@ export default function ProjectsPage() {
       endDate: "",
       description: "",
       status: "Planning",
+      organizationId: "",
       location: "",
       keyPersonnel: [],
       selectedPersonnelMap: {},
     }
   });
 
-  const { fields: keyPersonnelFields, append: appendKeyPersonnel, remove: removeKeyPersonnel } = useFieldArray({
+  const { fields: keyPersonnelFields, append: appendKeyPersonnel, remove: removeKeyPersonnel, replace: replaceKeyPersonnel } = useFieldArray({
     control: controlEdit,
     name: "keyPersonnel",
   });
@@ -125,45 +127,39 @@ export default function ProjectsPage() {
         endDate: editingProject.endDate || "",
         description: editingProject.description || "",
         status: editingProject.status as ProjectEditFormData['status'] || "Planning",
+        organizationId: editingProject.organizationId,
         location: editingProject.location || "",
         keyPersonnel: editingProject.keyPersonnel || [],
         selectedPersonnelMap: initialSelectedMap,
-      });
-    } else if (!isEditModalOpen) {
-        resetEditForm({
-            name: "",
-            startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
-            description: "",
-            status: "Planning",
-            location: "",
-            keyPersonnel: [],
-            selectedPersonnelMap: {},
       });
     }
   }, [editingProject, isEditModalOpen, resetEditForm]);
 
   useEffect(() => {
-    if (!selectedPersonnelMapEdit || !isEditModalOpen) return;
+    if (!isEditModalOpen || !selectedPersonnelMapEdit) return;
 
-    const currentKeyPersonnelIds = keyPersonnelFields.map(f => f.personnelId);
-
+    const currentKeyPersonnelValues = getValues("keyPersonnel") || [];
+    const newKeyPersonnelArray: KeyPersonnel[] = [];
+    
     availablePersonnelListForEdit.forEach(person => {
-      if (selectedPersonnelMapEdit[person.id] && !currentKeyPersonnelIds.includes(person.id)) {
-        appendKeyPersonnel({ personnelId: person.id, name: person.name, projectRole: "" });
-      }
+        if (selectedPersonnelMapEdit[person.id]) {
+            const existingEntry = currentKeyPersonnelValues.find(kp => kp.personnelId === person.id);
+            newKeyPersonnelArray.push({
+                personnelId: person.id,
+                name: person.name,
+                projectRole: existingEntry?.projectRole || "", 
+            });
+        }
     });
+    
+    const currentKpString = JSON.stringify(currentKeyPersonnelValues.map(k=>({p:k.personnelId, r:k.projectRole})).sort((a,b)=>a.p.localeCompare(b.p)));
+    const newKpString = JSON.stringify(newKeyPersonnelArray.map(k=>({p:k.personnelId, r:k.projectRole})).sort((a,b)=>a.p.localeCompare(b.p)));
 
-    const personnelToRemoveIndices: number[] = [];
-    keyPersonnelFields.forEach((field, index) => {
-      if (!selectedPersonnelMapEdit[field.personnelId]) {
-        personnelToRemoveIndices.push(index);
-      }
-    });
-    for (let i = personnelToRemoveIndices.length - 1; i >= 0; i--) {
-      removeKeyPersonnel(personnelToRemoveIndices[i]);
+    if (newKpString !== currentKpString) {
+        setEditValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
     }
-  }, [selectedPersonnelMapEdit, keyPersonnelFields, appendKeyPersonnel, removeKeyPersonnel, isEditModalOpen]);
+
+  }, [selectedPersonnelMapEdit, isEditModalOpen, setEditValue, getValues]);
 
 
   const handleEditProjectSubmit: SubmitHandler<ProjectEditFormData> = (data) => {
@@ -171,7 +167,7 @@ export default function ProjectsPage() {
       const finalKeyPersonnel = data.keyPersonnel?.filter(kp => kp.personnelId && selectedPersonnelMapEdit?.[kp.personnelId] && kp.projectRole) || [];
       const { selectedPersonnelMap, ...dataToUpdate } = data;
 
-      updateProject(editingProject.id, {...dataToUpdate, keyPersonnel: finalKeyPersonnel});
+      updateProject(editingProject.id, {...dataToUpdate, keyPersonnel: finalKeyPersonnel });
       toast({
         title: "Project Updated",
         description: `"${data.name}" has been successfully updated.`,
@@ -188,6 +184,10 @@ export default function ProjectsPage() {
   const closeEditModal = () => {
     setIsEditModalOpen(false);
     setEditingProject(null);
+    resetEditForm({ // Reset to default or empty values explicitly
+      name: "", startDate: "", endDate: "", description: "", status: "Planning", 
+      organizationId: "", location: "", keyPersonnel: [], selectedPersonnelMap: {}
+    });
   };
 
   const handleDeleteClick = (projectId: string) => {
@@ -197,7 +197,6 @@ export default function ProjectsPage() {
 
   const confirmDelete = () => {
     if (projectToDeleteId) {
-      // TODO: In a real app, check if user has permission to delete this project within their organization.
       const project = projects.find(p => p.id === projectToDeleteId);
       deleteProject(projectToDeleteId);
       toast({
@@ -209,13 +208,9 @@ export default function ProjectsPage() {
     }
     setIsDeleteDialogOpen(false);
   };
-
+  
   const displayProjects = useMemo(() => {
-    // TODO: In a real multi-tenant app, filter projects by current user's organizationId.
-    // const userOrganizationId = "org_default_demo"; // Get this from user context
-    // const orgProjects = projects.filter(p => p.organizationId === userOrganizationId);
-    // return orgProjects;
-    let filtered = projects;
+    let filtered = projects; // projects from context are already filtered by selectedOrganizationId
     if (filterText) {
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(filterText.toLowerCase())
@@ -228,8 +223,8 @@ export default function ProjectsPage() {
   }, [projects, filterText, statusFilter]);
 
 
-  if (isLoadingProjects) {
-    return <div className="p-4">Loading projects...</div>;
+  if (isLoadingProjects || isLoadingOrganizations) {
+    return <div className="p-4">Loading projects and organizations...</div>;
   }
 
 
@@ -238,8 +233,12 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground">Manage your event timelines and project setups.</p>
-          {/* TODO: Add a note here if showing projects for a specific organization */}
+          <p className="text-muted-foreground">
+            {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId) 
+              ? `Projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. ` 
+              : "All projects across your organizations. "}
+            Manage your event timelines and project setups.
+          </p>
         </div>
         <Button asChild>
           <Link href="/projects/new">
@@ -254,7 +253,7 @@ export default function ProjectsPage() {
       }}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
+            <DialogTitle>Edit Project: {editingProject?.name}</DialogTitle>
             <DialogDescription>
               Update the details for this project.
             </DialogDescription>
@@ -267,6 +266,28 @@ export default function ProjectsPage() {
                   <div className="col-span-3">
                     <Input id="edit-name" {...registerEdit("name")} className={editErrors.name ? "border-destructive" : ""} />
                     {editErrors.name && <p className="text-xs text-destructive mt-1">{editErrors.name.message}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-organizationId" className="text-right col-span-1">Organization</Label>
+                  <div className="col-span-3">
+                     <Controller
+                      name="organizationId"
+                      control={controlEdit}
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingOrganizations}>
+                          <SelectTrigger className={editErrors.organizationId ? "border-destructive" : ""}>
+                            <SelectValue placeholder="Select organization" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {organizations.map((org) => (
+                              <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {editErrors.organizationId && <p className="text-xs text-destructive mt-1">{editErrors.organizationId.message}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
@@ -321,33 +342,44 @@ export default function ProjectsPage() {
               </div>
               <div className="space-y-2">
                   <Label>Key Personnel & Roles</Label>
-                  <ScrollArea className="h-32 w-full rounded-md border p-2 mb-2">
+                  <ScrollArea className="h-40 w-full rounded-md border p-2 mb-2">
                       {availablePersonnelListForEdit.map((person) => (
-                        <div key={`edit-person-select-${person.id}`} className="flex items-center space-x-2 mb-1">
+                        <div key={`edit-person-select-${person.id}`} className="flex items-center space-x-2 mb-1 py-1">
                           <Checkbox
                             id={`edit-person-select-${person.id}`}
                             checked={!!selectedPersonnelMapEdit?.[person.id]}
                             onCheckedChange={(checked) => {
-                              setEditValue(`selectedPersonnelMap.${person.id}`, !!checked, { shouldValidate: true });
+                              setEditValue(`selectedPersonnelMap.${person.id}`, !!checked, { shouldValidate: true, shouldDirty: true });
                             }}
                           />
-                          <Label htmlFor={`edit-person-select-${person.id}`} className="font-normal">{person.name}</Label>
+                          <Label htmlFor={`edit-person-select-${person.id}`} className="font-normal text-sm">{person.name}</Label>
                         </div>
                       ))}
                   </ScrollArea>
-                  <ScrollArea className="h-40 w-full space-y-2 border p-2 rounded-md">
-                      {keyPersonnelFields.map((field, index) => (
-                        selectedPersonnelMapEdit?.[field.personnelId] && (
+                  <ScrollArea className="h-48 w-full space-y-2.5 border p-2 rounded-md">
+                      {keyPersonnelFields.map((field, index) => {
+                        const personDetails = availablePersonnelListForEdit.find(p => p.id === field.personnelId);
+                        return selectedPersonnelMapEdit?.[field.personnelId] && personDetails && (
                           <div key={field.id} className="grid grid-cols-5 items-center gap-2">
                             <Label htmlFor={`edit-keyPersonnel.${index}.projectRole`} className="col-span-2 text-xs truncate" title={field.name}>
                               {field.name}
                             </Label>
                             <div className="col-span-3">
-                              <Input
-                                id={`edit-keyPersonnel.${index}.projectRole`}
-                                placeholder="Role"
-                                {...registerEdit(`keyPersonnel.${index}.projectRole`)}
-                                className={`h-8 text-xs ${editErrors.keyPersonnel?.[index]?.projectRole ? "border-destructive" : ""}`}
+                               <Controller
+                                name={`keyPersonnel.${index}.projectRole`}
+                                control={controlEdit}
+                                render={({ field: selectField }) => (
+                                  <Select onValueChange={selectField.onChange} value={selectField.value || ""}>
+                                    <SelectTrigger className={`h-8 text-xs ${editErrors.keyPersonnel?.[index]?.projectRole ? "border-destructive" : ""}`}>
+                                      <SelectValue placeholder="Select role..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {personDetails.capabilities.map(cap => (
+                                        <SelectItem key={`${personDetails.id}-${cap}`} value={cap}>{cap}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
                               />
                               {editErrors.keyPersonnel?.[index]?.projectRole && (
                                 <p className="text-xs text-destructive mt-0.5">{editErrors.keyPersonnel?.[index]?.projectRole?.message}</p>
@@ -355,7 +387,7 @@ export default function ProjectsPage() {
                             </div>
                           </div>
                         )
-                      ))}
+                      })}
                   </ScrollArea>
               </div>
             </div>
@@ -369,29 +401,17 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the project
-              and remove its data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setProjectToDeleteId(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className={cn(buttonVariants({variant: "destructive"}))}>Continue</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-
       <Card className="shadow-lg">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-grow">
               <CardTitle>Project List</CardTitle>
-              <CardDescription>Overview of all registered projects. ({displayProjects.length} of {projects.length} projects shown)</CardDescription>
+              <CardDescription>
+                {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId) 
+                  ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. ` 
+                  : "Showing projects for all your organizations. "}
+                ({displayProjects.length} projects shown)
+              </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <div className="relative w-full sm:w-64">
@@ -424,12 +444,11 @@ export default function ProjectsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Project Name</TableHead>
+                  {selectedOrganizationId === ALL_ORGANIZATIONS_ID && <TableHead>Organization</TableHead>}
                   <TableHead>Location</TableHead>
                   <TableHead>Dates</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Key Personnel</TableHead>
-                  {/* TODO: In a multi-tenant app, you might show Organization if an admin views multiple orgs */}
-                  {/* <TableHead>Organization</TableHead> */}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -437,6 +456,11 @@ export default function ProjectsPage() {
                 {displayProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
+                    {selectedOrganizationId === ALL_ORGANIZATIONS_ID && 
+                      <TableCell className="text-xs text-muted-foreground">
+                        {organizations.find(o => o.id === project.organizationId)?.name || "N/A"}
+                      </TableCell>
+                    }
                     <TableCell className="text-xs text-muted-foreground">
                         {project.location || "N/A"}
                     </TableCell>
@@ -450,7 +474,7 @@ export default function ProjectsPage() {
                         project.status === "Completed" ? "default" :
                         project.status === "On Hold" ? "outline" :
                         project.status === "Cancelled" ? "destructive" :
-                        "destructive" // Fallback, should ideally not happen
+                        "destructive" 
                       }>{project.status}</Badge>
                     </TableCell>
                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={
@@ -462,7 +486,6 @@ export default function ProjectsPage() {
                         ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ')
                         : "N/A"}
                     </TableCell>
-                    {/* <TableCell className="text-xs text-muted-foreground">{project.organizationId}</TableCell> */}
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditProjectModal(project)}>
                         <Edit className="h-4 w-4" />
@@ -479,8 +502,9 @@ export default function ProjectsPage() {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              {filterText || statusFilter !== "all" ? `No projects found matching your filters.` : "No projects found. Click \"Add New Project (Wizard)\" to get started."}
-              {/* TODO: Adjust message if filtered by organization: "No projects found for your organization." */}
+              {filterText || statusFilter !== "all" 
+                ? `No projects found matching your filters ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}.` 
+                : `No projects found ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}. Click "Add New Project (Wizard)" to get started.`}
             </p>
           )}
         </CardContent>
@@ -488,5 +512,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
-    

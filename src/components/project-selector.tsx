@@ -10,36 +10,38 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FolderKanban } from "lucide-react";
+import { useOrganizationContext } from "@/contexts/OrganizationContext"; // To know when org changes
 
 export function ProjectSelector() {
   const { selectedProjectId, setSelectedProjectId, projects, isLoadingProjects } = useProjectContext();
+  const { selectedOrganizationId, isLoadingOrganizations } = useOrganizationContext(); // Get selected org ID
 
   return (
     <div className="flex items-center gap-2">
       <FolderKanban className="h-5 w-5 text-muted-foreground" />
       <Select
-        value={selectedProjectId || ""} // If null, use "" for placeholder making SelectValue show placeholder
+        value={selectedProjectId || ""} 
         onValueChange={(value) => {
-          // The value will always be a project ID since "all" is removed
-          // or "" if the placeholder somehow becomes selectable (though it shouldn't with items)
-          if (value) { // Ensure a valid project ID is passed
+          if (value) { 
             setSelectedProjectId(value);
           }
         }}
-        disabled={isLoadingProjects || projects.length === 0}
+        disabled={isLoadingProjects || isLoadingOrganizations || projects.length === 0}
+        key={selectedOrganizationId} // Add key to force re-render if organization changes, ensuring value resets correctly
       >
         <SelectTrigger className="w-[200px] md:w-[280px] h-9">
           <SelectValue placeholder="Select a project" />
         </SelectTrigger>
         <SelectContent>
-          {/* "All Projects" option is removed */}
           {projects.map((project: Project) => (
             <SelectItem key={project.id} value={project.id}>
               {project.name}
             </SelectItem>
           ))}
-          {projects.length === 0 && !isLoadingProjects && (
-            <p className="p-2 text-xs text-muted-foreground text-center">No projects available.</p>
+          {projects.length === 0 && !isLoadingProjects && !isLoadingOrganizations && (
+            <p className="p-2 text-xs text-muted-foreground text-center">
+              {selectedOrganizationId ? "No projects for this organization." : "No projects available."}
+            </p>
           )}
         </SelectContent>
       </Select>
