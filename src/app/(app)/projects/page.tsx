@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link"; // Import Link
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, MapPin, Users } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Filter } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +79,7 @@ export default function ProjectsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectToDeleteId, setProjectToDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
+  const [filterText, setFilterText] = useState("");
 
   const {
     register: registerEdit,
@@ -206,14 +207,24 @@ export default function ProjectsPage() {
     setIsDeleteDialogOpen(false);
   };
 
+  const displayProjects = useMemo(() => {
+    // TODO: In a real multi-tenant app, filter projects by current user's organizationId.
+    // const userOrganizationId = "org_default_demo"; // Get this from user context
+    // const orgProjects = projects.filter(p => p.organizationId === userOrganizationId);
+    // return orgProjects;
+    if (!filterText) {
+      return projects;
+    }
+    return projects.filter(project =>
+      project.name.toLowerCase().includes(filterText.toLowerCase())
+    );
+  }, [projects, filterText]);
+
+
   if (isLoadingProjects) {
     return <div className="p-4">Loading projects...</div>;
   }
 
-  // TODO: Filter 'projects' array based on the logged-in user's organizationId
-  // const userOrganizationId = "org_default_demo"; // Get this from user context
-  // const displayProjects = projects.filter(p => p.organizationId === userOrganizationId);
-  const displayProjects = projects; // Using all projects for now
 
   return (
     <div className="flex flex-col gap-8">
@@ -372,8 +383,22 @@ export default function ProjectsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Project List</CardTitle>
-          <CardDescription>Overview of all registered projects. ({displayProjects.length} projects)</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Project List</CardTitle>
+              <CardDescription>Overview of all registered projects. ({displayProjects.length} of {projects.length} projects shown)</CardDescription>
+            </div>
+            <div className="relative w-full max-w-xs ml-4">
+              <Input
+                type="text"
+                placeholder="Filter projects by name..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="pl-10"
+              />
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {displayProjects.length > 0 ? (
@@ -432,7 +457,7 @@ export default function ProjectsPage() {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No projects found. Click "Add New Project (Wizard)" to get started.
+              {filterText ? `No projects found matching "${filterText}".` : "No projects found. Click \"Add New Project (Wizard)\" to get started."}
               {/* TODO: Adjust message if filtered by organization: "No projects found for your organization." */}
             </p>
           )}
@@ -441,3 +466,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
