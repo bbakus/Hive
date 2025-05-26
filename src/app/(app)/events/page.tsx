@@ -39,7 +39,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval } from "date-fns";
-import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -47,6 +46,15 @@ import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
 import { useEventContext } from "@/contexts/EventContext";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 
 export const eventSchema = z.object({
@@ -110,20 +118,17 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; // Cannot determine overlap if times are invalid
+  if (!timesA || !timesB) return false; 
 
-  // Check for basic overlap
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  // If both events have assigned personnel, check for shared personnel
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
-    return sharedPersonnel; // Overlap only if time AND personnel overlap
+    return sharedPersonnel; 
   }
   
-  // If one or both events have no assigned personnel, basic time overlap is sufficient
   return true; 
 };
 
@@ -143,7 +148,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], // Default to empty array
+    eventsForSelectedProjectAndOrg = [],
     addEvent,
     updateEvent,
     deleteEvent,
@@ -161,7 +166,7 @@ export default function EventsPage() {
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
   const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
-  const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
 
 
   const { toast } = useToast();
@@ -266,19 +271,8 @@ export default function EventsPage() {
       });
     }
     
-    if (filterDateRange?.from) {
-      const fromDate = startOfDay(filterDateRange.from);
-      filtered = filtered.filter(event => {
-        const eventDate = parseISO(event.date);
-        return isValid(eventDate) && (eventDate.getTime() >= fromDate.getTime());
-      });
-    }
-    if (filterDateRange?.to) {
-      const toDate = endOfDay(filterDateRange.to);
-      filtered = filtered.filter(event => {
-        const eventDate = parseISO(event.date);
-        return isValid(eventDate) && (eventDate.getTime() <= toDate.getTime());
-      });
+    if (selectedEventDates.length > 0) {
+      filtered = filtered.filter(event => selectedEventDates.includes(event.date));
     }
 
 
@@ -300,7 +294,7 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, filterDateRange]);
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, selectedEventDates]);
 
 
   const groupedAndSortedEventsForDisplay = useMemo(() => {
@@ -325,6 +319,12 @@ export default function EventsPage() {
     });
     return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
   }, [displayableEvents]);
+
+  const uniqueEventDatesForFilter = useMemo(() => {
+    const dates = new Set(eventsForSelectedProjectAndOrg.map(event => event.date));
+    return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  }, [eventsForSelectedProjectAndOrg]);
+
 
   useEffect(() => {
     if (groupedAndSortedEventsForDisplay.length > 0) {
@@ -355,8 +355,8 @@ export default function EventsPage() {
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables, // retain existing counts
-        shotRequests: editingEvent.shotRequests, // retain existing counts
+        deliverables: editingEvent.deliverables, 
+        shotRequests: editingEvent.shotRequests, 
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -521,54 +521,55 @@ export default function EventsPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="md:col-span-1"> {/* Adjusted span for better layout */}
-                <Label htmlFor="filter-date-range">Date Range</Label>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        id="filter-date-range"
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !filterDateRange && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIconLucide className="mr-2 h-4 w-4" />
-                        {filterDateRange?.from ? (
-                        filterDateRange.to ? (
-                            <>
-                            {format(filterDateRange.from, "LLL dd, y")} -{" "}
-                            {format(filterDateRange.to, "LLL dd, y")}
-                            </>
-                        ) : (
-                            format(filterDateRange.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Pick a date range</span>
-                        )}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={filterDateRange?.from}
-                        selected={filterDateRange}
-                        onSelect={setFilterDateRange}
-                        numberOfMonths={2}
-                    />
-                    </PopoverContent>
-                </Popover>
+            <div className="md:col-span-1">
+              <Label htmlFor="filter-specific-dates">Filter by Specific Dates</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" id="filter-specific-dates" className={cn("w-full justify-start text-left font-normal", selectedEventDates.length === 0 && "text-muted-foreground")}>
+                    <CalendarIconLucide className="mr-2 h-4 w-4" />
+                    {selectedEventDates.length === 0
+                      ? "All Event Dates"
+                      : selectedEventDates.length === 1
+                      ? format(parseISO(selectedEventDates[0]), "PPP")
+                      : `${selectedEventDates.length} dates selected`}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 max-h-72 overflow-y-auto" align="start">
+                  <DropdownMenuLabel>Select Dates</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {uniqueEventDatesForFilter.length > 0 ? (
+                    uniqueEventDatesForFilter.map(dateStr => (
+                      <DropdownMenuCheckboxItem
+                        key={dateStr}
+                        checked={selectedEventDates.includes(dateStr)}
+                        onCheckedChange={(checked) => {
+                          setSelectedEventDates(prev =>
+                            checked
+                              ? [...prev, dateStr]
+                              : prev.filter(d => d !== dateStr)
+                          );
+                        }}
+                      >
+                        {format(parseISO(dateStr), "PPP")}
+                      </DropdownMenuCheckboxItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled>No event dates available</DropdownMenuItem>
+                  )}
+                  {selectedEventDates.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setSelectedEventDates([])}
+                        className="text-destructive focus:text-destructive-foreground focus:bg-destructive/90 hover:text-destructive-foreground hover:bg-destructive"
+                      >
+                        Clear Selection
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-             {filterDateRange && (
-                <Button
-                    variant="ghost"
-                    onClick={() => setFilterDateRange(undefined)}
-                    className="text-xs text-muted-foreground self-end md:col-start-2" // Adjust based on grid flow
-                >
-                    Clear Date Range
-                </Button>
-            )}
         </CardContent>
       </Card>
 
@@ -585,7 +586,7 @@ export default function EventsPage() {
           <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div className="space-y-4">
-                {/* Event Details Fields */}
+                
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
                   <div className="col-span-3">
@@ -616,6 +617,7 @@ export default function EventsPage() {
                             {allProjects.map((proj) => (
                               <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
                             ))}
+                             {allProjects.length === 0 && <p className="p-2 text-xs text-muted-foreground">No projects available. Add one first.</p>}
                           </SelectContent>
                         </Select>
                       )}
@@ -774,6 +776,7 @@ export default function EventsPage() {
                             </Label>
                           </div>
                         ))}
+                        {initialPersonnelMock.length === 0 && <p className="text-muted-foreground text-xs">No personnel in system. Add them via Personnel page.</p>}
                       </div>
                     )}
                   />
