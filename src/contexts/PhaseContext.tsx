@@ -13,9 +13,9 @@ import {
   LifeBuoy,
   Film,
   ClipboardList,
-  Target, // Example for future
-  Edit3,  // Example for future
-  Send    // Example for future
+  // Target, // Example for future
+  // Edit3,  // Example for future
+  // Send    // Example for future
 } from "lucide-react";
 
 export type NavItem = {
@@ -25,11 +25,17 @@ export type NavItem = {
   matchStartsWith?: boolean;
 };
 
-export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver";
+// Add "Dashboard" as a Phase
+export type Phase = "Dashboard" | "Plan" | "Shoot" | "Edit" | "Deliver";
 
-export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver"];
+// Add "Dashboard" to the PHASES array, typically first
+export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"];
 
+// Define sidebar navigation items for each phase
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
+  "Dashboard": [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true },
+  ],
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -37,7 +43,9 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true },
   ],
   "Shoot": [
-    { href: "/events", label: "Event Schedules", icon: CalendarDays, matchStartsWith: true }, // Links to /events, user navigates to block/shot lists
+    // "Events" is a good entry point for seeing schedules during the "Shoot" phase.
+    // Users can navigate to specific event shot lists from there.
+    { href: "/events", label: "Event Schedules", icon: CalendarDays, matchStartsWith: true },
     // { href: "/shot-tracker", label: "Active Shot Tracker", icon: Target, matchStartsWith: true }, // Example for future
   ],
   "Edit": [
@@ -50,10 +58,8 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
 };
 
-// Items always visible at the top of the main nav group
-export const constantTopNavItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true },
-];
+// Items always visible at the top of the main nav group (now empty)
+export const constantTopNavItems: NavItem[] = [];
 
 // Items always visible in the footer nav group
 export const constantFooterNavItems: NavItem[] = [
@@ -70,7 +76,8 @@ type PhaseContextType = {
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  const [activePhase, setActivePhase] = useState<Phase>("Plan");
+  // Default active phase is now "Dashboard"
+  const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
     return phaseNavConfigs[phase] || [];
