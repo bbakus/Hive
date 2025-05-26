@@ -70,6 +70,8 @@ const projectEditSchema = z.object({
 });
 
 type ProjectEditFormData = z.infer<typeof projectEditSchema>;
+const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
+
 
 export default function ProjectsPage() {
   // TODO: In a multi-tenant app, filter projects by current user's organizationId.
@@ -80,6 +82,7 @@ export default function ProjectsPage() {
   const [projectToDeleteId, setProjectToDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
   const [filterText, setFilterText] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const {
     register: registerEdit,
@@ -212,13 +215,17 @@ export default function ProjectsPage() {
     // const userOrganizationId = "org_default_demo"; // Get this from user context
     // const orgProjects = projects.filter(p => p.organizationId === userOrganizationId);
     // return orgProjects;
-    if (!filterText) {
-      return projects;
+    let filtered = projects;
+    if (filterText) {
+      filtered = filtered.filter(project =>
+        project.name.toLowerCase().includes(filterText.toLowerCase())
+      );
     }
-    return projects.filter(project =>
-      project.name.toLowerCase().includes(filterText.toLowerCase())
-    );
-  }, [projects, filterText]);
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(project => project.status === statusFilter);
+    }
+    return filtered;
+  }, [projects, filterText, statusFilter]);
 
 
   if (isLoadingProjects) {
@@ -295,11 +302,9 @@ export default function ProjectsPage() {
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Planning">Planning</SelectItem>
-                            <SelectItem value="In Progress">In Progress</SelectItem>
-                            <SelectItem value="Completed">Completed</SelectItem>
-                            <SelectItem value="On Hold">On Hold</SelectItem>
-                            <SelectItem value="Cancelled">Cancelled</SelectItem>
+                            {projectStatuses.map(status => (
+                                <SelectItem key={status} value={status}>{status}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       )}
@@ -383,20 +388,33 @@ export default function ProjectsPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex-grow">
               <CardTitle>Project List</CardTitle>
               <CardDescription>Overview of all registered projects. ({displayProjects.length} of {projects.length} projects shown)</CardDescription>
             </div>
-            <div className="relative w-full max-w-xs ml-4">
-              <Input
-                type="text"
-                placeholder="Filter projects by name..."
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                className="pl-10"
-              />
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Input
+                  type="text"
+                  placeholder="Filter by name..."
+                  value={filterText}
+                  onChange={(e) => setFilterText(e.target.value)}
+                  className="pl-10"
+                />
+                <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {projectStatuses.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -435,7 +453,11 @@ export default function ProjectsPage() {
                         "destructive" // Fallback, should ideally not happen
                       }>{project.status}</Badge>
                     </TableCell>
-                     <TableCell className="text-xs text-muted-foreground">
+                     <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={
+                        (project.keyPersonnel && project.keyPersonnel.length > 0)
+                          ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole})`).join(', ')
+                          : "N/A"
+                      }>
                       {(project.keyPersonnel && project.keyPersonnel.length > 0)
                         ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ')
                         : "N/A"}
@@ -457,7 +479,7 @@ export default function ProjectsPage() {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              {filterText ? `No projects found matching "${filterText}".` : "No projects found. Click \"Add New Project (Wizard)\" to get started."}
+              {filterText || statusFilter !== "all" ? `No projects found matching your filters.` : "No projects found. Click \"Add New Project (Wizard)\" to get started."}
               {/* TODO: Adjust message if filtered by organization: "No projects found for your organization." */}
             </p>
           )}
@@ -467,3 +489,4 @@ export default function ProjectsPage() {
   );
 }
 
+    
