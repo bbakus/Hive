@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, MapPin, Users } from "lucide-react"; // Added MapPin and Users
+import { PlusCircle, Edit, Trash2, MapPin, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,16 +31,17 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form"; // Added useFieldArray
+import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectContext, type Project, type KeyPersonnel } from "@/contexts/ProjectContext"; // Import KeyPersonnel
+import { useProjectContext, type Project, type KeyPersonnel } from "@/contexts/ProjectContext";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area"; // Added ScrollArea
-import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Mock available personnel for the edit modal (similar to wizard)
+// TODO: In a multi-tenant app, this list should be fetched for the current user's organization.
 const availablePersonnelListForEdit = [
   { id: "user001", name: "Alice Wonderland" },
   { id: "user002", name: "Bob The Builder" },
@@ -54,7 +55,7 @@ const availablePersonnelListForEdit = [
 const keyPersonnelEditSchema = z.object({
   personnelId: z.string(),
   name: z.string(),
-  projectRole: z.string().min(1, "Role is required.").max(50, "Role too long"),
+  projectRole: z.string().min(1, "Role is required if personnel is selected.").max(50, "Role too long"),
 });
 
 const projectEditSchema = z.object({
@@ -71,6 +72,7 @@ const projectEditSchema = z.object({
 type ProjectEditFormData = z.infer<typeof projectEditSchema>;
 
 export default function ProjectsPage() {
+  // TODO: In a multi-tenant app, filter projects by current user's organizationId.
   const { projects, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -100,11 +102,11 @@ export default function ProjectsPage() {
     }
   });
 
-  const { fields: keyPersonnelFields, append: appendKeyPersonnel, remove: removeKeyPersonnel, update: updateKeyPersonnel } = useFieldArray({
+  const { fields: keyPersonnelFields, append: appendKeyPersonnel, remove: removeKeyPersonnel } = useFieldArray({
     control: controlEdit,
     name: "keyPersonnel",
   });
-  
+
   const selectedPersonnelMapEdit = watchEdit("selectedPersonnelMap");
 
   useEffect(() => {
@@ -137,12 +139,11 @@ export default function ProjectsPage() {
     }
   }, [editingProject, isEditModalOpen, resetEditForm]);
 
-   // Sync keyPersonnel array with selectedPersonnelMap for Edit form
   useEffect(() => {
     if (!selectedPersonnelMapEdit || !isEditModalOpen) return;
 
     const currentKeyPersonnelIds = keyPersonnelFields.map(f => f.personnelId);
-    
+
     availablePersonnelListForEdit.forEach(person => {
       if (selectedPersonnelMapEdit[person.id] && !currentKeyPersonnelIds.includes(person.id)) {
         appendKeyPersonnel({ personnelId: person.id, name: person.name, projectRole: "" });
@@ -163,14 +164,10 @@ export default function ProjectsPage() {
 
   const handleEditProjectSubmit: SubmitHandler<ProjectEditFormData> = (data) => {
     if (editingProject) {
-      const finalData = {
-        ...data,
-        keyPersonnel: data.keyPersonnel?.filter(kp => kp.personnelId && kp.projectRole) || [],
-      };
-      // Remove selectedPersonnelMap before submitting
-      const { selectedPersonnelMap, ...dataToSubmit } = finalData;
+      const finalKeyPersonnel = data.keyPersonnel?.filter(kp => kp.personnelId && selectedPersonnelMapEdit?.[kp.personnelId] && kp.projectRole) || [];
+      const { selectedPersonnelMap, ...dataToUpdate } = data;
 
-      updateProject(editingProject.id, dataToSubmit);
+      updateProject(editingProject.id, {...dataToUpdate, keyPersonnel: finalKeyPersonnel});
       toast({
         title: "Project Updated",
         description: `"${data.name}" has been successfully updated.`,
@@ -186,7 +183,7 @@ export default function ProjectsPage() {
 
   const closeEditModal = () => {
     setIsEditModalOpen(false);
-    setEditingProject(null); 
+    setEditingProject(null);
   };
 
   const handleDeleteClick = (projectId: string) => {
@@ -196,6 +193,7 @@ export default function ProjectsPage() {
 
   const confirmDelete = () => {
     if (projectToDeleteId) {
+      // TODO: In a real app, check if user has permission to delete this project within their organization.
       const project = projects.find(p => p.id === projectToDeleteId);
       deleteProject(projectToDeleteId);
       toast({
@@ -207,10 +205,15 @@ export default function ProjectsPage() {
     }
     setIsDeleteDialogOpen(false);
   };
-  
+
   if (isLoadingProjects) {
     return <div className="p-4">Loading projects...</div>;
   }
+
+  // TODO: Filter 'projects' array based on the logged-in user's organizationId
+  // const userOrganizationId = "org_default_demo"; // Get this from user context
+  // const displayProjects = projects.filter(p => p.organizationId === userOrganizationId);
+  const displayProjects = projects; // Using all projects for now
 
   return (
     <div className="flex flex-col gap-8">
@@ -218,6 +221,7 @@ export default function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="text-muted-foreground">Manage your event timelines and project setups.</p>
+          {/* TODO: Add a note here if showing projects for a specific organization */}
         </div>
         <Button asChild>
           <Link href="/projects/new">
@@ -230,7 +234,7 @@ export default function ProjectsPage() {
       <Dialog open={isEditModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEditModal(); else setIsEditModalOpen(true);
       }}>
-        <DialogContent className="sm:max-w-2xl"> {/* Increased width for more fields */}
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Project</DialogTitle>
             <DialogDescription>
@@ -239,7 +243,6 @@ export default function ProjectsPage() {
           </DialogHeader>
           <form onSubmit={handleSubmitEdit(handleEditProjectSubmit)} className="grid gap-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-              {/* Left Column */}
               <div className="space-y-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="edit-name" className="text-right col-span-1">Name</Label>
@@ -300,7 +303,6 @@ export default function ProjectsPage() {
                   </div>
                 </div>
               </div>
-              {/* Right Column - Key Personnel */}
               <div className="space-y-2">
                   <Label>Key Personnel & Roles</Label>
                   <ScrollArea className="h-32 w-full rounded-md border p-2 mb-2">
@@ -371,10 +373,10 @@ export default function ProjectsPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Project List</CardTitle>
-          <CardDescription>Overview of all registered projects. ({projects.length} projects)</CardDescription>
+          <CardDescription>Overview of all registered projects. ({displayProjects.length} projects)</CardDescription>
         </CardHeader>
         <CardContent>
-          {projects.length > 0 ? (
+          {displayProjects.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -383,11 +385,13 @@ export default function ProjectsPage() {
                   <TableHead>Dates</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Key Personnel</TableHead>
+                  {/* TODO: In a multi-tenant app, you might show Organization if an admin views multiple orgs */}
+                  {/* <TableHead>Organization</TableHead> */}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projects.map((project) => (
+                {displayProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -403,14 +407,15 @@ export default function ProjectsPage() {
                         project.status === "Completed" ? "default" :
                         project.status === "On Hold" ? "outline" :
                         project.status === "Cancelled" ? "destructive" :
-                        "destructive"
+                        "destructive" // Fallback, should ideally not happen
                       }>{project.status}</Badge>
                     </TableCell>
                      <TableCell className="text-xs text-muted-foreground">
-                      {(project.keyPersonnel && project.keyPersonnel.length > 0) 
-                        ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ') 
+                      {(project.keyPersonnel && project.keyPersonnel.length > 0)
+                        ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ')
                         : "N/A"}
                     </TableCell>
+                    {/* <TableCell className="text-xs text-muted-foreground">{project.organizationId}</TableCell> */}
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditProjectModal(project)}>
                         <Edit className="h-4 w-4" />
@@ -428,6 +433,7 @@ export default function ProjectsPage() {
           ) : (
             <p className="text-muted-foreground text-center py-8">
               No projects found. Click "Add New Project (Wizard)" to get started.
+              {/* TODO: Adjust message if filtered by organization: "No projects found for your organization." */}
             </p>
           )}
         </CardContent>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,14 +13,19 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Settings, CreditCard } from "lucide-react";
+import { LogOut, User, Settings, CreditCard, Building } from "lucide-react"; // Added Building icon for organization
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function UserNav() {
   // In a real app, fetch user data or get from context/auth state
+  // This would include userId and organizationId
   const user = {
+    userId: "user_admin_demo", // Example user ID
     name: "Admin User",
     email: "admin@hive.com",
-    avatarUrl: "https://placehold.co/40x40.png", 
+    avatarUrl: "https://placehold.co/40x40.png",
+    organizationId: "org_default_demo", // Example organization ID
+    organizationName: "Demo Production Co." // Example organization name
   };
 
   return (
@@ -37,17 +43,23 @@ export function UserNav() {
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>Account Settings</p>
+            <p>{user.name} ({user.organizationName})</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent className="w-64" align="end" forceMount> {/* Increased width slightly */}
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
               {user.email}
             </p>
+            <div className="flex items-center pt-1">
+                <Building className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                <p className="text-xs leading-none text-muted-foreground">
+                    {user.organizationName}
+                </p>
+            </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -67,9 +79,11 @@ export function UserNav() {
             <span>Settings</span>
             <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
           </DropdownMenuItem>
+          {/* TODO: Add "Manage Organization" link for admins */}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
+          {/* TODO: Implement actual logout functionality */}
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
           <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
@@ -78,5 +92,3 @@ export function UserNav() {
     </DropdownMenu>
   );
 }
-
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
