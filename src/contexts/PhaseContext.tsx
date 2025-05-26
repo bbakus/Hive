@@ -29,9 +29,7 @@ export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"]
 // Define sidebar navigation items for each phase
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   "Dashboard": [
-    // When "Dashboard" is active, only the dashboard link itself should show,
-    // handled by getNavItemsForPhase ensuring Dashboard is present if active.
-    // For now, if activePhase is Dashboard, we will return a specific item for it.
+    // No items in the sidebar when Dashboard phase is active
   ],
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
@@ -41,12 +39,15 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Shoot": [
     { href: "/events", label: "Event Schedules", icon: CalendarDays, matchStartsWith: true },
+    // Potentially add links to live shot tracking, camera feeds, etc. later
   ],
   "Edit": [
     { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
+    // Links to editing bins, review portals, version tracking
   ],
   "Deliver": [
     { href: "/deliverables", label: "Deliverables", icon: ClipboardList, matchStartsWith: true },
+    // Links to file uploads, client delivery portals
   ],
 };
 
@@ -60,7 +61,7 @@ type PhaseContextType = {
   activePhase: Phase;
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
-  constantFooterNavItems: NavItem[]; // Added this
+  constantFooterNavItems: NavItem[];
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
@@ -69,17 +70,18 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
   const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
+    // If the phase is "Dashboard", return an empty array for the main sidebar section.
     if (phase === "Dashboard") {
-      return [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, matchStartsWith: true }];
+      return [];
     }
-    return phaseNavConfigs[phase] || []; // Ensure this always returns an array
+    return phaseNavConfigs[phase] || []; // Default to an empty array if config is missing
   };
 
   const value = useMemo(() => ({
     activePhase,
     setActivePhase,
     getNavItemsForPhase,
-    constantFooterNavItems, // Provide it here
+    constantFooterNavItems,
   }), [activePhase]);
 
   return (
