@@ -44,6 +44,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
+import { useEventContext } from "@/contexts/EventContext"; // Import useEventContext
 
 type PersonnelMinimal = {
   id: string;
@@ -57,6 +58,8 @@ const availablePersonnelList: PersonnelMinimal[] = [
   { id: "user003", name: "Charlie Chaplin", role: "Producer" },
   { id: "user004", name: "Diana Prince", role: "Drone Pilot" },
   { id: "user005", name: "Edward Scissorhands", role: "Grip" },
+  { id: "user006", name: "Fiona Gallagher", role: "Coordinator" },
+  { id: "user007", name: "George Jetson", role: "Tech Lead" },
 ];
 
 const eventSchema = z.object({
@@ -67,28 +70,22 @@ const eventSchema = z.object({
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
   assignedPersonnelIds: z.array(z.string()).optional(),
   isQuickTurnaround: z.boolean().optional(),
-  deadline: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), {
-    message: "Deadline must be a valid date-time.",
+  deadline: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)) || val === "", {
+    message: "Deadline must be a valid date-time string or empty.",
   }),
+  organizationId: z.string().optional(), // Added organizationId
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventFormData & {
   id: string;
-  project?: string;
+  project?: string; // Project name for display
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
+  organizationId?: string; // Ensure this is part of the final Event type
 };
-
-export const initialEventsMock: Event[] = [
-    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00" },
-    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003"], deadline: "2024-09-15T12:00" },
-    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false },
-    { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004"] },
-    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59" },
-];
 
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
@@ -142,7 +139,14 @@ export function formatDeadline(deadlineString?: string): string | null {
 export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const [events, setEvents] = useState<Event[]>([]);
+  const {
+    eventsForSelectedProject,
+    addEvent,
+    updateEvent,
+    deleteEvent,
+    isLoadingEvents: isLoadingContextEvents,
+  } = useEventContext();
+
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -164,14 +168,9 @@ export default function EventsPage() {
     defaultValues: {
       isQuickTurnaround: false,
       deadline: "",
+      assignedPersonnelIds: [],
     }
   });
-
-  useEffect(() => {
-    if (!isLoadingSettings) {
-        setEvents(useDemoData ? initialEventsMock : []);
-    }
-  }, [useDemoData, isLoadingSettings]);
 
   useEffect(() => {
     let defaultEventDate = new Date();
@@ -192,27 +191,28 @@ export default function EventsPage() {
         assignedPersonnelIds: editingEvent.assignedPersonnelIds || [],
         isQuickTurnaround: editingEvent.isQuickTurnaround || false,
         deadline: editingEvent.deadline || "",
+        organizationId: editingEvent.organizationId || "",
       });
     } else {
+      const firstProjectForOrg = selectedProject ? selectedProject : (allProjects.length > 0 ? allProjects[0] : null);
       reset({
         name: "",
-        projectId: selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""),
+        projectId: firstProjectForOrg?.id || "",
         date: format(defaultEventDate, "yyyy-MM-dd"),
         time: "09:00 - 17:00",
         priority: "Medium",
         assignedPersonnelIds: [],
         isQuickTurnaround: false,
         deadline: "",
+        organizationId: firstProjectForOrg?.organizationId || "",
       });
     }
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
 
 
   const filteredEvents = useMemo(() => {
-    let currentEvents = events;
-    if (selectedProject) {
-      currentEvents = events.filter(event => event.projectId === selectedProject.id);
-    }
+    let currentEvents = eventsForSelectedProject; // Already filtered by project ID from context
+
     return currentEvents.map(event => {
       let hasOverlap = false;
       for (const otherEvent of currentEvents) {
@@ -225,7 +225,7 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [selectedProject, events]);
+  }, [eventsForSelectedProject]);
 
   const groupedAndSortedEvents = useMemo(() => {
     const grouped = filteredEvents.reduce((acc, event) => {
@@ -264,27 +264,31 @@ export default function EventsPage() {
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
     const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
+    if (!selectedProjInfo) {
+      toast({ title: "Error", description: "Selected project not found.", variant: "destructive" });
+      return;
+    }
+
+    const eventPayload = {
+      ...data,
+      project: selectedProjInfo.name, // Add project name for display
+      organizationId: selectedProjInfo.organizationId, // Add organizationId
+      // deliverables and shotRequests will be set by context or default
+    };
 
     if (editingEvent) {
-      setEvents(prevEvents => prevEvents.map(evt =>
-        evt.id === editingEvent.id
-        ? { ...editingEvent, ...data, project: selectedProjInfo?.name || editingEvent.project || "Unknown Project" }
-        : evt
-      ));
+      updateEvent(editingEvent.id, eventPayload);
       toast({
         title: "Event Updated",
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      const newEvent: Event = {
+      // For addEvent, we construct the object that addEvent in Context expects
+      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'hasOverlap'> = {
         ...data,
-        id: `evt${String(events.length + initialEventsMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-        project: selectedProjInfo?.name || "Unknown Project",
-        deliverables: 0,
-        shotRequests: 0,
-        hasOverlap: false,
+        organizationId: selectedProjInfo.organizationId,
       };
-      setEvents((prevEvents) => [...prevEvents, newEvent]);
+      addEvent(newEventDataForContext);
       toast({
         title: "Event Added",
         description: `"${data.name}" has been successfully added.`,
@@ -295,11 +299,36 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
+    // Ensure projectId is set to current selectedProject or first available project
+    const currentProjectId = selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : "");
+    const projectInfo = allProjects.find(p => p.id === currentProjectId);
+    reset({
+      name: "",
+      projectId: currentProjectId,
+      date: format(activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date(), "yyyy-MM-dd"),
+      time: "09:00 - 17:00",
+      priority: "Medium",
+      assignedPersonnelIds: [],
+      isQuickTurnaround: false,
+      deadline: "",
+      organizationId: projectInfo?.organizationId || "",
+    });
     setIsEventModalOpen(true);
   };
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
+    reset({
+      name: event.name,
+      projectId: event.projectId,
+      date: event.date,
+      time: event.time,
+      priority: event.priority as EventFormData['priority'],
+      assignedPersonnelIds: event.assignedPersonnelIds || [],
+      isQuickTurnaround: event.isQuickTurnaround || false,
+      deadline: event.deadline || "",
+      organizationId: event.organizationId || "",
+    });
     setIsEventModalOpen(true);
   };
 
@@ -315,8 +344,8 @@ export default function EventsPage() {
 
   const confirmDelete = () => {
     if (eventToDeleteId) {
-      const event = events.find(e => e.id === eventToDeleteId);
-      setEvents(prevEvents => prevEvents.filter(e => e.id !== eventToDeleteId));
+      const event = eventsForSelectedProject.find(e => e.id === eventToDeleteId);
+      deleteEvent(eventToDeleteId);
       toast({
         title: "Event Deleted",
         description: `Event "${event?.name}" has been deleted.`,
@@ -327,7 +356,7 @@ export default function EventsPage() {
     setIsDeleteDialogOpen(false);
   };
 
-  if (isLoadingSettings || isLoadingProjects) {
+  if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents) {
       return <div>Loading event data settings...</div>;
   }
 
@@ -375,7 +404,11 @@ export default function EventsPage() {
                       control={control}
                       render={({ field }) => (
                         <Select
-                          onValueChange={field.onChange}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            const projInfo = allProjects.find(p => p.id === value);
+                            setValue("organizationId", projInfo?.organizationId || "");
+                          }}
                           value={field.value}
                           defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
                         >
@@ -612,7 +645,7 @@ export default function EventsPage() {
                                 Assigned: {event.assignedPersonnelIds.length}
                               </p>
                             )}
-                            <Link href={`/events/${event.id}/shots`} className="text-xs text-accent hover:underline flex items-center">
+                             <Link href={`/events/${event.id}/shots`} className="text-xs text-accent hover:underline flex items-center">
                                 <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
                                 Shot Requests: {event.shotRequests}
                             </Link>
@@ -692,7 +725,7 @@ export default function EventsPage() {
                         <TableCell className="text-center">
                           {event.assignedPersonnelIds?.length || 0}
                         </TableCell>
-                        <TableCell>
+                         <TableCell>
                            <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
                             {event.shotRequests}
                           </Link>

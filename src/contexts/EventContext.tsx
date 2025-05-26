@@ -5,13 +5,14 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useProjectContext } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
+import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext'; // Import OrganizationContext
 import type { Event as EventTypeDefinition } from '@/app/(app)/events/page'; // Use existing type
 
-export type Event = EventTypeDefinition;
+export type Event = EventTypeDefinition; // This will now include organizationId
 
 type EventContextType = {
-  allEvents: Event[]; // All events, unfiltered by project
-  eventsForSelectedProject: Event[];
+  allEvents: Event[]; // All events, unfiltered by project or org
+  eventsForSelectedProjectAndOrg: Event[]; // Filtered by selected org AND project
   addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'>) => void;
   updateEvent: (eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => void;
   deleteEvent: (eventId: string) => void;
@@ -28,13 +29,12 @@ const g9eOrgId = "org_g9e";
 
 const generateG9eSummitEvents = (): Event[] => {
   const summitEvents: Event[] = [];
-  let eventIdCounter = 100; // Start from a higher number to avoid collision with existing IDs
+  let eventIdCounter = 100; 
 
   g9eSummitDays.forEach((day, dayIndex) => {
     g9eSummitPhotographers.forEach((photographerId, photographerIndex) => {
-      const photographerName = `Photographer ${String.fromCharCode(65 + photographerIndex)}`; // A, B, C...
+      const photographerName = `Photographer ${String.fromCharCode(65 + photographerIndex)}`; 
 
-      // Morning Session
       summitEvents.push({
         id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter++}`,
         name: `${photographerName} - Summit Day ${dayIndex + 1} Morning Coverage`,
@@ -49,7 +49,6 @@ const generateG9eSummitEvents = (): Event[] => {
         organizationId: g9eOrgId,
       });
 
-      // Lunch Break
       summitEvents.push({
         id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_lunch_${eventIdCounter++}`,
         name: `${photographerName} - Summit Day ${dayIndex + 1} Lunch Break`,
@@ -57,14 +56,13 @@ const generateG9eSummitEvents = (): Event[] => {
         project: "G9e Corporate Summit 2024",
         date: day,
         time: "12:30 - 13:30",
-        priority: "Low", // Breaks are low priority for event types but important for scheduling
+        priority: "Low", 
         assignedPersonnelIds: [photographerId],
         deliverables: 0,
         shotRequests: 0,
         organizationId: g9eOrgId,
       });
 
-      // Afternoon Session
       summitEvents.push({
         id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter++}`,
         name: `${photographerName} - Summit Day ${dayIndex + 1} Afternoon Workshops`,
@@ -79,8 +77,7 @@ const generateG9eSummitEvents = (): Event[] => {
         organizationId: g9eOrgId,
       });
 
-      // Optional Evening Session (for some)
-      if (photographerIndex % 2 === 0) { // e.g., half the photographers cover evening
+      if (photographerIndex % 2 === 0) { 
         summitEvents.push({
           id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter++}`,
           name: `${photographerName} - Summit Day ${dayIndex + 1} Evening Reception`,
@@ -102,19 +99,20 @@ const generateG9eSummitEvents = (): Event[] => {
 
 
 const initialMockEvents: Event[] = [
-  { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002", "user006"], isQuickTurnaround: true, deadline: "2024-07-16T10:00", organizationId: "org_g9e" },
-  { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00", organizationId: "org_damion_hamilton" },
-  { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e" },
-  { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004", "user006"], organizationId: "org_g9e" },
-  { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59", organizationId: "org_damion_hamilton" },
-  { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e"},
-  ...generateG9eSummitEvents(), // Add the new detailed G9e Summit events
+    { id: "evt001", name: "Main Stage - Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002", "user006"], isQuickTurnaround: true, deadline: "2024-07-16T10:00", organizationId: "org_g9e" },
+    { id: "evt002", name: "Keynote Speech", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00", organizationId: "org_damion_hamilton" },
+    { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e" },
+    { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004", "user006"], organizationId: "org_g9e" },
+    { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59", organizationId: "org_damion_hamilton" },
+    { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e"},
+  ...generateG9eSummitEvents(),
 ];
 
 
 export function EventProvider({ children }: { children: ReactNode }) {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { selectedProjectId } = useProjectContext();
+  const { selectedProjectId, projects } = useProjectContext(); // Get all projects to find project name
+  const { selectedOrganizationId } = useOrganizationContext(); // Get selected org
 
   const [allEventsState, setAllEventsState] = useState<Event[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
@@ -128,27 +126,42 @@ export function EventProvider({ children }: { children: ReactNode }) {
   }, [useDemoData, isLoadingSettings]);
 
   const addEvent = useCallback((eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'>) => {
+    // eventData should include projectId and organizationId from the form
+    const projectForEvent = projects.find(p => p.id === eventData.projectId);
+
     setAllEventsState((prevEvents) => {
       const newEvent: Event = {
         ...eventData,
         id: `evt${String(prevEvents.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
-        project: "Unknown Project (Context Placeholder)", // Placeholder, ideally resolve from projectId
-        deliverables: 0, // Default value
-        shotRequests: 0, // Default value
-        hasOverlap: false, // Default value
+        project: projectForEvent?.name || "Unknown Project",
+        deliverables: 0, 
+        shotRequests: 0, 
+        hasOverlap: false, 
+        // organizationId is expected to be part of eventData now
       };
-      // TODO: Resolve project name from projectId if needed
       return [...prevEvents, newEvent];
     });
-  }, []);
+  }, [projects]);
 
-  const updateEvent = useCallback((eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => {
+  const updateEvent = useCallback((eventId: string, eventData: Partial<Omit<Event, 'id' | 'hasOverlap'>>) => {
+    // If projectId changes, project name and organizationId should also update
+    let projectName = eventData.project;
+    let orgId = eventData.organizationId;
+
+    if (eventData.projectId) {
+        const projectForEvent = projects.find(p => p.id === eventData.projectId);
+        if (projectForEvent) {
+            projectName = projectForEvent.name;
+            orgId = projectForEvent.organizationId;
+        }
+    }
+
     setAllEventsState((prevEvents) =>
       prevEvents.map((evt) =>
-        evt.id === eventId ? { ...evt, ...eventData } : evt
+        evt.id === eventId ? { ...evt, ...eventData, project: projectName || evt.project, organizationId: orgId || evt.organizationId } : evt
       )
     );
-  }, []);
+  }, [projects]);
 
   const deleteEvent = useCallback((eventId: string) => {
     setAllEventsState((prevEvents) =>
@@ -156,11 +169,21 @@ export function EventProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const eventsForSelectedProject = useMemo(() => {
+  const eventsForSelectedProjectAndOrg = useMemo(() => {
     if (isLoadingEvents) return [];
-    if (!selectedProjectId) return allEventsState; // Or an empty array if "All Projects" shouldn't show all events
-    return allEventsState.filter(event => event.projectId === selectedProjectId);
-  }, [allEventsState, selectedProjectId, isLoadingEvents]);
+
+    let filteredByOrg = allEventsState;
+    if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
+      filteredByOrg = allEventsState.filter(event => event.organizationId === selectedOrganizationId);
+    }
+
+    if (!selectedProjectId) { // If no project is selected (e.g. "All Projects" under an org, or "All Orgs" and no project)
+      return filteredByOrg; // Return events filtered by org only (or all events if no org selected)
+    }
+
+    return filteredByOrg.filter(event => event.projectId === selectedProjectId);
+  }, [allEventsState, selectedProjectId, selectedOrganizationId, isLoadingEvents]);
+
 
   const getEventById = useCallback((eventId: string) => {
     return allEventsState.find(event => event.id === eventId);
@@ -169,13 +192,13 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     allEvents: allEventsState,
-    eventsForSelectedProject,
+    eventsForSelectedProjectAndOrg: eventsForSelectedProjectAndOrg,
     addEvent,
     updateEvent,
     deleteEvent,
     isLoadingEvents,
     getEventById,
-  }), [allEventsState, eventsForSelectedProject, addEvent, updateEvent, deleteEvent, isLoadingEvents, getEventById]);
+  }), [allEventsState, eventsForSelectedProjectAndOrg, addEvent, updateEvent, deleteEvent, isLoadingEvents, getEventById]);
 
   return (
     <EventContext.Provider value={value}>
