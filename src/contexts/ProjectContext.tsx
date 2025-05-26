@@ -9,7 +9,7 @@ import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationCont
 // Define project structure
 export type KeyPersonnel = {
   personnelId: string;
-  name: string; 
+  name: string;
   projectRole: string;
 };
 
@@ -22,24 +22,24 @@ export type Project = {
   description?: string;
   location?: string;
   keyPersonnel?: KeyPersonnel[];
-  organizationId: string; 
-  createdByUserId?: string; 
+  organizationId: string;
+  createdByUserId?: string;
 };
 
-export type ProjectFormData = Omit<Project, 'id' | 'createdByUserId'> & { 
+export type ProjectFormData = Omit<Project, 'id' | 'createdByUserId'> & {
   location?: string;
   keyPersonnel?: KeyPersonnel[];
 };
 
 
 type ProjectContextType = {
-  selectedProjectId: string | null; 
+  selectedProjectId: string | null;
   setSelectedProjectId: (projectId: string | null) => void;
-  projects: Project[]; 
-  addProject: (projectData: Omit<ProjectFormData, 'organizationId'>, organizationId: string, userId?: string) => void; 
-  updateProject: (projectId: string, projectData: Partial<ProjectFormData>) => void; 
-  deleteProject: (projectId: string) => void; 
-  selectedProject: Project | null; 
+  projects: Project[];
+  addProject: (projectData: Omit<ProjectFormData, 'organizationId'>, organizationId: string, userId?: string) => void;
+  updateProject: (projectId: string, projectData: Partial<ProjectFormData>) => void;
+  deleteProject: (projectId: string) => void;
+  selectedProject: Project | null;
   isLoadingProjects: boolean;
 };
 
@@ -58,8 +58,8 @@ const initialMockProjects: Project[] = [
       { personnelId: "user001", name: "Alice Wonderland", projectRole: "Festival Director" },
       { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Production Manager" },
     ],
-    organizationId: "org_g9e", 
-    createdByUserId: "user_admin_demo", 
+    organizationId: "org_g9e",
+    createdByUserId: "user_admin_demo",
   },
   {
     id: "proj002",
@@ -84,7 +84,7 @@ const initialMockProjects: Project[] = [
     description: "Annual corporate fundraising gala.",
     location: "The Grand Ballroom",
     keyPersonnel: [],
-    organizationId: "org_g9e", 
+    organizationId: "org_g9e",
     createdByUserId: "user_admin_demo",
   },
   {
@@ -109,6 +109,21 @@ const initialMockProjects: Project[] = [
     organizationId: "org_damion_hamilton",
     createdByUserId: "user_admin_demo",
   },
+  {
+    id: "proj_g9e_summit",
+    name: "G9e Corporate Summit 2024",
+    startDate: "2024-08-01",
+    endDate: "2024-08-04",
+    status: "Planning",
+    description: "Multi-day corporate summit for G9e, requiring extensive photographic coverage.",
+    location: "Grand Hyatt, San Diego",
+    keyPersonnel: [
+        { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Lead Producer" },
+        { personnelId: "user006", name: "Fiona Gallagher", projectRole: "Production Coordinator" }
+    ],
+    organizationId: "org_g9e",
+    createdByUserId: "user_admin_demo",
+  }
 ];
 
 
@@ -127,7 +142,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setIsLoadingProjects(false);
     }
   }, [useDemoData, isLoadingSettings]);
-  
+
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
       return allProjects;
@@ -156,7 +171,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         ...projectData,
         id: `proj${String(prevProjects.length + initialMockProjects.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
         keyPersonnel: projectData.keyPersonnel || [],
-        organizationId: organizationId, 
+        organizationId: organizationId,
         createdByUserId: userId,
       };
       return [...prevProjects, newProject];
@@ -175,7 +190,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setAllProjects((prevProjects) =>
       prevProjects.filter((proj) => proj.id !== projectId)
     );
-  }, []);
+    // If the deleted project was the selected one, reset selection
+    if (selectedProjectId === projectId) {
+        setSelectedProjectIdState(null); // Will be auto-selected to first in list by the other useEffect
+    }
+  }, [selectedProjectId]);
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId) return null;
