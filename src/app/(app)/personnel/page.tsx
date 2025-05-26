@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, UserPlus, CalendarDays, Eye, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { initialEventsMock, type Event } from "@/app/(app)/events/page"; // Import Event type and mock data
+import { initialEventsMock, type Event } from "@/app/(app)/events/page"; 
 import { format } from "date-fns";
 
 // --- Personnel Definitions ---
@@ -76,6 +76,7 @@ export default function PersonnelPage() {
   const [viewingScheduleForPersonnel, setViewingScheduleForPersonnel] = useState<Personnel | null>(null);
   const [eventsForSelectedPersonnel, setEventsForSelectedPersonnel] = useState<Event[]>([]);
 
+  const [filterText, setFilterText] = useState("");
   const { toast } = useToast();
 
   const {
@@ -125,7 +126,7 @@ export default function PersonnelPage() {
     } else {
       const newPersonnelMember: Personnel = {
         ...data,
-        id: `user${String(personnelList.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        id: `user${String(personnelList.length + initialPersonnelMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
       };
       setPersonnelList((prevList) => [...prevList, newPersonnelMember]);
       toast({
@@ -178,6 +179,16 @@ export default function PersonnelPage() {
     setEventsForSelectedPersonnel(assignedEvents);
     setIsViewScheduleModalOpen(true);
   };
+
+  const filteredPersonnelList = useMemo(() => {
+    if (!filterText) {
+      return personnelList;
+    }
+    return personnelList.filter(member =>
+      member.name.toLowerCase().includes(filterText.toLowerCase()) ||
+      member.role.toLowerCase().includes(filterText.toLowerCase())
+    );
+  }, [personnelList, filterText]);
 
 
   if (isLoadingSettings) {
@@ -329,11 +340,28 @@ export default function PersonnelPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Team Roster</CardTitle>
-          <CardDescription>List of all team members and their current status. ({personnelList.length} members)</CardDescription>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <CardTitle>Team Roster</CardTitle>
+              <CardDescription>
+                List of all team members and their current status. 
+                (Showing {filteredPersonnelList.length} of {personnelList.length} members)
+              </CardDescription>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Input
+                type="text"
+                placeholder="Filter by name or role..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="pl-10"
+              />
+              <FilterIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {personnelList.length > 0 ? (
+          {filteredPersonnelList.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -344,7 +372,7 @@ export default function PersonnelPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {personnelList.map((member) => (
+                {filteredPersonnelList.map((member) => (
                   <TableRow key={member.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -387,7 +415,7 @@ export default function PersonnelPage() {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No team members found. {useDemoData ? 'Toggle "Load Demo Data" in settings or add a new member.' : 'Add a new team member to get started.'}
+              {filterText ? "No team members found matching your filter." : (useDemoData ? 'Toggle "Load Demo Data" in settings or add a new member.' : 'Add a new team member to get started.')}
             </p>
           )}
         </CardContent>
@@ -418,6 +446,3 @@ export default function PersonnelPage() {
     </div>
   );
 }
-
-
-    
