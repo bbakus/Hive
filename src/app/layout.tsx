@@ -33,6 +33,18 @@ export default function RootLayout({
         )}>
         {children}
         <Toaster />
+        {/*
+          In a real application, you would include the Google Maps API script here.
+          Replace YOUR_API_KEY with your actual Google Maps API key.
+          Ensure the "Places" library is loaded.
+          Example:
+          <script
+            async
+            defer
+            src={`https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap`}
+          ></script>
+          You might also need a global initMap function if not handled by a library.
+        */}
       </body>
     </html>
   );
