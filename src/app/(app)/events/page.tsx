@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -95,6 +96,7 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
+  // Handle events that cross midnight
   if (isBefore(endDate, startDate)) {
     endDate.setDate(endDate.getDate() + 1);
   }
@@ -102,23 +104,29 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   return { start: startDate, end: endDate };
 };
 
-const checkOverlap = (eventA: Event, eventB: Event, allEventsForDay: Event[]): boolean => {
+const checkOverlap = (eventA: Event, eventB: Event): boolean => {
   if (eventA.id === eventB.id) return false;
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false;
+  if (!timesA || !timesB) return false; // Cannot determine overlap if times are invalid
 
+  // Check for basic overlap
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  if (eventA.assignedPersonnelIds && eventB.assignedPersonnelIds) {
+  // If both events have assigned personnel, check for shared personnel
+  if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
+      eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
-    return sharedPersonnel;
+    return sharedPersonnel; // Overlap only if time AND personnel overlap
   }
-  return false;
+  
+  // If one or both events have no assigned personnel, basic time overlap is sufficient
+  return true; 
 };
+
 
 export function formatDeadline(deadlineString?: string): string | null {
   if (!deadlineString) return null;
@@ -135,7 +143,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [],
+    eventsForSelectedProjectAndOrg = [], // Default to empty array
     addEvent,
     updateEvent,
     deleteEvent,
@@ -153,6 +161,7 @@ export default function EventsPage() {
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
   const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
+  const [filterDateRange, setFilterDateRange] = useState<DateRange | undefined>(undefined);
 
 
   const { toast } = useToast();
@@ -218,7 +227,7 @@ export default function EventsPage() {
   const assignedPersonnelForFilter = useMemo(() => {
     if (isLoadingContextEvents || !eventsForSelectedProjectAndOrg) return [];
     const personnelIds = new Set<string>();
-    eventsForSelectedProjectAndOrg.forEach(event => {
+    (eventsForSelectedProjectAndOrg || []).forEach(event => {
       event.assignedPersonnelIds?.forEach(id => personnelIds.add(id));
     });
     return initialPersonnelMock.filter(person => personnelIds.has(person.id));
@@ -253,9 +262,25 @@ export default function EventsPage() {
       filtered = filtered.filter(event => {
         if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
         if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
-        return true; // Should not happen if filterDiscipline is "all"
+        return true; 
       });
     }
+    
+    if (filterDateRange?.from) {
+      const fromDate = startOfDay(filterDateRange.from);
+      filtered = filtered.filter(event => {
+        const eventDate = parseISO(event.date);
+        return isValid(eventDate) && (eventDate.getTime() >= fromDate.getTime());
+      });
+    }
+    if (filterDateRange?.to) {
+      const toDate = endOfDay(filterDateRange.to);
+      filtered = filtered.filter(event => {
+        const eventDate = parseISO(event.date);
+        return isValid(eventDate) && (eventDate.getTime() <= toDate.getTime());
+      });
+    }
+
 
     const eventsGroupedByDay: Record<string, Event[]> = filtered.reduce((acc, event) => {
         const date = event.date;
@@ -268,14 +293,14 @@ export default function EventsPage() {
       let hasOverlap = false;
       const dayEvents = eventsGroupedByDay[event.date] || [];
       for (const otherEvent of dayEvents) {
-        if (checkOverlap(event, otherEvent, dayEvents)) {
+        if (checkOverlap(event, otherEvent)) {
           hasOverlap = true;
           break;
         }
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
-  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline]);
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, filterDateRange]);
 
 
   const groupedAndSortedEventsForDisplay = useMemo(() => {
@@ -324,14 +349,14 @@ export default function EventsPage() {
       ...data,
       project: selectedProjInfo.name,
       organizationId: selectedProjInfo.organizationId,
-      discipline: data.discipline || "", // Ensure discipline is set
+      discipline: data.discipline || "", 
     };
 
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables,
-        shotRequests: editingEvent.shotRequests,
+        deliverables: editingEvent.deliverables, // retain existing counts
+        shotRequests: editingEvent.shotRequests, // retain existing counts
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -342,7 +367,7 @@ export default function EventsPage() {
       const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'> = {
         ...data,
         organizationId: selectedProjInfo.organizationId,
-        discipline: data.discipline || "", // Ensure discipline is set
+        discipline: data.discipline || "",
       };
       addEvent(newEventDataForContext);
       toast({
@@ -445,7 +470,7 @@ export default function EventsPage() {
             <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
             <CardDescription>Refine the events shown across all views below.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="flex items-center space-x-2">
                 <Checkbox
                     id="filter-quick-turnaround"
@@ -496,6 +521,54 @@ export default function EventsPage() {
                     </SelectContent>
                 </Select>
             </div>
+            <div className="md:col-span-1"> {/* Adjusted span for better layout */}
+                <Label htmlFor="filter-date-range">Date Range</Label>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="filter-date-range"
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !filterDateRange && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIconLucide className="mr-2 h-4 w-4" />
+                        {filterDateRange?.from ? (
+                        filterDateRange.to ? (
+                            <>
+                            {format(filterDateRange.from, "LLL dd, y")} -{" "}
+                            {format(filterDateRange.to, "LLL dd, y")}
+                            </>
+                        ) : (
+                            format(filterDateRange.from, "LLL dd, y")
+                        )
+                        ) : (
+                        <span>Pick a date range</span>
+                        )}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={filterDateRange?.from}
+                        selected={filterDateRange}
+                        onSelect={setFilterDateRange}
+                        numberOfMonths={2}
+                    />
+                    </PopoverContent>
+                </Popover>
+            </div>
+             {filterDateRange && (
+                <Button
+                    variant="ghost"
+                    onClick={() => setFilterDateRange(undefined)}
+                    className="text-xs text-muted-foreground self-end md:col-start-2" // Adjust based on grid flow
+                >
+                    Clear Date Range
+                </Button>
+            )}
         </CardContent>
       </Card>
 
