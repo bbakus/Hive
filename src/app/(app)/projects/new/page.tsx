@@ -16,34 +16,30 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type KeyPersonnel } from "@/contexts/ProjectContext";
-import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; // Import OrganizationContext
-import { ArrowLeft, ArrowRight, CheckCircle, Users, MapPin, UserPlus, Briefcase } from "lucide-react";
+import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
+import { ArrowLeft, ArrowRight, CheckCircle, Users, MapPin, UserPlus } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; // Import the roles
 
 type WizardAvailablePersonnel = {
   id: string;
   name: string;
-  capabilities: string[];
+  capabilities: typeof PHOTOGRAPHY_ROLES[number][]; // Use the imported roles
 };
 
 const initialAvailablePersonnelList: WizardAvailablePersonnel[] = [
-  { id: "user001", name: "Alice Wonderland", capabilities: ["Director", "Producer", "Lead Camera Op"] },
-  { id: "user002", name: "Bob The Builder", capabilities: ["Audio Engineer", "Grip", "Technical Director"] },
-  { id: "user003", name: "Charlie Chaplin", capabilities: ["Producer", "Editor", "Writer"] },
-  { id: "user004", name: "Diana Prince", capabilities: ["Drone Pilot", "Photographer", "Camera Operator"] },
-  { id: "user005", name: "Edward Scissorhands", capabilities: ["Grip", "Set Designer", "Editor"] },
-  { id: "user006", name: "Fiona Gallagher", capabilities: ["Coordinator", "Project Manager"] },
-  { id: "user007", name: "George Jetson", capabilities: ["Tech Lead", "IT Support", "Streaming Engineer"] },
+  { id: "user001", name: "Alice Wonderland", capabilities: ["Photographer", "Editor"] },
+  { id: "user002", name: "Bob The Builder", capabilities: ["Editor", "Project Manager"] },
+  { id: "user003", name: "Charlie Chaplin", capabilities: ["Project Manager", "Photographer"] },
+  { id: "user004", name: "Diana Prince", capabilities: ["Photographer"] },
+  { id: "user005", name: "Edward Scissorhands", capabilities: ["Editor"] },
+  { id: "user006", name: "Fiona Gallagher", capabilities: ["Project Manager"] },
+  { id: "user007", name: "George Jetson", capabilities: ["Photographer"] },
+  { id: "user008", name: "Client Representative", capabilities: ["Client"] },
 ];
 
-const allPossibleCapabilities = [
-  "Director", "Producer", "Lead Camera Op", "Camera Operator", "Drone Pilot",
-  "Audio Engineer", "Grip", "Technical Director", "Editor", "Writer",
-  "Photographer", "Set Designer", "Coordinator", "Project Manager", "IT Support",
-  "Streaming Engineer", "Assistant"
-];
-
+const allPossibleCapabilities = PHOTOGRAPHY_ROLES;
 
 const keyPersonnelSchema = z.object({
   personnelId: z.string(),
@@ -57,7 +53,7 @@ const projectWizardSchema = z.object({
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "End date must be YYYY-MM-DD." }),
   description: z.string().optional(),
   status: z.enum(["Planning", "In Progress", "Completed", "On Hold", "Cancelled"]),
-  organizationId: z.string().min(1, { message: "Please select an organization." }), // Added organizationId
+  organizationId: z.string().min(1, { message: "Please select an organization." }),
   location: z.string().optional(),
   keyPersonnel: z.array(keyPersonnelSchema).optional(),
   selectedPersonnelMap: z.record(z.boolean()).optional(), 
@@ -65,13 +61,12 @@ const projectWizardSchema = z.object({
 
 type ProjectWizardFormDataInternal = z.infer<typeof projectWizardSchema>;
 
-// Match ProjectContext's ProjectFormData but ensure organizationId is handled separately.
 type ProjectContextInputData = Omit<import('@/contexts/ProjectContext').ProjectFormData, 'organizationId' | 'createdByUserId'> & {
   location?: string;
   keyPersonnel?: KeyPersonnel[];
 };
 
-const TOTAL_STEPS = 4; // Remains 4 steps, org selection is part of Step 1 if needed.
+const TOTAL_STEPS = 4;
 
 export default function NewProjectWizardPage() {
   const router = useRouter();
@@ -108,7 +103,7 @@ export default function NewProjectWizardPage() {
       endDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
       description: "",
       status: "Planning",
-      organizationId: globalSelectedOrgId !== ALL_ORGANIZATIONS_ID ? globalSelectedOrgId || "" : "", // Pre-fill if specific org is selected globally
+      organizationId: globalSelectedOrgId !== ALL_ORGANIZATIONS_ID ? globalSelectedOrgId || "" : "",
       location: "",
       keyPersonnel: [],
       selectedPersonnelMap: {},
@@ -117,50 +112,49 @@ export default function NewProjectWizardPage() {
 
   const selectedPersonnelMap = watch("selectedPersonnelMap", {});
   const watchedKeyPersonnel = watch("keyPersonnel", []);
-  const watchedOrganizationId = watch("organizationId"); // Watch for changes in Step 1's org selection
+  const watchedOrganizationId = watch("organizationId");
 
-  // Pre-fill organizationId if a global one is selected
   useEffect(() => {
     if (globalSelectedOrgId !== ALL_ORGANIZATIONS_ID && globalSelectedOrgId && getValues("organizationId") !== globalSelectedOrgId) {
       setValue("organizationId", globalSelectedOrgId, { shouldValidate: true, shouldDirty: true });
     }
   }, [globalSelectedOrgId, getValues, setValue]);
 
-
   useEffect(() => {
-    const currentKeyPersonnelValues = getValues("keyPersonnel") || [];
-    const newKeyPersonnelArray: KeyPersonnel[] = [];
-    let mapChanged = false;
+    const currentKeyPersonnel = getValues("keyPersonnel") || [];
+    const newKeyPersonnel: KeyPersonnel[] = [];
+    let hasChanged = false;
 
     Object.keys(selectedPersonnelMap || {}).forEach(personId => {
       if (selectedPersonnelMap?.[personId]) {
-        const existingEntry = currentKeyPersonnelValues.find(kp => kp.personnelId === personId);
         const personDetails = currentAvailablePersonnel.find(p => p.id === personId);
         if (personDetails) {
-            newKeyPersonnelArray.push({
-            personnelId: personId,
+          const existingEntry = currentKeyPersonnel.find(kp => kp.personnelId === personId);
+          newKeyPersonnel.push({
+            personnelId: personDetails.id,
             name: personDetails.name,
-            projectRole: existingEntry?.projectRole || "",
-            });
+            projectRole: existingEntry?.projectRole || "", // Preserve existing role if any
+          });
         }
       }
     });
 
-    // Compare new array with existing to prevent unnecessary updates
-    if (newKeyPersonnelArray.length !== currentKeyPersonnelValues.length || 
-        !newKeyPersonnelArray.every((newItem, index) => 
-            newItem.personnelId === currentKeyPersonnelValues[index]?.personnelId &&
-            newItem.projectRole === currentKeyPersonnelValues[index]?.projectRole
-        )) {
-        mapChanged = true;
+    // Check if the new array is different from the current one
+    if (newKeyPersonnel.length !== currentKeyPersonnel.length ||
+        !newKeyPersonnel.every((newKp, index) => 
+            currentKeyPersonnel[index] &&
+            newKp.personnelId === currentKeyPersonnel[index].personnelId &&
+            newKp.name === currentKeyPersonnel[index].name &&
+            newKp.projectRole === currentKeyPersonnel[index].projectRole
+        )
+    ) {
+      hasChanged = true;
     }
-
-    if (mapChanged) {
-        setValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
+    
+    if (hasChanged) {
+      setValue("keyPersonnel", newKeyPersonnel, { shouldValidate: true, shouldDirty: true });
     }
-
-  }, [selectedPersonnelMap, getValues, setValue, currentAvailablePersonnel]);
-
+  }, [selectedPersonnelMap, currentAvailablePersonnel, getValues, setValue]);
 
   useEffect(() => {
     if (currentStep === 3 && typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places && locationInputRef.current && !autocompleteRef.current) {
@@ -184,7 +178,7 @@ export default function NewProjectWizardPage() {
     }
     const selectedCapabilities = Object.entries(newPersonnelCapabilities)
       .filter(([, isSelected]) => isSelected)
-      .map(([capability]) => capability);
+      .map(([capability]) => capability as typeof PHOTOGRAPHY_ROLES[number]);
 
     if (selectedCapabilities.length === 0) {
       toast({ title: "Error", description: "Please select at least one capability.", variant: "destructive" });
@@ -211,20 +205,21 @@ export default function NewProjectWizardPage() {
       isValidStep = await trigger(["name", "startDate", "endDate", "status", "organizationId"]);
     } else if (currentStep === 2) {
       const keyPersonnelValues = getValues("keyPersonnel") || [];
-      isValidStep = await trigger("keyPersonnel"); 
-      if (keyPersonnelValues.length > 0 && !isValidStep) {
-         toast({
-            title: "Missing Roles",
-            description: "Please assign a project role to all selected key personnel.",
-            variant: "destructive",
-          });
-      } else if (keyPersonnelValues.length > 0 && isValidStep) {
-        // if valid and has personnel, ensure errors are clear
-        clearErrors("keyPersonnel");
+      if (keyPersonnelValues.some(kp => !kp.projectRole)) {
+        toast({
+          title: "Missing Roles",
+          description: "Please assign a project role to all selected key personnel.",
+          variant: "destructive",
+        });
+        // Manually set errors for specific fields if react-hook-form doesn't catch them all here
+        keyPersonnelValues.forEach((kp, index) => {
+          if(!kp.projectRole) {
+            control.setError(`keyPersonnel.${index}.projectRole`, { type: "manual", message: "Role is required."})
+          }
+        });
+        isValidStep = false;
       } else {
-         // No personnel selected, or validation passed
-         isValidStep = true;
-         clearErrors("keyPersonnel");
+         isValidStep = await trigger("keyPersonnel"); // Zod validation for array structure
       }
     } else if (currentStep === 3) {
       isValidStep = await trigger("location");
@@ -253,10 +248,9 @@ export default function NewProjectWizardPage() {
       status: data.status,
       location: data.location,
       keyPersonnel: finalKeyPersonnel,
-      // organizationId is handled by addProject directly
     };
 
-    const currentUserId = "user_admin_demo"; // Placeholder for actual user ID
+    const currentUserId = "user_admin_demo"; 
 
     addProject(projectDataForContext, data.organizationId, currentUserId);
     
@@ -386,8 +380,6 @@ export default function NewProjectWizardPage() {
                         <Input value={organizations.find(o => o.id === globalSelectedOrgId)?.name || "Selected Organization"} readOnly disabled className="bg-muted/50" />
                      </div>
                 )}
-
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date <span className="text-destructive">*</span></Label>
@@ -430,7 +422,7 @@ export default function NewProjectWizardPage() {
              <>
               <CardHeader className="flex flex-row items-start sm:items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Step 2: Assign Key Personnel & Roles</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Step 2: Assign Key Roles & Personnel</CardTitle>
                   <CardDescription>Select team members and their project-specific roles.</CardDescription>
                 </div>
                 <Button type="button" size="sm" variant="outline" onClick={() => setIsAddPersonnelDialogOpen(true)} className="shrink-0 mt-2 sm:mt-0">
@@ -452,8 +444,9 @@ export default function NewProjectWizardPage() {
                             id={`person-select-${person.id}`}
                             checked={isSelected}
                             onCheckedChange={(checked) => {
-                              const currentMap = getValues("selectedPersonnelMap") || {};
-                              setValue("selectedPersonnelMap", { ...currentMap, [person.id]: !!checked }, { shouldDirty: true });
+                              const currentMap = { ...(getValues("selectedPersonnelMap") || {}) };
+                              currentMap[person.id] = !!checked;
+                              setValue("selectedPersonnelMap", currentMap , { shouldDirty: true });
                             }}
                             className="mr-2.5"
                           />
@@ -481,7 +474,7 @@ export default function NewProjectWizardPage() {
                                         </SelectItem>
                                       ))
                                     ) : (
-                                      <SelectItem value="" disabled>No capabilities</SelectItem>
+                                      <SelectItem value="" disabled>No capabilities defined</SelectItem>
                                     )}
                                   </SelectContent>
                                 </Select>
@@ -502,7 +495,7 @@ export default function NewProjectWizardPage() {
                   })}
                 </ScrollArea>
                  <p className="text-xs text-muted-foreground">
-                  Select personnel to add them to this project. Then, choose their specific role for this project from their capabilities.
+                  Select personnel to add them to this project. Then, choose their specific role for this project from their capabilities. A role must be assigned for each selected member before proceeding.
                 </p>
               </CardContent>
             </>
@@ -526,7 +519,7 @@ export default function NewProjectWizardPage() {
                   />
                   {errors.location && <p className="text-xs text-destructive mt-1">{errors.location.message}</p>}
                    <p className="text-xs text-muted-foreground mt-1">
-                    Start typing for address suggestions (Google Maps Autocomplete needs API key setup).
+                    Start typing for address suggestions. Note: Google Maps Autocomplete requires API key setup for full functionality.
                   </p>
                 </div>
               </CardContent>
@@ -625,3 +618,4 @@ export default function NewProjectWizardPage() {
     </div>
   );
 }
+

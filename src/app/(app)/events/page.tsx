@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Video, Camera, Focus } from "lucide-react"; // Added Focus
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Focus } from "lucide-react"; 
 import {
   Dialog,
   DialogContent,
@@ -45,7 +45,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
 import { useEventContext } from "@/contexts/EventContext";
-import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
+import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -70,8 +70,8 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Video", "Photography", "Both", "" ]).optional(),
-  isCovered: z.boolean().optional(), // New field
+  discipline: z.enum(["Photography", "" ]).optional(), // Only Photography or N/A
+  isCovered: z.boolean().optional(),
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
@@ -83,8 +83,8 @@ export type Event = EventFormData & {
   shotRequests: number;
   hasOverlap?: boolean;
   organizationId?: string;
-  discipline?: "Video" | "Photography" | "Both" | "";
-  isCovered?: boolean; // New field
+  discipline?: "Photography" | "";
+  isCovered?: boolean;
 };
 
 
@@ -107,7 +107,6 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  // Handle events that cross midnight
   if (isBefore(endDate, startDate)) {
     endDate.setDate(endDate.getDate() + 1);
   }
@@ -151,7 +150,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [],
+    eventsForSelectedProjectAndOrg = [], // Default to empty array
     addEvent,
     updateEvent,
     deleteEvent,
@@ -164,11 +163,10 @@ export default function EventsPage() {
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
   const [activeBlockScheduleDateKey, setActiveBlockScheduleDateKey] = useState<string | null>(null);
 
-  // Filters State
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
-  const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
+  const [filterDiscipline, setFilterDiscipline] = useState<string>("all"); // "all", "Photography"
   const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
   const [filterCoverageStatus, setFilterCoverageStatus] = useState<"all" | "covered" | "not_covered">("all");
 
@@ -190,7 +188,7 @@ export default function EventsPage() {
       deadline: "",
       assignedPersonnelIds: [],
       discipline: "",
-      isCovered: true, // Default new events to covered
+      isCovered: true, 
     }
   });
 
@@ -272,8 +270,7 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
-        if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
-        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
+        if (filterDiscipline === "Photography") return event.discipline === "Photography";
         return true; 
       });
     }
@@ -289,7 +286,6 @@ export default function EventsPage() {
     if (selectedEventDates.length > 0) {
       filtered = filtered.filter(event => selectedEventDates.includes(event.date));
     }
-
 
     const eventsGroupedByDay: Record<string, Event[]> = filtered.reduce((acc, event) => {
         const date = event.date;
@@ -365,7 +361,7 @@ export default function EventsPage() {
       project: selectedProjInfo.name,
       organizationId: selectedProjInfo.organizationId,
       discipline: data.discipline || "", 
-      isCovered: data.isCovered === undefined ? true : data.isCovered, // Ensure default
+      isCovered: data.isCovered === undefined ? true : data.isCovered,
     };
 
     if (editingEvent) {
@@ -458,9 +454,7 @@ export default function EventsPage() {
   };
 
   const getDisciplineIcon = (discipline?: Event['discipline']) => {
-    if (discipline === "Video") return <Video className="h-3.5 w-3.5 opacity-80" />;
     if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
-    if (discipline === "Both") return <><Video className="h-3.5 w-3.5 opacity-80" /><Camera className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
     return null;
   };
 
@@ -478,7 +472,7 @@ export default function EventsPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Events & Shot Requests</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Events Setup</h1>
           <p className="text-muted-foreground">
             {selectedProject ? `Events for ${selectedProject.name}` : "Manage all events, shot requests, timings, and priorities."}
           </p>
@@ -494,7 +488,7 @@ export default function EventsPage() {
             <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
             <CardDescription>Refine the events shown across all views below.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex items-center space-x-2">
                 <Checkbox
                     id="filter-quick-turnaround"
@@ -540,7 +534,6 @@ export default function EventsPage() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Disciplines</SelectItem>
-                        <SelectItem value="Video">Video Only</SelectItem>
                         <SelectItem value="Photography">Photography Only</SelectItem>
                     </SelectContent>
                 </Select>
@@ -558,7 +551,7 @@ export default function EventsPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="md:col-span-1">
+            <div className="lg:col-span-1">
               <Label htmlFor="filter-specific-dates">Filter by Specific Dates</Label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -741,9 +734,7 @@ export default function EventsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
-                            <SelectItem value="Video">Video</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
-                            <SelectItem value="Both">Both</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
@@ -812,7 +803,7 @@ export default function EventsPage() {
                     defaultValue={[]}
                     render={({ field }) => (
                       <div className="space-y-2">
-                        {initialPersonnelMock.map((person) => (
+                        {initialPersonnelMock.filter(p=> p.role !== "Client").map((person) => ( // Filter out 'Client' role
                           <div key={person.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`person-${person.id}`}
@@ -832,7 +823,7 @@ export default function EventsPage() {
                             </Label>
                           </div>
                         ))}
-                        {initialPersonnelMock.length === 0 && <p className="text-muted-foreground text-xs">No personnel in system. Add them via Personnel page.</p>}
+                        {initialPersonnelMock.filter(p=> p.role !== "Client").length === 0 && <p className="text-muted-foreground text-xs">No personnel in system. Add them via Personnel page.</p>}
                       </div>
                     )}
                   />

@@ -52,15 +52,19 @@ export type Personnel = PersonnelFormData & {
   id: string;
 };
 
+export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client"] as const;
+
+
 // Initial Mock data
 export const initialPersonnelMock: Personnel[] = [
-  { id: "user001", name: "Alice Wonderland", role: "Lead Camera Operator", status: "Available", avatar: "https://placehold.co/40x40.png" },
-  { id: "user002", name: "Bob The Builder", role: "Audio Engineer", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
-  { id: "user003", name: "Charlie Chaplin", role: "Producer", status: "Available", avatar: "https://placehold.co/40x40.png" },
-  { id: "user004", name: "Diana Prince", role: "Drone Pilot", status: "On Leave", avatar: "https://placehold.co/40x40.png" },
-  { id: "user005", name: "Edward Scissorhands", role: "Grip", status: "Assigned" },
-  { id: "user006", name: "Fiona Gallagher", role: "Coordinator", status: "Available" },
-  { id: "user007", name: "George Jetson", role: "Tech Lead", status: "Assigned" },
+  { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png" },
+  { id: "user002", name: "Bob The Builder", role: "Editor", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
+  { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png" },
+  { id: "user004", name: "Diana Prince", role: "Photographer", status: "On Leave", avatar: "https://placehold.co/40x40.png" },
+  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned" },
+  { id: "user006", name: "Fiona Gallagher", role: "Project Manager", status: "Available" },
+  { id: "user007", name: "George Jetson", role: "Photographer", status: "Assigned" },
+  { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
 ];
 // --- End Personnel Definitions ---
 
@@ -90,7 +94,7 @@ export default function PersonnelPage() {
     resolver: zodResolver(personnelSchema),
     defaultValues: {
       name: "",
-      role: "",
+      role: "Photographer",
       avatar: "",
       status: "Available",
     },
@@ -108,7 +112,7 @@ export default function PersonnelPage() {
     } else {
       reset({
         name: "",
-        role: "",
+        role: "Photographer",
         avatar: "",
         status: "Available",
       });
@@ -235,7 +239,22 @@ export default function PersonnelPage() {
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="role" className="text-right">Role</Label>
                 <div className="col-span-3">
-                  <Input id="role" {...register("role")} className={errors.role ? "border-destructive" : ""} />
+                  <Controller
+                    name="role"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <SelectTrigger className={errors.role ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PHOTOGRAPHY_ROLES.map(role => (
+                            <SelectItem key={role} value={role}>{role}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   {errors.role && <p className="text-xs text-destructive mt-1">{errors.role.message}</p>}
                 </div>
               </div>
@@ -440,16 +459,16 @@ export default function PersonnelPage() {
               <div>
                 <h4 className="font-semibold text-sm mb-2">Available Team Members</h4>
                 <ul className="space-y-1 text-xs">
-                  {initialPersonnelMock.slice(0, 3).map(p => <li key={`assign-avail-${p.id}`} className="p-1.5 bg-background rounded-sm shadow-sm">{p.name} ({p.role})</li>)}
+                  {initialPersonnelMock.filter(p=>p.role !== "Client").slice(0, 3).map(p => <li key={`assign-avail-${p.id}`} className="p-1.5 bg-background rounded-sm shadow-sm">{p.name} ({p.role})</li>)}
                    <li>... more</li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-semibold text-sm mb-2">Project Events / Roles</h4>
                  <ul className="space-y-1 text-xs">
-                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Main Stage - Day 1: Camera Op 1</li>
-                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Keynote Speech: Audio Lead</li>
-                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Workshop Alpha: Videographer</li>
+                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Opening Ceremony: Photographer 1</li>
+                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Keynote Address: Lead Photographer</li>
+                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Workshop Alpha: Roaming Photographer</li>
                   <li>... more</li>
                 </ul>
               </div>
@@ -471,14 +490,14 @@ export default function PersonnelPage() {
             </p>
             <div className="p-4 border rounded-md bg-muted/30 text-xs space-y-2">
               <div>
-                <p className="font-semibold">{initialPersonnelMock[0]?.name || "Team Member A"}:</p>
+                <p className="font-semibold">{initialPersonnelMock.find(p => p.role === "Photographer")?.name || "Photographer A"}:</p>
                 <ul className="list-disc list-inside pl-4">
                   <li>{(allEvents && allEvents.length > 0 && allEvents[0]?.name) || "Event Alpha"} ({(allEvents && allEvents.length > 0 && allEvents[0]?.date) || "YYYY-MM-DD"})</li>
                   <li>{(allEvents && allEvents.length > 3 && allEvents[3]?.name) || "Event Beta"} ({(allEvents && allEvents.length > 3 && allEvents[3]?.date) || "YYYY-MM-DD"})</li>
                 </ul>
               </div>
                <div>
-                <p className="font-semibold">{initialPersonnelMock[1]?.name || "Team Member B"}:</p>
+                <p className="font-semibold">{initialPersonnelMock.find(p => p.role === "Editor")?.name || "Editor B"}:</p>
                 <ul className="list-disc list-inside pl-4">
                    <li>{(allEvents && allEvents.length > 0 && allEvents[0]?.name) || "Event Alpha"} ({(allEvents && allEvents.length > 0 && allEvents[0]?.date) || "YYYY-MM-DD"})</li>
                    <li>{(allEvents && allEvents.length > 1 && allEvents[1]?.name) || "Event Gamma"} ({(allEvents && allEvents.length > 1 && allEvents[1]?.date) || "YYYY-MM-DD"})</li>
