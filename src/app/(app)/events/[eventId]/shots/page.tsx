@@ -34,10 +34,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { z } from "zod"; // Only import z
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal as shotRequestSchema } from "@/contexts/EventContext"; // Import schema from context
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal as shotRequestSchema } from "@/contexts/EventContext";
 
 
 export default function ShotListPage() {
@@ -70,8 +69,8 @@ export default function ShotListPage() {
     handleSubmit,
     reset,
     control,
-    watch, // Import watch
-    setValue, // Import setValue
+    watch, 
+    setValue, 
     formState: { errors },
   } = useForm<ShotRequestFormData>({
     resolver: zodResolver(shotRequestSchema), 
@@ -129,7 +128,7 @@ export default function ShotListPage() {
             description: "",
             shotType: "Medium",
             priority: "Medium",
-            status: "Planned",
+            status: "Planned", // Default for new shots
             notes: "",
             blockedReason: "",
           });
@@ -150,7 +149,7 @@ export default function ShotListPage() {
 
     let dataToSubmit = { ...data };
     if (data.status !== "Blocked") {
-      dataToSubmit.blockedReason = ""; // Clear reason if not blocked
+      dataToSubmit.blockedReason = ""; 
     }
 
 
@@ -167,13 +166,13 @@ export default function ShotListPage() {
         description: `"${dataToSubmit.description.substring(0,30)}..." has been added.`,
       });
     }
-    refreshShotRequests(); // Refresh list from context
+    refreshShotRequests(); 
     closeShotModal();
   };
   
   const openAddShotModal = () => {
     setEditingShotRequest(null);
-    reset({ // Explicitly reset form for "add" mode
+    reset({ 
       description: "",
       shotType: "Medium",
       priority: "Medium",
@@ -186,7 +185,7 @@ export default function ShotListPage() {
 
   const openEditShotModal = (shot: ShotRequest) => {
     setEditingShotRequest(shot);
-     reset({ // Pre-fill form for "edit" mode
+     reset({ 
       description: shot.description,
       shotType: shot.shotType,
       priority: shot.priority,
@@ -211,7 +210,7 @@ export default function ShotListPage() {
     if (shotRequestToDeleteId && eventId) {
       const shot = currentShotRequests.find(sr => sr.id === shotRequestToDeleteId);
       deleteShotRequest(eventId, shotRequestToDeleteId);
-      refreshShotRequests(); // Refresh list from context
+      refreshShotRequests(); 
       toast({
         title: "Shot Request Deleted",
         description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
@@ -228,16 +227,23 @@ export default function ShotListPage() {
     if (shotToUpdate) {
       const updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
       if (newStatus !== "Blocked") {
-        updatePayload.blockedReason = ""; // Clear reason if not blocked
+        updatePayload.blockedReason = ""; 
       }
-      // If changing TO "Blocked", we don't prompt for reason here, it's done in edit modal.
-      // For inline status change, we assume reason will be added via edit if needed.
       updateShotRequest(eventId, shotId, updatePayload);
       refreshShotRequests(); 
       toast({
         title: "Status Updated",
         description: `Shot status changed to "${newStatus}".`,
       });
+
+      if (newStatus === "Request More") {
+        toast({
+          title: "Notification Simulated",
+          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to the assigned user.`,
+          variant: "default",
+          duration: 5000,
+        });
+      }
     }
   };
 
@@ -259,7 +265,7 @@ export default function ShotListPage() {
     );
   }
 
-  const shotStatuses: ShotRequestFormData['status'][] = ["Planned", "Assigned", "Captured", "Reviewed", "Blocked", "Completed"];
+  const shotStatuses: ShotRequestFormData['status'][] = ["Planned", "Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
 
 
   return (
@@ -461,11 +467,13 @@ export default function ShotListPage() {
                             className="w-full justify-center"
                             variant={
                                 shot.status === "Captured" ? "default" :
-                                shot.status === "Reviewed" ? "default" :
+                                shot.status === "Reviewed" ? "default" : // Keep for now, workflow can refine this
                                 shot.status === "Planned" ? "outline" :
+                                shot.status === "Unassigned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
-                                shot.status === "Completed" ? "default" : // Adjusted for Completed
+                                shot.status === "Request More" ? "destructive" : // Or a specific "warning" yellow if available
+                                shot.status === "Completed" ? "default" : 
                                 "outline"
                             }
                             >
@@ -481,9 +489,11 @@ export default function ShotListPage() {
                                 s === "Captured" ? "default" :
                                 s === "Reviewed" ? "default" :
                                 s === "Planned" ? "outline" :
+                                s === "Unassigned" ? "outline" :
                                 s === "Assigned" ? "secondary" :
                                 s === "Blocked" ? "destructive" :
-                                s === "Completed" ? "default" : // Adjusted for Completed
+                                s === "Request More" ? "destructive" :
+                                s === "Completed" ? "default" : 
                                 "outline"
                                 }
                               >
@@ -521,3 +531,4 @@ export default function ShotListPage() {
   );
 }
     
+
