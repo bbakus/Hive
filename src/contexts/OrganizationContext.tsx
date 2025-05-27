@@ -11,27 +11,24 @@ export type Organization = {
 
 type OrganizationContextType = {
   organizations: Organization[];
-  selectedOrganizationId: string | null; // null represents "All My Organizations"
+  selectedOrganizationId: string | null; 
   setSelectedOrganizationId: (orgId: string | null) => void;
   selectedOrganization: Organization | null;
-  isLoadingOrganizations: boolean; // In a real app, this would manage async loading
+  isLoadingOrganizations: boolean; 
 };
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
-// Mock data - in a real app, this would come from an API based on user authentication
 const initialMockOrganizations: Organization[] = [
-  { id: "org_g9e", name: "G9e" },
-  { id: "org_damion_hamilton", name: "Damion Hamilton Photographer" },
-  { id: "org_other_client", name: "Another Creative Co." },
+  { id: "org_g9e", name: "G9e Productions" },
 ];
 
-export const ALL_ORGANIZATIONS_ID = null; // Using null to represent all
+export const ALL_ORGANIZATIONS_ID = null; 
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organizations] = useState<Organization[]>(initialMockOrganizations);
-  const [selectedOrganizationId, setSelectedOrganizationIdState] = useState<string | null>(ALL_ORGANIZATIONS_ID);
-  const [isLoadingOrganizations] = useState<boolean>(false); // Simulate no loading for mock data
+  const [selectedOrganizationId, setSelectedOrganizationIdState] = useState<string | null>("org_g9e"); // Default to G9e
+  const [isLoadingOrganizations] = useState<boolean>(false); 
 
   const setSelectedOrganizationId = useCallback((orgId: string | null) => {
     setSelectedOrganizationIdState(orgId);

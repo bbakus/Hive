@@ -4,9 +4,9 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useSettingsContext } from './SettingsContext';
-import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext'; // Import Organization context
+import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
+import { format, subDays, addDays } from 'date-fns';
 
-// Define project structure
 export type KeyPersonnel = {
   personnelId: string;
   name: string;
@@ -45,81 +45,18 @@ type ProjectContextType = {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-const initialMockProjects: Project[] = [
+const getInitialMockProjects = (): Project[] => [
   {
-    id: "proj001",
-    name: "Summer Music Festival 2024",
-    startDate: "2024-06-01",
-    endDate: "2024-08-31",
+    id: "proj_g9e_summit_2024",
+    name: "G9e Annual Summit 2024",
+    startDate: format(subDays(new Date(), 1), "yyyy-MM-dd"), 
+    endDate: format(addDays(new Date(), 2), "yyyy-MM-dd"),   
     status: "In Progress",
-    description: "Annual summer music festival featuring diverse artists.",
-    location: "Central Park, New York",
+    description: "Comprehensive photographic coverage of the G9e Annual Summit 2024 over 4 days, involving 4 key photographers.",
+    location: "Grand Conference Center, Metropolis",
     keyPersonnel: [
-      { personnelId: "user001", name: "Alice Wonderland", projectRole: "Festival Director" },
-      { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Production Manager" },
-    ],
-    organizationId: "org_g9e",
-    createdByUserId: "user_admin_demo",
-  },
-  {
-    id: "proj002",
-    name: "Tech Conference X",
-    startDate: "2024-09-15",
-    endDate: "2024-09-17",
-    status: "Planning",
-    description: "Major technology conference showcasing new innovations.",
-    location: "Moscone Center, San Francisco",
-    keyPersonnel: [
-      { personnelId: "user002", name: "Bob The Builder", projectRole: "Lead Organizer" }
-    ],
-    organizationId: "org_damion_hamilton",
-    createdByUserId: "user_admin_demo",
-  },
-  {
-    id: "proj003",
-    name: "Corporate Gala Dinner",
-    startDate: "2024-11-05",
-    endDate: "2024-11-05",
-    status: "Completed",
-    description: "Annual corporate fundraising gala.",
-    location: "The Grand Ballroom",
-    keyPersonnel: [],
-    organizationId: "org_g9e",
-    createdByUserId: "user_admin_demo",
-  },
-  {
-    id: "proj004",
-    name: "Oracle Cloud World Wrap-up",
-    startDate: "2024-10-01",
-    endDate: "2024-10-31",
-    status: "Planning",
-    description: "Post-event content production for Oracle Cloud World.",
-    location: "Remote",
-    organizationId: "org_g9e",
-    createdByUserId: "user_admin_demo",
-  },
-  {
-    id: "proj005",
-    name: "ServiceNow Knowledge On-Site",
-    startDate: "2025-05-10",
-    endDate: "2025-05-15",
-    status: "Planning",
-    description: "Event coverage for ServiceNow Knowledge conference.",
-    location: "Las Vegas Convention Center",
-    organizationId: "org_damion_hamilton",
-    createdByUserId: "user_admin_demo",
-  },
-  {
-    id: "proj_g9e_summit",
-    name: "G9e Corporate Summit 2024",
-    startDate: "2024-08-01",
-    endDate: "2024-08-04",
-    status: "Planning",
-    description: "Multi-day corporate summit for G9e, requiring extensive photographic coverage.",
-    location: "Grand Hyatt, San Diego",
-    keyPersonnel: [
-        { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Lead Producer" },
-        { personnelId: "user006", name: "Fiona Gallagher", projectRole: "Production Coordinator" }
+      { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Project Manager" },
+      { personnelId: "user005", name: "Edward Scissorhands", projectRole: "Lead Editor" },
     ],
     organizationId: "org_g9e",
     createdByUserId: "user_admin_demo",
@@ -129,23 +66,29 @@ const initialMockProjects: Project[] = [
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { selectedOrganizationId } = useOrganizationContext(); // Consume OrganizationContext
+  const { selectedOrganizationId } = useOrganizationContext(); 
 
-  const [allProjects, setAllProjects] = useState<Project[]>([]); // Holds all projects regardless of org filter
+  const [allProjects, setAllProjects] = useState<Project[]>([]); 
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
   useEffect(() => {
     if (!isLoadingSettings) {
-      const loadedProjects = useDemoData ? initialMockProjects : [];
+      const loadedProjects = useDemoData ? getInitialMockProjects() : [];
       setAllProjects(loadedProjects);
+      if (loadedProjects.length > 0) {
+        // Default selection to the new single project if demo data is on
+        setSelectedProjectIdState(loadedProjects[0].id);
+      } else {
+        setSelectedProjectIdState(null);
+      }
       setIsLoadingProjects(false);
     }
   }, [useDemoData, isLoadingSettings]);
 
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
-      return allProjects;
+      return allProjects; // Should ideally be empty or one if only G9e exists
     }
     return allProjects.filter(p => p.organizationId === selectedOrganizationId);
   }, [allProjects, selectedOrganizationId]);
@@ -169,14 +112,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setAllProjects((prevProjects) => {
       const newProject: Project = {
         ...projectData,
-        id: `proj${String(prevProjects.length + initialMockProjects.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+        id: `proj${String(prevProjects.length + getInitialMockProjects().length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
         keyPersonnel: projectData.keyPersonnel || [],
         organizationId: organizationId,
         createdByUserId: userId,
       };
-      return [...prevProjects, newProject];
+      const updatedProjects = [...prevProjects, newProject];
+       // If this is the first project for the currently selected org (or for "All Orgs" if applicable), select it.
+      const currentOrgProjects = selectedOrganizationId === ALL_ORGANIZATIONS_ID 
+                                ? updatedProjects 
+                                : updatedProjects.filter(p => p.organizationId === selectedOrganizationId);
+      if (currentOrgProjects.length === 1 || (currentOrgProjects.length > 0 && selectedProjectId === null) ) {
+        setSelectedProjectIdState(newProject.id);
+      }
+      return updatedProjects;
     });
-  }, []);
+  }, [selectedOrganizationId, selectedProjectId]);
 
   const updateProject = useCallback((projectId: string, projectData: Partial<ProjectFormData>) => {
     setAllProjects((prevProjects) =>
@@ -190,11 +141,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setAllProjects((prevProjects) =>
       prevProjects.filter((proj) => proj.id !== projectId)
     );
-    // If the deleted project was the selected one, reset selection
     if (selectedProjectId === projectId) {
-        setSelectedProjectIdState(null); // Will be auto-selected to first in list by the other useEffect
+        const remainingOrgProjects = projectsForSelectedOrg.filter(p => p.id !== projectId);
+        setSelectedProjectIdState(remainingOrgProjects.length > 0 ? remainingOrgProjects[0].id : null);
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, projectsForSelectedOrg]);
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId) return null;
@@ -204,7 +155,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     selectedProjectId,
     setSelectedProjectId: setSelectedProjectIdState,
-    projects: projectsForSelectedOrg, // Provide filtered projects
+    projects: projectsForSelectedOrg, 
     addProject,
     updateProject,
     deleteProject,

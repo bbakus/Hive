@@ -38,10 +38,9 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useEventContext, type Event } from "@/contexts/EventContext"; 
-import { useProjectContext } from "@/contexts/ProjectContext"; // Import ProjectContext
+import { useProjectContext } from "@/contexts/ProjectContext"; 
 import { format, parseISO } from "date-fns";
 
-// --- Personnel Definitions ---
 const personnelSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters." }),
   role: z.string().min(2, { message: "Role must be at least 2 characters." }),
@@ -58,19 +57,16 @@ export type Personnel = PersonnelFormData & {
 
 export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client"] as const;
 
-
-// Initial Mock data
 export const initialPersonnelMock: Personnel[] = [
   { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN12345A" },
   { id: "user002", name: "Bob The Builder", role: "Photographer", status: "Assigned", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN98765E"},
   { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN67890B" },
-  { id: "user004", name: "Diana Prince", role: "Photographer", status: "On Leave", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN11223F" },
+  { id: "user004", name: "Diana Prince", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN11223F" },
   { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", cameraSerial: "SN24680C" },
-  { id: "user006", name: "Fiona Gallagher", role: "Project Manager", status: "Available", cameraSerial: "SN13579D" },
-  { id: "user007", name: "George Jetson", role: "Editor", status: "Assigned" },
+  { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", cameraSerial: "SN13579D" },
+  // { id: "user007", name: "George Jetson", role: "Editor", status: "Assigned" }, // No camera serial by default
   { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
 ];
-// --- End Personnel Definitions ---
 
 export default function PersonnelPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
@@ -131,13 +127,13 @@ export default function PersonnelPage() {
   }, [editingPersonnel, reset, isPersonnelModalOpen]);
 
   useEffect(() => {
-    if (selectedEventForAssignment) {
+    if (selectedEventForAssignment && !isLoadingEvents) {
       const event = getEventById(selectedEventForAssignment);
       setEventDetailsForAssignment(event || null);
     } else {
       setEventDetailsForAssignment(null);
     }
-  }, [selectedEventForAssignment, getEventById]);
+  }, [selectedEventForAssignment, getEventById, isLoadingEvents]);
 
   const handlePersonnelSubmit: SubmitHandler<PersonnelFormData> = (data) => {
     if (editingPersonnel) {
@@ -202,7 +198,7 @@ export default function PersonnelPage() {
     if (!isLoadingEvents && allEvents) { 
         assignedEvents = allEvents.filter(event => 
             event.assignedPersonnelIds?.includes(person.id)
-        );
+        ).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     setEventsForSelectedPersonnelInModal(assignedEvents);
     setIsViewScheduleModalOpen(true);
@@ -234,7 +230,6 @@ export default function PersonnelPage() {
     const updatedEventData = { assignedPersonnelIds: newAssignedPersonnelIds };
     updateEvent(eventDetailsForAssignment.id, updatedEventData);
     
-    // Optimistically update local state for immediate UI feedback
     setEventDetailsForAssignment(prev => prev ? {...prev, assignedPersonnelIds: newAssignedPersonnelIds} : null);
 
     const person = personnelList.find(p => p.id === personnelId);
@@ -263,7 +258,6 @@ export default function PersonnelPage() {
         </Button>
       </div>
 
-      {/* Add/Edit Personnel Modal */}
       <Dialog open={isPersonnelModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closePersonnelModal(); else setIsPersonnelModalOpen(true);
       }}>
@@ -350,7 +344,6 @@ export default function PersonnelPage() {
           </DialogContent>
         </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -366,14 +359,13 @@ export default function PersonnelPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* View Schedule Modal */}
       {viewingScheduleForPersonnel && (
         <Dialog open={isViewScheduleModalOpen} onOpenChange={setIsViewScheduleModalOpen}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Schedule for {viewingScheduleForPersonnel.name}</DialogTitle>
               <DialogDescription>
-                List of events {viewingScheduleForPersonnel.name} is assigned to.
+                List of events {viewingScheduleForPersonnel.name} is assigned to. Sorted by date.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 max-h-[60vh] overflow-y-auto">
@@ -482,10 +474,6 @@ export default function PersonnelPage() {
                         <CalendarDays className="h-4 w-4" />
                         <span className="sr-only">View Schedule</span>
                       </Button>
-                       <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">Assign to Event (deprecated here)</span>
-                      </Button>
                       <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditPersonnelModal(member)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
@@ -531,7 +519,7 @@ export default function PersonnelPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {eventsForSelectedProjectAndOrg.map(event => (
-                        <SelectItem key={event.id} value={event.id}>{event.name} ({format(parseISO(event.date), "MMM d")})</SelectItem>
+                        <SelectItem key={event.id} value={event.id}>{event.name} ({event.date ? format(parseISO(event.date), "MMM d") : "N/A"})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -577,14 +565,15 @@ export default function PersonnelPage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</CardTitle>
-            <CardDescription>View team member schedules and event commitments across all projects.</CardDescription>
+            <CardDescription>View team member schedules and event commitments across all projects. Sorted by date.</CardDescription>
           </CardHeader>
           <CardContent>
             {personnelList.filter(p => p.role !== "Client").length === 0 && <p className="text-sm text-muted-foreground">No team members (excluding Clients) to visualize schedules for.</p>}
-            <ScrollArea className="h-[26rem]"> {/* Approx height of assignment card content */}
+            <ScrollArea className="h-[26rem]">
               <div className="space-y-4">
                 {personnelList.filter(p => p.role !== "Client").map(person => {
-                  const assignments = allEvents.filter(event => event.assignedPersonnelIds?.includes(person.id));
+                  const assignments = allEvents.filter(event => event.assignedPersonnelIds?.includes(person.id))
+                                      .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                   return (
                     <div key={`schedule-vis-${person.id}`}>
                       <h4 className="font-semibold text-sm mb-1">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></h4>
@@ -592,7 +581,7 @@ export default function PersonnelPage() {
                         <ul className="list-disc list-inside pl-4 space-y-1 text-xs">
                           {assignments.map(event => (
                             <li key={`assign-event-${event.id}-${person.id}`}>
-                              <span className="font-medium">{event.name}</span> ({event.project ? `${event.project}, ` : ''}{format(parseISO(event.date), "MMM d, yyyy")})
+                              <span className="font-medium">{event.name}</span> ({event.project ? `${event.project}, ` : ''}{event.date ? format(parseISO(event.date), "MMM d, yyyy") : 'N/A'})
                             </li>
                           ))}
                         </ul>
