@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { useProjectContext, type Project } from './ProjectContext';
+import { useProjectContext } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
 import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
@@ -18,7 +18,9 @@ export const shotRequestSchemaInternal = z.object({
   assignedPersonnelId: z.string().optional(),
   notes: z.string().optional(),
   blockedReason: z.string().optional(),
-  capturedById: z.string().optional(), // New field
+  initialCapturerId: z.string().optional(),
+  lastStatusModifierId: z.string().optional(),
+  lastStatusModifiedAt: z.string().optional(), // ISO Date String
 });
 
 export type ShotRequestFormData = z.infer<typeof shotRequestSchemaInternal>;
@@ -32,29 +34,30 @@ export type Event = EventTypeDefinition;
 
 
 export const initialShotRequestsMock: ShotRequest[] = [
-  // Existing evt001 shots
-  { id: "sr001", eventId: "evt001", description: "Opening wide shot of festival grounds, as gates open", priority: "High", status: "Unassigned", notes: "Get this as gates open" },
-  { id: "sr002", eventId: "evt001", description: "Close-up of headline act performance, key moments", priority: "Critical", status: "Assigned", assignedPersonnelId: "user001" },
+  // evt001 shots
+  { id: "sr001", eventId: "evt001", description: "Opening wide shot of festival grounds, as gates open", priority: "High", status: "Assigned", assignedPersonnelId: "user001", notes: "Get this as gates open" },
+  { id: "sr002", eventId: "evt001", description: "Close-up of headline act performance, key moments", priority: "Critical", status: "Captured", assignedPersonnelId: "user001", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date(Date.now() - 3600000).toISOString() },
   { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various angles, B-Roll style", priority: "Medium", status: "Unassigned" },
-  // Existing evt002 shots
-  { id: "sr004", eventId: "evt002", description: "Speaker on stage - wide and medium compositions", priority: "High", status: "Captured", capturedById: "user003" },
+  // evt002 shots
+  { id: "sr004", eventId: "evt002", description: "Speaker on stage - wide and medium compositions", priority: "High", status: "Completed", initialCapturerId: "user003", lastStatusModifierId: "user002", lastStatusModifiedAt: new Date(Date.now() - 7200000).toISOString() }, // Captured by user003, completed by user002 (editor)
   { id: "sr006", eventId: "evt002", description: "Audience listening during keynote - medium shots", priority: "Medium", status: "Assigned", assignedPersonnelId: "user007" },
-  // Existing evt004 shots
+  // evt004 shots
   { id: "sr007", eventId: "evt004", description: "Workshop interaction shots - candid B-Roll", priority: "Medium", status: "Unassigned" },
-  { id: "sr008", eventId: "evt004", description: "Group photo after session, well-lit portrait style", priority: "Medium", status: "Completed", capturedById: "user004" },
-  // Existing evt005 shots
-  { id: "sr009", eventId: "evt005", description: "Action shot of product demo, focus on product features", priority: "High", status: "Captured", capturedById: "user001"},
-  // Existing evt006 shots
+  { id: "sr008", eventId: "evt004", description: "Group photo after session, well-lit portrait style", priority: "Medium", status: "Completed", initialCapturerId: "user004", lastStatusModifierId: "user004", lastStatusModifiedAt: new Date().toISOString() },
+  // evt005 shots
+  { id: "sr009", eventId: "evt005", description: "Action shot of product demo, focus on product features", priority: "High", status: "Captured", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
+  // evt006 shots
   { id: "sr011", eventId: "evt006", description: "Venue ambiance shots before event, wide establishing shots", priority: "Medium", status: "Unassigned"},
-  { id: "sr012", eventId: "evt006", description: "Specific requested portrait of VIP - talent unavailable", priority: "High", status: "Blocked", blockedReason: "Talent was not available at scheduled time."},
-  // Shots for dynamically created "today" events (from previous step, ensure they have eventIds)
-  { id: "sr_today_completed_1", eventId: "evt_today_completed_dynamic", description: "Dynamic completed shot: Morning ambiance", priority: "Medium", status: "Completed", capturedById: "user001" },
-  { id: "sr_today_completed_2", eventId: "evt_today_completed_dynamic", description: "Dynamic completed shot: Setup details", priority: "Low", status: "Completed", capturedById: "user001" },
-  { id: "sr_today_inprogress_1", eventId: "evt_today_inprogress_dynamic", description: "Dynamic in-progress: Speaker A main angle", priority: "High", status: "Captured", assignedPersonnelId: "user002", capturedById: "user002" },
-  { id: "sr_today_inprogress_2", eventId: "evt_today_inprogress_dynamic", description: "Dynamic in-progress: Audience reactions", priority: "Medium", status: "Assigned" },
-  { id: "sr_today_inprogress_3", eventId: "evt_today_inprogress_dynamic", description: "Dynamic in-progress: Q&A Wide shot", priority: "Medium", status: "Unassigned" },
-  { id: "sr_today_upcoming_1", eventId: "evt_today_upcoming_dynamic", description: "Dynamic upcoming: Product reveal shot", priority: "Critical", status: "Assigned", assignedPersonnelId: "user004" },
-  { id: "sr_today_upcoming_2", eventId: "evt_today_upcoming_dynamic", description: "Dynamic upcoming: CEO handshake", priority: "High", status: "Unassigned" },
+  { id: "sr012", eventId: "evt006", description: "Specific requested portrait of VIP", priority: "High", status: "Blocked", blockedReason: "Talent was not available at scheduled time.", lastStatusModifierId: "user003", lastStatusModifiedAt: new Date().toISOString()},
+  
+  // Shots for dynamically created "today" events
+  { id: "sr_today_completed_1_new", eventId: "evt_today_completed_dynamic_new", description: "Morning ambiance", priority: "Medium", status: "Completed", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr_today_completed_2_new", eventId: "evt_today_completed_dynamic_new", description: "Setup details", priority: "Low", status: "Completed", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr_today_inprogress_1_new", eventId: "evt_today_inprogress_dynamic_new", description: "Speaker A main angle", priority: "High", status: "Captured", assignedPersonnelId: "user002", initialCapturerId: "user002", lastStatusModifierId: "user002", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr_today_inprogress_2_new", eventId: "evt_today_inprogress_dynamic_new", description: "Audience reactions", priority: "Medium", status: "Assigned", assignedPersonnelId: "user002" },
+  { id: "sr_today_inprogress_3_new", eventId: "evt_today_inprogress_dynamic_new", description: "Q&A Wide shot", priority: "Medium", status: "Unassigned" },
+  { id: "sr_today_upcoming_1_new", eventId: "evt_today_upcoming_dynamic_new", description: "Product reveal shot", priority: "Critical", status: "Assigned", assignedPersonnelId: "user004" },
+  { id: "sr_today_upcoming_2_new", eventId: "evt_today_upcoming_dynamic_new", description: "CEO handshake", priority: "High", status: "Unassigned" },
 ];
 
 
@@ -75,7 +78,6 @@ const generateG9eSummitEvents = (): Event[] => {
       const afternoonEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter + 1}`;
       const eveningEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter + 200}`;
 
-
       const morningDiscipline = disciplines[(dayIndex + photographerIndex) % disciplines.length];
       const afternoonDiscipline = disciplines[(dayIndex + photographerIndex + 1) % disciplines.length];
       const eveningDiscipline = disciplines[(dayIndex + photographerIndex + 2) % disciplines.length];
@@ -94,7 +96,7 @@ const generateG9eSummitEvents = (): Event[] => {
         organizationId: g9eOrgId,
         discipline: morningDiscipline,
         isQuickTurnaround: (dayIndex + photographerIndex) % 3 === 0,
-        deadline: (dayIndex + photographerIndex) % 3 === 0 ? `${day}T18:00:00` : undefined,
+        deadline: (dayIndex + photographerIndex) % 3 === 0 ? `${day}T18:00:00Z` : undefined,
         isCovered: true,
       });
       eventIdCounter++;
@@ -174,12 +176,12 @@ const generateG9eSummitEvents = (): Event[] => {
 };
 
 const initialBaseEvents: Event[] = [
-    { id: "evt001", name: "Music Festival - Main Stage Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00:00", organizationId: "org_g9e", discipline: "Photography", isCovered: true },
-    { id: "evt002", name: "Tech Conference Keynote", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 2, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00:00", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
+    { id: "evt001", name: "Music Festival - Main Stage Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 3, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00:00Z", organizationId: "org_g9e", discipline: "Photography", isCovered: true },
+    { id: "evt002", name: "Tech Conference Keynote", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00:00Z", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
     { id: "evt003", name: "Gala Dinner - Client Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: false },
-    { id: "evt004", name: "Festival Artist Portraits", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 2, assignedPersonnelIds: ["user004"], organizationId: "org_g9e", discipline: "Photography", isCovered: true },
-    { id: "evt005", name: "Tech Conference Closing Remarks", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 1, assignedPersonnelIds: ["user001", "user003"], isQuickTurnaround: true, deadline: "2024-09-17T23:59:00", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
-    { id: "evt006", name: "Festival Workshop Photography", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 2, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Photography", isCovered: true},
+    { id: "evt004", name: "Festival Artist Portraits", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004"], organizationId: "org_g9e", discipline: "Photography", isCovered: true },
+    { id: "evt005", name: "Tech Conference Closing Remarks", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003"], isQuickTurnaround: true, deadline: "2024-09-17T23:59:00Z", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
+    { id: "evt006", name: "Festival Workshop Photography", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 1, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Photography", isCovered: true},
 ];
 
 const getInitialEventsWithDynamicToday = (useDemo: boolean): Event[] => {
@@ -192,33 +194,32 @@ const getInitialEventsWithDynamicToday = (useDemo: boolean): Event[] => {
 
   const dynamicTodayEvents: Event[] = [
     {
-      id: "evt_today_completed_dynamic", name: "Demo: Recently Completed Shoot", projectId: "proj001", project: "Summer Music Festival 2024",
+      id: "evt_today_completed_dynamic_new", name: "Completed Shoot (Demo)", projectId: "proj001", project: "Summer Music Festival 2024",
       date: todayStr, time: `${format(subHours(now, 2), "HH:mm")} - ${format(subHours(now, 1), "HH:mm")}`, priority: "Medium", deliverables: 1,
-      shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_completed_dynamic").length, 
+      shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_completed_dynamic_new").length, 
       assignedPersonnelIds: ["user001"],
       isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: true,
     },
     {
-      id: "evt_today_inprogress_dynamic", name: "Demo: Current Live Shoot", projectId: "proj001", project: "Summer Music Festival 2024",
+      id: "evt_today_inprogress_dynamic_new", name: "Live Shoot (Demo)", projectId: "proj001", project: "Summer Music Festival 2024",
       date: todayStr, time: `${format(subHours(now, 0.5), "HH:mm")} - ${format(addHours(now, 0.5), "HH:mm")}`, priority: "High", deliverables: 2,
-      shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_inprogress_dynamic").length, 
+      shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_inprogress_dynamic_new").length, 
       assignedPersonnelIds: ["user002", "user003"],
-      isQuickTurnaround: true, deadline: format(addHours(now, 4), "yyyy-MM-dd'T'HH:mm:ss"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
+      isQuickTurnaround: true, deadline: format(addHours(now, 4), "yyyy-MM-dd'T'HH:mm:ssX"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
     },
     {
-      id: "evt_today_upcoming_dynamic", name: "Demo: Upcoming Photo Session Today", projectId: "proj001", project: "Summer Music Festival 2024",
+      id: "evt_today_upcoming_dynamic_new", name: "Upcoming Session (Demo)", projectId: "proj001", project: "Summer Music Festival 2024",
       date: todayStr, time: `${format(addHours(now, 1), "HH:mm")} - ${format(addHours(now, 2), "HH:mm")}`, priority: "Critical", deliverables: 0,
-      shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_upcoming_dynamic").length, 
+      shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_upcoming_dynamic_new").length, 
       assignedPersonnelIds: ["user004", "user005"],
-      isQuickTurnaround: true, deadline: format(addHours(now, 6), "yyyy-MM-dd'T'HH:mm:ss"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
+      isQuickTurnaround: true, deadline: format(addHours(now, 6), "yyyy-MM-dd'T'HH:mm:ssX"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
     }
   ];
 
   let combinedEvents = [...baseEvents, ...dynamicTodayEvents];
-  // Ensure all events have their shotRequests count correctly initialized from the global mock
   combinedEvents = combinedEvents.map(event => ({
     ...event,
-    shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === event.id).length
+    shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === event.id).length,
   }));
 
   return combinedEvents;
@@ -257,13 +258,18 @@ export function EventProvider({ children }: { children: ReactNode }) {
       const loadedShotsByEvent: Record<string, ShotRequest[]> = {};
       
       initialShotRequestsMock.forEach(shot => {
+        const cleanShot = { ...shot };
+        // Clean up description prefixes if any (one-time cleanup)
+        if (cleanShot.description.startsWith("Dynamic in-progress: ") || cleanShot.description.startsWith("Dynamic completed shot: ") || cleanShot.description.startsWith("Dynamic upcoming: ")) {
+          cleanShot.description = cleanShot.description.split(": ")[1] || cleanShot.description;
+        }
+
         if (!loadedShotsByEvent[shot.eventId]) {
           loadedShotsByEvent[shot.eventId] = [];
         }
-        loadedShotsByEvent[shot.eventId].push(shot);
+        loadedShotsByEvent[shot.eventId].push(cleanShot);
       });
       
-      // Ensure shotRequests count on events is accurate from the start
       loadedEvents = loadedEvents.map(event => ({
         ...event,
         shotRequests: loadedShotsByEvent[event.id]?.length || 0,
@@ -283,9 +289,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
         ...eventData,
         id: `evt${String(prevEvents.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
         project: projectForEvent?.name || "Unknown Project",
-        deliverables: 0,
-        shotRequests: 0,
-        hasOverlap: false,
+        deliverables: 0, // Typically initialized to 0
+        shotRequests: 0, // Initialized to 0, managed by shot request functions
+        hasOverlap: false, // Recalculated on display
         organizationId: eventData.organizationId || projectForEvent?.organizationId || "",
         discipline: eventData.discipline || "",
         isCovered: eventData.isCovered === undefined ? true : eventData.isCovered,
@@ -303,7 +309,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         if (evt.id === eventId) {
             const updatedEvent = { ...evt, ...eventData };
             if (projectName) updatedEvent.project = projectName;
-            if (orgId !== undefined) updatedEvent.organizationId = orgId; // Ensure orgId can be updated
+            if (orgId !== undefined) updatedEvent.organizationId = orgId;
             if (eventData.discipline !== undefined) updatedEvent.discipline = eventData.discipline;
             if (eventData.isCovered !== undefined) updatedEvent.isCovered = eventData.isCovered;
             return updatedEvent;
@@ -334,7 +340,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
       id: `sr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       eventId: eventId,
       assignedPersonnelId: shotData.assignedPersonnelId || undefined,
-      capturedById: shotData.capturedById || undefined,
+      initialCapturerId: shotData.initialCapturerId || undefined,
+      lastStatusModifierId: shotData.lastStatusModifierId || undefined,
+      lastStatusModifiedAt: shotData.lastStatusModifiedAt || new Date().toISOString(),
     };
     setShotRequestsByEventId(prev => ({
       ...prev,
@@ -348,31 +356,50 @@ export function EventProvider({ children }: { children: ReactNode }) {
   const updateShotRequest = useCallback((eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => {
     setShotRequestsByEventId(prev => {
       const eventShots = prev[eventId] || [];
-      let newEventShots = eventShots.map(shot =>
-        shot.id === shotId ? { ...shot, ...updatedData } : shot
-      );
+      const newEventShots = eventShots.map(shot => {
+        if (shot.id === shotId) {
+          const newShotData = { ...shot, ...updatedData };
+          // Ensure lastStatusModifiedAt is always updated on any change
+          newShotData.lastStatusModifiedAt = new Date().toISOString(); 
 
-      const targetShot = newEventShots.find(s => s.id === shotId);
-      if (targetShot && targetShot.status !== "Blocked" && targetShot.blockedReason) {
-         newEventShots = newEventShots.map(shot =>
-          shot.id === shotId ? { ...shot, blockedReason: "" } : shot // Clear reason if not blocked
-        );
-      }
-       if (targetShot && (targetShot.status !== "Captured" && targetShot.status !== "Completed") && targetShot.capturedById) {
-        newEventShots = newEventShots.map(shot =>
-          shot.id === shotId ? { ...shot, capturedById: undefined } : shot // Clear capturedBy if not captured/completed
-        );
-      }
-      if (targetShot && updatedData.assignedPersonnelId === "") {
-        newEventShots = newEventShots.map(shot =>
-          shot.id === shotId ? { ...shot, assignedPersonnelId: undefined } : shot
-        );
-      }
+          // Clear blockedReason if status is not Blocked
+          if (newShotData.status !== "Blocked" && newShotData.blockedReason) {
+            newShotData.blockedReason = "";
+          }
+          // If specific assignment is cleared (set to empty string by select), make it undefined
+          if (newShotData.assignedPersonnelId === "") {
+            newShotData.assignedPersonnelId = undefined;
+          }
+          
+          // Logic for initialCapturerId and lastStatusModifierId
+          const oldStatus = shot.status;
+          const newStatus = newShotData.status;
 
-      return {
-        ...prev,
-        [eventId]: newEventShots,
-      };
+          if ((newStatus === "Captured" || newStatus === "Completed") && 
+              (oldStatus !== "Captured" && oldStatus !== "Completed")) {
+            // First time capturing or completing
+            if (!newShotData.initialCapturerId && updatedData.initialCapturerId) { // If explicitly provided by prompt
+              newShotData.initialCapturerId = updatedData.initialCapturerId;
+            }
+            newShotData.lastStatusModifierId = newShotData.initialCapturerId || updatedData.lastStatusModifierId; // Default to initial capturer
+          } else if (newStatus !== "Captured" && newStatus !== "Completed") {
+            // If moving away from captured/completed to other states, modifier is whoever changed it
+             if (updatedData.lastStatusModifierId) { // If explicitly provided by prompt
+                newShotData.lastStatusModifierId = updatedData.lastStatusModifierId;
+             }
+          } else if ((newStatus === "Captured" || newStatus === "Completed") && (oldStatus === "Captured" || oldStatus === "Completed")) {
+            // Re-capturing or just re-confirming completion. Modifier is the current actor.
+            if (updatedData.lastStatusModifierId) {
+                newShotData.lastStatusModifierId = updatedData.lastStatusModifierId;
+            }
+          }
+
+
+          return newShotData;
+        }
+        return shot;
+      });
+      return { ...prev, [eventId]: newEventShots };
     });
   }, []);
 
@@ -412,7 +439,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     allEvents: allEventsState,
-    eventsForSelectedProjectAndOrg: eventsForSelectedProjectAndOrg || [], // Ensure it's always an array
+    eventsForSelectedProjectAndOrg: eventsForSelectedProjectAndOrg || [],
     addEvent,
     updateEvent,
     deleteEvent,
@@ -442,3 +469,4 @@ export function useEventContext() {
   }
   return context;
 }
+

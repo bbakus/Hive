@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User, CheckCircle, Info } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal } from "@/contexts/EventContext";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
+import { format, parseISO } from "date-fns";
 
 
 export default function ShotListPage() {
@@ -65,6 +66,10 @@ export default function ShotListPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Hardcoded current user for status modification tracking (replace with actual auth user ID)
+  const MOCK_CURRENT_USER_ID = "user_admin_ops"; 
+  const MOCK_CURRENT_USER_NAME = "Ops Admin";
+
   const {
     register,
     handleSubmit,
@@ -82,7 +87,9 @@ export default function ShotListPage() {
       assignedPersonnelId: "",
       notes: "",
       blockedReason: "",
-      capturedById: "",
+      initialCapturerId: "",
+      lastStatusModifierId: "",
+      lastStatusModifiedAt: "",
     },
   });
 
@@ -97,13 +104,13 @@ export default function ShotListPage() {
 
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
-      setEvent(undefined); // Indicate loading or inability to load
+      setEvent(undefined); 
       setCurrentShotRequests([]);
       return;
     }
 
     const foundEvent = getEventById(eventId);
-    setEvent(foundEvent || null); // Set to null if not found after loading
+    setEvent(foundEvent || null); 
 
     if (foundEvent) {
       refreshShotRequests();
@@ -124,17 +131,21 @@ export default function ShotListPage() {
             assignedPersonnelId: editingShotRequest.assignedPersonnelId || "",
             notes: editingShotRequest.notes || "",
             blockedReason: editingShotRequest.blockedReason || "",
-            capturedById: editingShotRequest.capturedById || "",
+            initialCapturerId: editingShotRequest.initialCapturerId || "",
+            lastStatusModifierId: editingShotRequest.lastStatusModifierId || "",
+            lastStatusModifiedAt: editingShotRequest.lastStatusModifiedAt || "",
           });
         } else {
-          reset({ // Default for new shot
+          reset({ 
             description: "",
             priority: "Medium",
             status: "Unassigned",
             assignedPersonnelId: "",
             notes: "",
             blockedReason: "",
-            capturedById: "",
+            initialCapturerId: "",
+            lastStatusModifierId: "",
+            lastStatusModifiedAt: "",
           });
         }
     }
@@ -142,10 +153,7 @@ export default function ShotListPage() {
 
   useEffect(() => {
     if (watchedStatus !== "Blocked") {
-      setValue("blockedReason", "");
-    }
-    if (watchedStatus !== "Captured" && watchedStatus !== "Completed") {
-      setValue("capturedById", ""); // Clear capturedBy if status is not Captured or Completed
+      setValue("blockedReason", ""); // Clear reason if not blocked
     }
   }, [watchedStatus, setValue]);
 
@@ -153,28 +161,38 @@ export default function ShotListPage() {
   const handleShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
     if (!eventId) return;
 
-    let dataToSubmit = { ...data };
-    if (data.status !== "Blocked") {
-      dataToSubmit.blockedReason = "";
-    }
-     if (data.status !== "Captured" && data.status !== "Completed") {
-      dataToSubmit.capturedById = undefined;
+    let dataToSubmit: Partial<ShotRequestFormData> = { ...data };
+     if (data.status !== "Blocked") {
+        dataToSubmit.blockedReason = "";
     }
     if (data.assignedPersonnelId === "") { 
         dataToSubmit.assignedPersonnelId = undefined;
     }
+    // The initialCapturerId is managed by status changes, not directly by the form for now
+    // lastStatusModifierId and lastStatusModifiedAt will be set by the update logic
 
     if (editingShotRequest) {
-      updateShotRequest(eventId, editingShotRequest.id, dataToSubmit);
+      // Preserve existing initialCapturerId if it's there and not being explicitly changed via status
+      dataToSubmit.initialCapturerId = editingShotRequest.initialCapturerId || data.initialCapturerId;
+      
+      updateShotRequest(eventId, editingShotRequest.id, {
+          ...dataToSubmit,
+          lastStatusModifierId: MOCK_CURRENT_USER_ID, // Assume current user is making the edit
+          lastStatusModifiedAt: new Date().toISOString(),
+      });
       toast({
         title: "Shot Request Updated",
-        description: `"${dataToSubmit.description.substring(0,30)}..." has been updated.`,
+        description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
     } else {
-      addShotRequest(eventId, dataToSubmit);
+      addShotRequest(eventId, {
+        ...data, // data already conforms to ShotRequestFormData
+        lastStatusModifierId: MOCK_CURRENT_USER_ID, // Assume current user is adding
+        lastStatusModifiedAt: new Date().toISOString(),
+      });
       toast({
         title: "Shot Request Added",
-        description: `"${dataToSubmit.description.substring(0,30)}..." has been added.`,
+        description: `"${data.description.substring(0,30)}..." has been added.`,
       });
     }
     refreshShotRequests();
@@ -190,7 +208,9 @@ export default function ShotListPage() {
       assignedPersonnelId: "",
       notes: "",
       blockedReason: "",
-      capturedById: "",
+      initialCapturerId: "",
+      lastStatusModifierId: "",
+      lastStatusModifiedAt: "",
     });
     setIsShotModalOpen(true);
   };
@@ -204,7 +224,9 @@ export default function ShotListPage() {
       assignedPersonnelId: shot.assignedPersonnelId || "",
       notes: shot.notes || "",
       blockedReason: shot.blockedReason || "",
-      capturedById: shot.capturedById || "",
+      initialCapturerId: shot.initialCapturerId || "",
+      lastStatusModifierId: shot.lastStatusModifierId || "",
+      lastStatusModifiedAt: shot.lastStatusModifiedAt || "",
     });
     setIsShotModalOpen(true);
   };
@@ -234,48 +256,64 @@ export default function ShotListPage() {
     setIsShotDeleteDialogOpen(false);
   };
 
-  const handleStatusChange = (shotId: string, newStatus: ShotRequestFormData['status']) => {
+  const handleStatusChange = (shotId: string, newStatus: ShotRequest['status']) => {
     if (!eventId) return;
     const shotToUpdate = currentShotRequests.find(sr => sr.id === shotId);
     if (shotToUpdate) {
-      let updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
+      let updatePayload: Partial<ShotRequestFormData> = { 
+        status: newStatus,
+        lastStatusModifierId: MOCK_CURRENT_USER_ID, // Current user making the change
+        lastStatusModifiedAt: new Date().toISOString(),
+      };
 
       if (newStatus !== "Blocked") {
-        updatePayload.blockedReason = "";
+        updatePayload.blockedReason = ""; // Clear reason if not blocked
       }
-       if (newStatus !== "Captured" && newStatus !== "Completed") {
-        updatePayload.capturedById = undefined;
-      }
-
-      if (newStatus === "Captured" || newStatus === "Completed") {
-        const defaultCaptureUser = shotToUpdate.assignedPersonnelId || event?.assignedPersonnelIds?.[0] || "";
-        const capturedBy = window.prompt("Enter ID of photographer who captured this shot:", defaultCaptureUser);
-        if (capturedBy !== null) { // If user clicks OK (even if empty)
-          updatePayload.capturedById = capturedBy || undefined; // Store empty string as undefined
-        } else { // User clicked cancel, so don't change status or capturedBy
-          return;
+      
+      // Logic for initialCapturerId
+      if ((newStatus === "Captured" || newStatus === "Completed")) {
+        if (!shotToUpdate.initialCapturerId) { // Only set initial capturer if it's not already set
+            const capturer = window.prompt(`Who captured shot: "${shotToUpdate.description.substring(0,50)}..."?`, shotToUpdate.assignedPersonnelId || event?.assignedPersonnelIds?.[0] || MOCK_CURRENT_USER_ID);
+            if (capturer !== null) {
+                updatePayload.initialCapturerId = capturer || undefined;
+                if (!updatePayload.lastStatusModifierId) { // If status directly set to captured by someone
+                  updatePayload.lastStatusModifierId = capturer || undefined;
+                }
+            } else {
+                return; // User cancelled prompt
+            }
+        } else { // Shot was previously captured, now re-captured or marked completed by someone else
+            const modifier = window.prompt(`Status changed to ${newStatus}. Confirm modifier/re-capturer for shot: "${shotToUpdate.description.substring(0,50)}..."`, MOCK_CURRENT_USER_ID);
+             if (modifier !== null) {
+                updatePayload.lastStatusModifierId = modifier || undefined;
+            } else {
+                return; // User cancelled prompt
+            }
         }
+      } else { // Status is not Captured or Completed
+        // initialCapturerId is retained if it was set previously.
+        // lastStatusModifierId is already set to MOCK_CURRENT_USER_ID
       }
       
       updateShotRequest(eventId, shotId, updatePayload);
       refreshShotRequests();
       toast({
         title: "Status Updated",
-        description: `Shot status changed to "${newStatus}". ${updatePayload.capturedById ? 'Captured by ' + getPersonnelNameById(updatePayload.capturedById) : ''}`,
+        description: `Shot status changed to "${newStatus}".`,
       });
 
       if (newStatus === "Request More") {
         const assignedPersonName = shotToUpdate.assignedPersonnelId
           ? getPersonnelNameById(shotToUpdate.assignedPersonnelId)
           : (event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
-              ? getPersonnelNameById(event.assignedPersonnelIds[0]) // just take the first for demo
+              ? getPersonnelNameById(event.assignedPersonnelIds[0]) 
               : "team");
 
         toast({
           title: "Notification Simulated",
-          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to ${assignedPersonName || "the assigned user/team"}.`,
+          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to ${getPersonnelNameById(updatePayload.lastStatusModifierId) || MOCK_CURRENT_USER_NAME} (modifier) and/or ${assignedPersonName || "the assigned user/team"}.`,
           variant: "default",
-          duration: 5000,
+          duration: 7000,
         });
       }
     }
@@ -288,7 +326,7 @@ export default function ShotListPage() {
 
   const getPersonnelNameById = (id?: string) : string => {
     if (!id) return "Unknown";
-    return initialPersonnelMock.find(p => p.id === id)?.name || "Unknown";
+    return initialPersonnelMock.find(p => p.id === id)?.name || "Unknown User";
   };
 
 
@@ -491,15 +529,22 @@ export default function ShotListPage() {
                     <TableCell className="font-medium max-w-xs">
                         <p className="truncate" title={shot.description}>{shot.description}</p>
                         {shot.status === "Blocked" && shot.blockedReason && (
-                            <p className="text-xs text-destructive mt-1" title={shot.blockedReason}>
-                            <AlertTriangle className="inline-block h-3.5 w-3.5 mr-1 align-text-bottom" />
+                            <p className="text-xs text-destructive mt-1 flex items-center gap-1" title={shot.blockedReason}>
+                            <AlertTriangle className="h-3.5 w-3.5" />
                             Blocked: {shot.blockedReason.substring(0, 50)}{shot.blockedReason.length > 50 ? "..." : ""}
                             </p>
                         )}
-                        {(shot.status === "Captured" || shot.status === "Completed") && shot.capturedById && (
+                        {shot.initialCapturerId && (
                              <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
                                 <CheckCircle className="h-3.5 w-3.5" />
-                                Captured by: {getPersonnelNameById(shot.capturedById)}
+                                Initially Captured by: {getPersonnelNameById(shot.initialCapturerId)}
+                             </p>
+                        )}
+                        {shot.lastStatusModifierId && (shot.lastStatusModifierId !== shot.initialCapturerId || (shot.status !== "Captured" && shot.status !== "Completed")) && (
+                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                                <Info className="h-3.5 w-3.5" />
+                                Last update: {getPersonnelNameById(shot.lastStatusModifierId)}
+                                {shot.lastStatusModifiedAt ? ` on ${format(parseISO(shot.lastStatusModifiedAt), "MMM d, p")}`: ""}
                              </p>
                         )}
                     </TableCell>
@@ -521,7 +566,7 @@ export default function ShotListPage() {
                             <span className="text-muted-foreground italic">
                                 {event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
                                 ? `Event Team (${event.assignedPersonnelIds.map(id => getPersonnelNameById(id)).join(', ')})`
-                                : "Event Team"}
+                                : "Event Team (Unassigned)"}
                             </span>
                         )}
                     </TableCell>
@@ -539,7 +584,7 @@ export default function ShotListPage() {
                                 shot.status === "Unassigned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
-                                shot.status === "Request More" ? "destructive" : // Or a different warning color
+                                shot.status === "Request More" ? "destructive" : 
                                 "outline"
                             }
                             >
@@ -557,7 +602,7 @@ export default function ShotListPage() {
                                 s === "Unassigned" ? "outline" :
                                 s === "Assigned" ? "secondary" :
                                 s === "Blocked" ? "destructive" :
-                                s === "Request More" ? "destructive" : // Or a different warning color
+                                s === "Request More" ? "destructive" : 
                                 "outline"
                                 }
                               >
@@ -594,3 +639,4 @@ export default function ShotListPage() {
     </div>
   );
 }
+
