@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare, Camera } from "lucide-react";
+import { UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare, Camera, ListChecks } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,12 +30,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useEventContext, type Event } from "@/contexts/EventContext"; 
+import { useProjectContext } from "@/contexts/ProjectContext"; // Import ProjectContext
 import { format, parseISO } from "date-fns";
 
 // --- Personnel Definitions ---
@@ -59,19 +62,21 @@ export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "
 // Initial Mock data
 export const initialPersonnelMock: Personnel[] = [
   { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN12345A" },
-  { id: "user002", name: "Bob The Builder", role: "Editor", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
+  { id: "user002", name: "Bob The Builder", role: "Photographer", status: "Assigned", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN98765E"},
   { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN67890B" },
-  { id: "user004", name: "Diana Prince", role: "Photographer", status: "On Leave", avatar: "https://placehold.co/40x40.png" },
+  { id: "user004", name: "Diana Prince", role: "Photographer", status: "On Leave", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN11223F" },
   { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", cameraSerial: "SN24680C" },
-  { id: "user006", name: "Fiona Gallagher", role: "Project Manager", status: "Available" },
-  { id: "user007", name: "George Jetson", role: "Photographer", status: "Assigned", cameraSerial: "SN13579D" },
+  { id: "user006", name: "Fiona Gallagher", role: "Project Manager", status: "Available", cameraSerial: "SN13579D" },
+  { id: "user007", name: "George Jetson", role: "Editor", status: "Assigned" },
   { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
 ];
 // --- End Personnel Definitions ---
 
 export default function PersonnelPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { allEvents, isLoadingEvents } = useEventContext(); 
+  const { allEvents, isLoadingEvents, getEventById, updateEvent, eventsForSelectedProjectAndOrg } = useEventContext(); 
+  const { selectedProject } = useProjectContext();
+
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
@@ -80,10 +85,13 @@ export default function PersonnelPage() {
   
   const [isViewScheduleModalOpen, setIsViewScheduleModalOpen] = useState(false);
   const [viewingScheduleForPersonnel, setViewingScheduleForPersonnel] = useState<Personnel | null>(null);
-  const [eventsForSelectedPersonnel, setEventsForSelectedPersonnel] = useState<Event[]>([]);
+  const [eventsForSelectedPersonnelInModal, setEventsForSelectedPersonnelInModal] = useState<Event[]>([]);
 
   const [filterText, setFilterText] = useState("");
   const { toast } = useToast();
+
+  const [selectedEventForAssignment, setSelectedEventForAssignment] = useState<string | null>(null);
+  const [eventDetailsForAssignment, setEventDetailsForAssignment] = useState<Event | null>(null);
 
   const {
     register,
@@ -121,6 +129,15 @@ export default function PersonnelPage() {
       });
     }
   }, [editingPersonnel, reset, isPersonnelModalOpen]);
+
+  useEffect(() => {
+    if (selectedEventForAssignment) {
+      const event = getEventById(selectedEventForAssignment);
+      setEventDetailsForAssignment(event || null);
+    } else {
+      setEventDetailsForAssignment(null);
+    }
+  }, [selectedEventForAssignment, getEventById]);
 
   const handlePersonnelSubmit: SubmitHandler<PersonnelFormData> = (data) => {
     if (editingPersonnel) {
@@ -187,7 +204,7 @@ export default function PersonnelPage() {
             event.assignedPersonnelIds?.includes(person.id)
         );
     }
-    setEventsForSelectedPersonnel(assignedEvents);
+    setEventsForSelectedPersonnelInModal(assignedEvents);
     setIsViewScheduleModalOpen(true);
   };
 
@@ -202,9 +219,34 @@ export default function PersonnelPage() {
     );
   }, [personnelList, filterText]);
 
+  const handleAssignmentToggle = (personnelId: string, isAssigned: boolean) => {
+    if (!eventDetailsForAssignment) return;
+
+    let newAssignedPersonnelIds = [...(eventDetailsForAssignment.assignedPersonnelIds || [])];
+    if (isAssigned) {
+      if (!newAssignedPersonnelIds.includes(personnelId)) {
+        newAssignedPersonnelIds.push(personnelId);
+      }
+    } else {
+      newAssignedPersonnelIds = newAssignedPersonnelIds.filter(id => id !== personnelId);
+    }
+    
+    const updatedEventData = { assignedPersonnelIds: newAssignedPersonnelIds };
+    updateEvent(eventDetailsForAssignment.id, updatedEventData);
+    
+    // Optimistically update local state for immediate UI feedback
+    setEventDetailsForAssignment(prev => prev ? {...prev, assignedPersonnelIds: newAssignedPersonnelIds} : null);
+
+    const person = personnelList.find(p => p.id === personnelId);
+    toast({
+      title: "Assignment Updated",
+      description: `${person?.name || 'Team member'} ${isAssigned ? 'assigned to' : 'unassigned from'} ${eventDetailsForAssignment.name}.`,
+    });
+  };
+
 
   if (isLoadingSettings || isLoadingEvents) { 
-    return <div>Loading personnel data and event context...</div>;
+    return <div>Loading personnel data, event context, and project context...</div>;
   }
 
 
@@ -335,7 +377,7 @@ export default function PersonnelPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 max-h-[60vh] overflow-y-auto">
-              {eventsForSelectedPersonnel.length > 0 ? (
+              {eventsForSelectedPersonnelInModal.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -346,7 +388,7 @@ export default function PersonnelPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {eventsForSelectedPersonnel.map((event) => (
+                    {eventsForSelectedPersonnelInModal.map((event) => (
                       <TableRow key={event.id}>
                         <TableCell className="font-medium">{event.name}</TableCell>
                         <TableCell>{event.project}</TableCell>
@@ -442,7 +484,7 @@ export default function PersonnelPage() {
                       </Button>
                        <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
                         <Eye className="h-4 w-4" />
-                        <span className="sr-only">Assign to Event</span>
+                        <span className="sr-only">Assign to Event (deprecated here)</span>
                       </Button>
                       <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditPersonnelModal(member)}>
                         <Edit className="h-4 w-4" />
@@ -465,72 +507,107 @@ export default function PersonnelPage() {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-6">
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment Interface (Concept)</CardTitle>
-            <CardDescription>Assign team members based on availability and project needs.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment</CardTitle>
+            <CardDescription>
+              {selectedProject ? `Assign personnel to events for ${selectedProject.name}.` : "Select a project to assign personnel to its events."}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Future: This section will feature a visual interface to assign personnel to events and specific roles. 
-              Users will be able to see availability, skills, and current assignments to make informed decisions.
-            </p>
-            <div className="grid grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30 min-h-[200px]">
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Available Team Members</h4>
-                <ul className="space-y-1 text-xs">
-                  {initialPersonnelMock.filter(p=>p.role !== "Client").slice(0, 3).map(p => <li key={`assign-avail-${p.id}`} className="p-1.5 bg-background rounded-sm shadow-sm">{p.name} ({p.role})</li>)}
-                   <li>... more</li>
-                </ul>
+            { !selectedProject && <p className="text-muted-foreground text-sm">Please select a project from the main header to manage event assignments.</p>}
+            { selectedProject && eventsForSelectedProjectAndOrg.length === 0 && <p className="text-muted-foreground text-sm">No events found for {selectedProject.name} to assign personnel.</p>}
+            { selectedProject && eventsForSelectedProjectAndOrg.length > 0 && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <Label htmlFor="event-select-assignment">Select Event</Label>
+                  <Select
+                    value={selectedEventForAssignment || ""}
+                    onValueChange={(value) => setSelectedEventForAssignment(value || null)}
+                  >
+                    <SelectTrigger id="event-select-assignment">
+                      <SelectValue placeholder="Choose an event..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventsForSelectedProjectAndOrg.map(event => (
+                        <SelectItem key={event.id} value={event.id}>{event.name} ({format(parseISO(event.date), "MMM d")})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {eventDetailsForAssignment && (
+                  <ScrollArea className="h-72 border rounded-md p-3">
+                    <h4 className="text-sm font-medium mb-2">Assign team members to: <span className="text-accent">{eventDetailsForAssignment.name}</span></h4>
+                    <div className="space-y-2">
+                      {personnelList.filter(p => p.role !== "Client").map(person => {
+                        const isAssigned = eventDetailsForAssignment.assignedPersonnelIds?.includes(person.id);
+                        return (
+                          <div key={`assign-${person.id}-${eventDetailsForAssignment.id}`} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
+                            <div className="flex items-center gap-2">
+                               <Avatar className="h-7 w-7">
+                                <AvatarImage src={person.avatar || `https://placehold.co/40x40.png?text=${person.name.split(" ").map(n => n[0]).join("").toUpperCase()}`} alt={person.name} data-ai-hint="person avatar" />
+                                <AvatarFallback>{person.name.split(" ").map(n => n[0]).join("").toUpperCase()}</AvatarFallback>
+                               </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{person.name}</p>
+                                <p className="text-xs text-muted-foreground">{person.role}</p>
+                              </div>
+                            </div>
+                            <Checkbox
+                              checked={isAssigned}
+                              onCheckedChange={(checked) => handleAssignmentToggle(person.id, !!checked)}
+                              id={`assign-check-${person.id}-${eventDetailsForAssignment.id}`}
+                            />
+                          </div>
+                        );
+                      })}
+                      {personnelList.filter(p => p.role !== "Client").length === 0 && <p className="text-xs text-muted-foreground">No team members available for assignment (excluding Clients).</p>}
+                    </div>
+                  </ScrollArea>
+                )}
+                 {!eventDetailsForAssignment && selectedEventForAssignment && <p className="text-sm text-muted-foreground">Loading event details...</p>}
+                 {!selectedEventForAssignment && eventsForSelectedProjectAndOrg.length > 0 && <p className="text-sm text-muted-foreground">Select an event above to manage its team.</p>}
               </div>
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Project Events / Roles</h4>
-                 <ul className="space-y-1 text-xs">
-                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Opening Ceremony: Photographer 1</li>
-                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Keynote Address: Lead Photographer</li>
-                  <li className="p-1.5 bg-background rounded-sm shadow-sm">Workshop Alpha: Roaming Photographer</li>
-                  <li>... more</li>
-                </ul>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              (Conceptual UI: Drag-and-drop or selection-based assignment)
-            </p>
+            )}
           </CardContent>
         </Card>
+
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization (Concept)</CardTitle>
-            <CardDescription>Visualize team member schedules and event commitments.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</CardTitle>
+            <CardDescription>View team member schedules and event commitments across all projects.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Future: A visual timeline (e.g., Gantt chart or calendar view) will display team schedules, 
-              event assignments, and potential conflicts or overlaps.
-            </p>
-            <div className="p-4 border rounded-md bg-muted/30 text-xs space-y-2">
-              <div>
-                <p className="font-semibold">{initialPersonnelMock.find(p => p.role === "Photographer")?.name || "Photographer A"}:</p>
-                <ul className="list-disc list-inside pl-4">
-                  <li>{(allEvents && allEvents.length > 0 && allEvents[0]?.name) || "Event Alpha"} ({(allEvents && allEvents.length > 0 && allEvents[0]?.date) || "YYYY-MM-DD"})</li>
-                  <li>{(allEvents && allEvents.length > 3 && allEvents[3]?.name) || "Event Beta"} ({(allEvents && allEvents.length > 3 && allEvents[3]?.date) || "YYYY-MM-DD"})</li>
-                </ul>
+            {personnelList.filter(p => p.role !== "Client").length === 0 && <p className="text-sm text-muted-foreground">No team members (excluding Clients) to visualize schedules for.</p>}
+            <ScrollArea className="h-[26rem]"> {/* Approx height of assignment card content */}
+              <div className="space-y-4">
+                {personnelList.filter(p => p.role !== "Client").map(person => {
+                  const assignments = allEvents.filter(event => event.assignedPersonnelIds?.includes(person.id));
+                  return (
+                    <div key={`schedule-vis-${person.id}`}>
+                      <h4 className="font-semibold text-sm mb-1">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></h4>
+                      {assignments.length > 0 ? (
+                        <ul className="list-disc list-inside pl-4 space-y-1 text-xs">
+                          {assignments.map(event => (
+                            <li key={`assign-event-${event.id}-${person.id}`}>
+                              <span className="font-medium">{event.name}</span> ({event.project ? `${event.project}, ` : ''}{format(parseISO(event.date), "MMM d, yyyy")})
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">No events assigned.</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-               <div>
-                <p className="font-semibold">{initialPersonnelMock.find(p => p.role === "Editor")?.name || "Editor B"}:</p>
-                <ul className="list-disc list-inside pl-4">
-                   <li>{(allEvents && allEvents.length > 0 && allEvents[0]?.name) || "Event Alpha"} ({(allEvents && allEvents.length > 0 && allEvents[0]?.date) || "YYYY-MM-DD"})</li>
-                   <li>{(allEvents && allEvents.length > 1 && allEvents[1]?.name) || "Event Gamma"} ({(allEvents && allEvents.length > 1 && allEvents[1]?.date) || "YYYY-MM-DD"})</li>
-                </ul>
-              </div>
-              <p className="italic">... and so on for other team members.</p>
-            </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
-
     
