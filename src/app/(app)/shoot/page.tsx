@@ -19,11 +19,10 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-// Checkbox was removed as per previous request, direct buttons are used now
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox"; // Re-added for Quick Turnaround filter
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 
@@ -120,7 +119,7 @@ export default function ShootPage() {
     return { captured, total };
   }, [getShotRequestsForEvent]);
 
-  const handleShotAction = (eventId: string, shotId: string, action: "toggleCapture" | "toggleBlock") => {
+  const handleShotAction = (eventId: string, shotId: string, actionType: "toggleCapture" | "toggleBlock") => {
     const shots = getShotRequestsForEvent(eventId);
     const shotToUpdate = shots.find(s => s.id === shotId);
     if (!shotToUpdate) return;
@@ -128,15 +127,21 @@ export default function ShootPage() {
     let updatePayload: Partial<ShotRequestFormData> = {};
     const nowISO = new Date().toISOString();
 
-    if (action === "toggleCapture") {
-      if (shotToUpdate.status === "Captured" || shotToUpdate.status === "Completed") {
-        updatePayload.status = "Assigned";
+    if (actionType === 'toggleCapture') {
+      const oldStatus = shotToUpdate.status;
+      if (oldStatus === "Captured" || oldStatus === "Completed") {
+        updatePayload.status = "Assigned"; // Revert to Assigned
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
-        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain
+        // Retain initialCapturerId when un-capturing
+        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; 
       } else {
         updatePayload.status = "Captured";
-        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId || MOCK_CURRENT_USER_ID;
+        if (!shotToUpdate.initialCapturerId) {
+          updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
+        } else {
+          updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain if already set
+        }
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
       }
@@ -144,29 +149,40 @@ export default function ShootPage() {
         title: "Shot Status Updated",
         description: `Shot "${shotToUpdate.description.substring(0,30)}..." set to ${updatePayload.status}.`
       });
-    } else if (action === "toggleBlock") {
-      if (shotToUpdate.status === "Blocked") {
-        updatePayload.status = "Assigned"; 
-        updatePayload.blockedReason = "";
+    } else if (actionType === 'toggleBlock') {
+      const oldStatus = shotToUpdate.status;
+      if (oldStatus === "Blocked") {
+        updatePayload.status = "Assigned";
+        updatePayload.blockedReason = ""; // Clear the reason
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
+        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; 
         toast({
           title: "Shot Unblocked",
-          description: `Shot "${shotToUpdate.description.substring(0,30)}..." set to Assigned.`
+          description: `Shot "${shotToUpdate.description.substring(0,30)}..." status set to Assigned.`
         });
-      } else {
+      } else { // Trying to block the shot
         const reason = window.prompt("Please provide a reason for blocking this shot:");
-        if (reason !== null) { 
+
+        if (reason !== null && reason.trim() !== "") {
           updatePayload.status = "Blocked";
-          updatePayload.blockedReason = reason;
+          updatePayload.blockedReason = reason.trim();
           updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
           updatePayload.lastStatusModifiedAt = nowISO;
+          updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
           toast({
             title: "Shot Blocked",
-            description: `Shot "${shotToUpdate.description.substring(0,30)}..." Blocked. Reason: ${reason}`
+            description: `Shot "${shotToUpdate.description.substring(0,30)}..." Blocked. Reason: ${reason.trim()}`
           });
+        } else if (reason !== null && reason.trim() === "") {
+          toast({
+            title: "Block Reason Required",
+            variant: "destructive",
+            description: "A reason is required to block a shot. Status remains unchanged."
+          });
+          return; 
         } else {
-           toast({
+          toast({
             title: "Block Action Cancelled",
             variant: "default",
             description: "Shot status remains unchanged."
@@ -394,7 +410,7 @@ export default function ShootPage() {
                   {shotsForEvent.length > 0 ? (
                     <div className="space-y-1">
                       {shotsForEvent.map(shot => (
-                        <div key={shot.id} className="flex items-center gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
+                        <div key={shot.id} className="flex items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
                            <Badge
                              variant={
                                 shot.status === "Captured" ? "default" :
@@ -419,7 +435,7 @@ export default function ShootPage() {
                               onClick={() => handleShotAction(event.id, shot.id, 'toggleCapture')}
                               className="text-xs px-2 py-1 h-auto flex-grow-0"
                             >
-                              {shot.status === "Captured" || shot.status === "Completed" ? "Uncapture" : "Capture"}
+                              {(shot.status === "Captured" || shot.status === "Completed") ? "Uncapture" : "Capture"}
                             </Button>
                             <Button
                               variant={shot.status === "Blocked" ? "destructive" : "outline"}
