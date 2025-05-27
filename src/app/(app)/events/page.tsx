@@ -38,14 +38,14 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay } from "date-fns";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay, lightFormat } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event as EventContextEvent } from "@/contexts/EventContext"; // Renamed to avoid conflict
+import { useEventContext, type Event as EventContextEvent } from "@/contexts/EventContext"; 
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
@@ -81,8 +81,10 @@ export const eventSchema = z.object({
 
 export type EventFormData = z.infer<typeof eventSchema>;
 
-export type Event = EventContextEvent & { // Use the type from EventContext which now has organizationId
-  hasOverlap?: boolean; // Added by overlap checking logic
+export type Event = EventContextEvent & { 
+  hasOverlap?: boolean; 
+  organizationId?: string;
+  discipline?: "Photography" | "Video" | "Both" | "";
 };
 
 
@@ -114,28 +116,25 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 };
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.id === eventB.id) return false; // Don't compare an event with itself
+  if (eventA.id === eventB.id) return false; 
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; // Invalid time format
+  if (!timesA || !timesB) return false; 
 
-  // Basic time overlap check
+  
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  // Check for shared personnel if both events have personnel assigned
+  
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
   
-  // If one or both events have no personnel, overlap is still true if times clash (useful for general scheduling)
-  // However, for the specific "AlertTriangle" scenario, we care about shared personnel.
-  // If you want the triangle for ANY time overlap regardless of personnel, remove the personnel check block above.
-  return false; // Default to no "personnel-based" overlap if personnel checks don't apply
+  return false; 
 };
 
 
@@ -152,8 +151,7 @@ export function formatDeadline(deadlineString?: string): string | null {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80" />;
-  if (discipline === "Video") return <VideoIconLucide className="h-3.5 w-3.5 opacity-80" />;
-  if (discipline === "Both") return <><CameraIcon className="h-3.5 w-3.5 opacity-80" /><VideoIconLucide className="h-3.5 w-3.5 opacity-80 ml-0.5" /></>;
+  
   return null;
 };
 
@@ -243,7 +241,7 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
-              <SelectItem value="Video">Video Only</SelectItem>
+              
             </SelectContent>
           </Select>
         </div>
@@ -340,68 +338,69 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               </h3>
               <div className="space-y-4">
                 {dayEvents.map((event) => (
-                  <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-3 flex-row justify-between items-start gap-x-4">
-                      <div className="flex-grow min-w-0"> {/* Left side for Name and Project */}
+                  <Card key={event.id} className="shadow-md hover:shadow-lg transition-shadow">
+                    <div className="p-4 flex justify-between items-start gap-4">
+                      {/* Main Info Section - Left */}
+                      <div className="flex-grow space-y-1">
                         <CardTitle className="text-lg flex items-center gap-1.5">
                           {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0" title="Quick Turnaround"/>}
                           {getCoverageIcon(event.isCovered)}
                           <span className="truncate" title={event.name}>{event.name}</span>
                         </CardTitle>
-                        {!selectedProject && event.project && (
-                          <CardDescription className="text-xs mt-0.5 truncate" title={event.project}>
-                            Project: {event.project}
-                          </CardDescription>
-                        )}
+                        <div className="text-xs text-muted-foreground space-y-0.5">
+                            <p className="flex items-center gap-1">
+                                {event.time}
+                                {event.hasOverlap && <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
+                                <Badge variant={
+                                event.priority === "Critical" ? "destructive" :
+                                event.priority === "High" ? "secondary" :
+                                event.priority === "Medium" ? "outline" : "default"
+                                } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
+                            </p>
+                            {!selectedProject && event.project && (
+                            <p className="text-xs mt-0.5 truncate" title={event.project}>
+                                Project: {event.project}
+                            </p>
+                            )}
+                        </div>
+                        <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+                            {event.deadline && (
+                                <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                Deadline: {formatDeadline(event.deadline)}
+                                </p>
+                            )}
+                            {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
+                                <p className="flex items-center gap-1 whitespace-nowrap">
+                                <Users className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
+                                Assigned: {event.assignedPersonnelIds.length}
+                                </p>
+                            )}
+                            <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center gap-1 whitespace-nowrap">
+                                <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
+                                Shot Requests: {event.shotRequests}
+                            </Link>
+                            {event.discipline && (
+                                <p className="flex items-center gap-1 whitespace-nowrap">
+                                {getDisciplineIcon(event.discipline)}
+                                {event.discipline || "N/A"}
+                                </p>
+                            )}
+                            <p className="whitespace-nowrap">Deliverables: {event.deliverables}</p>
+                        </div>
                       </div>
-                      <div className="flex-shrink-0 text-right space-y-1"> {/* Right side for Priority and Time */}
-                        <Badge variant={
-                          event.priority === "Critical" ? "destructive" :
-                          event.priority === "High" ? "secondary" :
-                          event.priority === "Medium" ? "outline" : "default"
-                        } className="text-xs whitespace-nowrap">{event.priority}</Badge>
-                        <p className="text-sm text-muted-foreground flex items-center justify-end gap-1 whitespace-nowrap">
-                          {event.time}
-                          {event.hasOverlap && <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
-                        </p>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent className="pt-0 pb-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-                      {event.deadline && (
-                        <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                          Deadline: {formatDeadline(event.deadline)}
-                        </p>
-                      )}
-                      {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                        <p className="flex items-center gap-1 whitespace-nowrap">
-                          <Users className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
-                          Assigned: {event.assignedPersonnelIds.length}
-                        </p>
-                      )}
-                       <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center gap-1 whitespace-nowrap">
-                          <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
-                          Shot Requests: {event.shotRequests}
-                       </Link>
-                      {event.discipline && (
-                        <p className="flex items-center gap-1 whitespace-nowrap">
-                          {getDisciplineIcon(event.discipline)}
-                          {event.discipline || "N/A"}
-                        </p>
-                      )}
-                      <p className="whitespace-nowrap">Deliverables: {event.deliverables}</p>
-                    </CardContent>
 
-                    <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
-                        <Link href={`/events/${event.id}/shots`}>
-                          <Eye className="mr-2 h-4 w-4" /> Manage Shots
-                        </Link>
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
-                        <Edit className="mr-2 h-4 w-4" /> Edit Event
-                      </Button>
-                    </CardFooter>
+                      {/* Action Buttons - Right, Stacked */}
+                      <div className="flex flex-col gap-2 items-end flex-shrink-0">
+                        <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
+                          <Link href={`/events/${event.id}/shots`}>
+                            <Eye className="mr-2 h-4 w-4" /> Manage Shots
+                          </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
+                          <Edit className="mr-2 h-4 w-4" /> Edit Event
+                        </Button>
+                      </div>
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -590,7 +589,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], // Default to empty array
+    eventsForSelectedProjectAndOrg = [], 
     addEvent,
     updateEvent,
     deleteEvent,
@@ -607,8 +606,8 @@ export default function EventsPage() {
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
   const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
-  const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
   const [filterCoverageStatus, setFilterCoverageStatus] = useState<"all" | "covered" | "not_covered">("all");
+  const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
 
 
   const { toast } = useToast();
@@ -692,7 +691,7 @@ export default function EventsPage() {
 
   const displayableEvents = useMemo(() => {
     if (isLoadingContextEvents) return [];
-    let filtered = eventsForSelectedProjectAndOrg || [];
+    let filtered: Event[] = eventsForSelectedProjectAndOrg || [];
 
     if (filterQuickTurnaround) {
       filtered = filtered.filter(event => event.isQuickTurnaround);
@@ -715,12 +714,8 @@ export default function EventsPage() {
       filtered = filtered.filter(event => event.assignedPersonnelIds?.includes(filterAssignedMemberId));
     }
 
-    if (filterDiscipline !== "all") {
-        filtered = filtered.filter(event => {
-            if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
-            if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
-            return true; // if "all" or unknown filter value, include all
-        });
+    if (filterDiscipline === "Photography") {
+        filtered = filtered.filter(event => event.discipline === "Photography");
     }
     
     if (filterCoverageStatus !== "all") {
@@ -814,7 +809,7 @@ export default function EventsPage() {
 
     const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' > & { organizationId: string } = {
       ...data,
-      organizationId: data.organizationId || selectedProjInfo.organizationId, // Ensure organizationId is present
+      organizationId: data.organizationId || selectedProjInfo.organizationId, 
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
     };
@@ -822,10 +817,10 @@ export default function EventsPage() {
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        project: selectedProjInfo.name, // Ensure project name is updated if projectId changed
-        deliverables: editingEvent.deliverables, // Preserve these counts
-        shotRequests: editingEvent.shotRequests, // Preserve these counts
-        personnelActivity: editingEvent.personnelActivity || data.personnelActivity || {}, // Preserve or update
+        project: selectedProjInfo.name, 
+        deliverables: editingEvent.deliverables, 
+        shotRequests: editingEvent.shotRequests, 
+        personnelActivity: editingEvent.personnelActivity || data.personnelActivity || {}, 
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -1076,8 +1071,6 @@ export default function EventsPage() {
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
-                            <SelectItem value="Video">Video</SelectItem>
-                            <SelectItem value="Both">Both</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
