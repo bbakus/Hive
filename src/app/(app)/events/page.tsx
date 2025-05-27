@@ -44,8 +44,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext } from "@/contexts/EventContext";
-import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
+import { useEventContext, type Event } from "@/contexts/EventContext";
+import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -80,9 +80,8 @@ export const eventSchema = z.object({
 
 export type EventFormData = z.infer<typeof eventSchema>;
 
-export type Event = import("@/contexts/EventContext").Event & { // Ensure this matches the context one
-  hasOverlap?: boolean;
-};
+// Event type definition is now primarily sourced from EventContext,
+// but we keep this here as EventFormData might be used locally for forms.
 
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
@@ -105,7 +104,7 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  if (isBefore(endDate, startDate) || (isSameDay(startDate, endDate) && endHour * 60 + endMinute === 0 && startHour * 60 + startMinute > 0) ){ // Handle overnight events crossing midnight, or ending at 00:00
+  if (isBefore(endDate, startDate) || (isSameDay(startDate, endDate) && endHour * 60 + endMinute === 0 && startHour * 60 + startMinute > 0) ){
     endDate = addHours(endDate, 24);
   }
   
@@ -129,7 +128,7 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
     return sharedPersonnel;
   }
 
-  return false;
+  return false; // No personnel overlap check if either event has no assigned personnel
 };
 
 
@@ -146,13 +145,12 @@ export function formatDeadline(deadlineString?: string): string | null {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
-  // Remove VideoIcon as we are focusing on photography
   return null;
 };
 
 const getCoverageIcon = (isCovered?: boolean) => {
   if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
-  return null; 
+  return <Eye className="h-3.5 w-3.5 text-muted-foreground/50 opacity-70" title="Not Covered" />;
 };
 
 
@@ -236,7 +234,6 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
-              {/* Removed "Video Only" and "Both" */}
             </SelectContent>
           </Select>
         </div>
@@ -331,7 +328,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               <h3 className="text-xl font-semibold mb-3 border-b pb-2">
                 {format(parseISO(date), "EEEE, MMMM do, yyyy")}
               </h3>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-4"> {/* Changed from grid to space-y-4 for full-width rows */}
                 {dayEvents.map((event) => (
                   <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
                     <CardHeader className="pb-3">
@@ -414,7 +411,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
   return (
     <Card className="shadow-lg mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
         <CardDescription>
           {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
           ({displayableEvents.length} events found)
@@ -575,7 +572,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], // Default to empty array
+    eventsForSelectedProjectAndOrg = [],
     addEvent,
     updateEvent,
     deleteEvent,
@@ -688,8 +685,6 @@ export default function EventsPage() {
       filtered = filtered.filter(event => {
         const times = parseEventTimes(event.date, event.time);
         if (!times) return false;
-        const eventDayStart = startOfDay(times.start);
-        const eventDayEnd = endOfDay(times.start); // Use event's date for end of day consistency
         
         if (filterTimeStatus === "upcoming") return isAfter(times.start, now);
         if (filterTimeStatus === "past") return isBefore(times.end, now);
@@ -704,8 +699,7 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
-        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both" || event.discipline === ""; // "" is considered N/A
-        // No other discipline types relevant for now as per photography focus
+        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both" || !event.discipline; // include if Photography, Both, or empty/N/A
         return true;
       });
     }
@@ -775,7 +769,6 @@ export default function EventsPage() {
   }, [displayableEvents]);
 
   const uniqueEventDatesForFilter = useMemo(() => {
-    // Use eventsForSelectedProjectAndOrg before other filters for date selection
     const dates = new Set((eventsForSelectedProjectAndOrg || []).map(event => event.date));
     return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   }, [eventsForSelectedProjectAndOrg]);
@@ -1070,7 +1063,6 @@ export default function EventsPage() {
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
-                            {/* Removed Video and Both */}
                           </SelectContent>
                         </Select>
                       )}
@@ -1099,7 +1091,7 @@ export default function EventsPage() {
                         render={({ field }) => (
                             <Checkbox
                             id="event-isCovered"
-                            checked={field.value}
+                            checked={field.value === undefined ? true : field.value} // Default to true if undefined
                             onCheckedChange={field.onChange}
                             className="mr-2"
                             />
