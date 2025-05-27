@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User } from 'lucide-react'; // Added User
+import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User, CheckCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -79,9 +79,10 @@ export default function ShotListPage() {
       description: "",
       priority: "Medium",
       status: "Unassigned",
-      assignedPersonnelId: "", // Default to empty string for "Event's Assigned Personnel"
+      assignedPersonnelId: "",
       notes: "",
       blockedReason: "",
+      capturedById: "",
     },
   });
 
@@ -96,13 +97,13 @@ export default function ShotListPage() {
 
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
-      setEvent(undefined);
+      setEvent(undefined); // Indicate loading or inability to load
       setCurrentShotRequests([]);
       return;
     }
 
     const foundEvent = getEventById(eventId);
-    setEvent(foundEvent || null);
+    setEvent(foundEvent || null); // Set to null if not found after loading
 
     if (foundEvent) {
       refreshShotRequests();
@@ -123,15 +124,17 @@ export default function ShotListPage() {
             assignedPersonnelId: editingShotRequest.assignedPersonnelId || "",
             notes: editingShotRequest.notes || "",
             blockedReason: editingShotRequest.blockedReason || "",
+            capturedById: editingShotRequest.capturedById || "",
           });
         } else {
-          reset({
+          reset({ // Default for new shot
             description: "",
             priority: "Medium",
             status: "Unassigned",
             assignedPersonnelId: "",
             notes: "",
             blockedReason: "",
+            capturedById: "",
           });
         }
     }
@@ -140,6 +143,9 @@ export default function ShotListPage() {
   useEffect(() => {
     if (watchedStatus !== "Blocked") {
       setValue("blockedReason", "");
+    }
+    if (watchedStatus !== "Captured" && watchedStatus !== "Completed") {
+      setValue("capturedById", ""); // Clear capturedBy if status is not Captured or Completed
     }
   }, [watchedStatus, setValue]);
 
@@ -151,10 +157,12 @@ export default function ShotListPage() {
     if (data.status !== "Blocked") {
       dataToSubmit.blockedReason = "";
     }
-    if (data.assignedPersonnelId === "") { // Ensure empty string becomes undefined
+     if (data.status !== "Captured" && data.status !== "Completed") {
+      dataToSubmit.capturedById = undefined;
+    }
+    if (data.assignedPersonnelId === "") { 
         dataToSubmit.assignedPersonnelId = undefined;
     }
-
 
     if (editingShotRequest) {
       updateShotRequest(eventId, editingShotRequest.id, dataToSubmit);
@@ -182,6 +190,7 @@ export default function ShotListPage() {
       assignedPersonnelId: "",
       notes: "",
       blockedReason: "",
+      capturedById: "",
     });
     setIsShotModalOpen(true);
   };
@@ -195,6 +204,7 @@ export default function ShotListPage() {
       assignedPersonnelId: shot.assignedPersonnelId || "",
       notes: shot.notes || "",
       blockedReason: shot.blockedReason || "",
+      capturedById: shot.capturedById || "",
     });
     setIsShotModalOpen(true);
   };
@@ -228,28 +238,42 @@ export default function ShotListPage() {
     if (!eventId) return;
     const shotToUpdate = currentShotRequests.find(sr => sr.id === shotId);
     if (shotToUpdate) {
-      const updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
+      let updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
+
       if (newStatus !== "Blocked") {
         updatePayload.blockedReason = "";
       }
+       if (newStatus !== "Captured" && newStatus !== "Completed") {
+        updatePayload.capturedById = undefined;
+      }
+
+      if (newStatus === "Captured" || newStatus === "Completed") {
+        const defaultCaptureUser = shotToUpdate.assignedPersonnelId || event?.assignedPersonnelIds?.[0] || "";
+        const capturedBy = window.prompt("Enter ID of photographer who captured this shot:", defaultCaptureUser);
+        if (capturedBy !== null) { // If user clicks OK (even if empty)
+          updatePayload.capturedById = capturedBy || undefined; // Store empty string as undefined
+        } else { // User clicked cancel, so don't change status or capturedBy
+          return;
+        }
+      }
+      
       updateShotRequest(eventId, shotId, updatePayload);
       refreshShotRequests();
       toast({
         title: "Status Updated",
-        description: `Shot status changed to "${newStatus}".`,
+        description: `Shot status changed to "${newStatus}". ${updatePayload.capturedById ? 'Captured by ' + getPersonnelNameById(updatePayload.capturedById) : ''}`,
       });
 
       if (newStatus === "Request More") {
-        // In a real app, you'd look up the assigned user. For now, it's a generic simulation.
-        const assignedPerson = shotToUpdate.assignedPersonnelId
-          ? initialPersonnelMock.find(p => p.id === shotToUpdate.assignedPersonnelId)?.name
+        const assignedPersonName = shotToUpdate.assignedPersonnelId
+          ? getPersonnelNameById(shotToUpdate.assignedPersonnelId)
           : (event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
-              ? initialPersonnelMock.find(p => p.id === event.assignedPersonnelIds![0])?.name // just take the first for demo
+              ? getPersonnelNameById(event.assignedPersonnelIds[0]) // just take the first for demo
               : "team");
 
         toast({
           title: "Notification Simulated",
-          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to ${assignedPerson || "the assigned user/team"}.`,
+          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to ${assignedPersonName || "the assigned user/team"}.`,
           variant: "default",
           duration: 5000,
         });
@@ -262,7 +286,8 @@ export default function ShotListPage() {
     return initialPersonnelMock.filter(person => event.assignedPersonnelIds!.includes(person.id));
   }, [event]);
 
-  const getPersonnelNameById = (id: string) => {
+  const getPersonnelNameById = (id?: string) : string => {
+    if (!id) return "Unknown";
     return initialPersonnelMock.find(p => p.id === id)?.name || "Unknown";
   };
 
@@ -285,7 +310,7 @@ export default function ShotListPage() {
     );
   }
 
-  const shotStatuses: ShotRequestFormData['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
+  const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
 
 
   return (
@@ -471,6 +496,12 @@ export default function ShotListPage() {
                             Blocked: {shot.blockedReason.substring(0, 50)}{shot.blockedReason.length > 50 ? "..." : ""}
                             </p>
                         )}
+                        {(shot.status === "Captured" || shot.status === "Completed") && shot.capturedById && (
+                             <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                Captured by: {getPersonnelNameById(shot.capturedById)}
+                             </p>
+                        )}
                     </TableCell>
                     <TableCell>
                        <Badge variant={
@@ -489,7 +520,7 @@ export default function ShotListPage() {
                         ) : (
                             <span className="text-muted-foreground italic">
                                 {event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
-                                ? `Event Team (${event.assignedPersonnelIds.length})`
+                                ? `Event Team (${event.assignedPersonnelIds.map(id => getPersonnelNameById(id)).join(', ')})`
                                 : "Event Team"}
                             </span>
                         )}
@@ -497,7 +528,7 @@ export default function ShotListPage() {
                     <TableCell>
                       <Select
                         value={shot.status}
-                        onValueChange={(newStatus) => handleStatusChange(shot.id, newStatus as ShotRequestFormData['status'])}
+                        onValueChange={(newStatus) => handleStatusChange(shot.id, newStatus as ShotRequest['status'])}
                       >
                         <SelectTrigger className="w-[130px] h-8 text-xs p-1.5">
                            <Badge
@@ -508,7 +539,7 @@ export default function ShotListPage() {
                                 shot.status === "Unassigned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
-                                shot.status === "Request More" ? "destructive" :
+                                shot.status === "Request More" ? "destructive" : // Or a different warning color
                                 "outline"
                             }
                             >
@@ -526,7 +557,7 @@ export default function ShotListPage() {
                                 s === "Unassigned" ? "outline" :
                                 s === "Assigned" ? "secondary" :
                                 s === "Blocked" ? "destructive" :
-                                s === "Request More" ? "destructive" :
+                                s === "Request More" ? "destructive" : // Or a different warning color
                                 "outline"
                                 }
                               >
