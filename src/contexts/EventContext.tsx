@@ -6,10 +6,11 @@ import { createContext, useContext, useState, useMemo, useCallback, useEffect } 
 import { useProjectContext } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
-import type { Event as EventTypeDefinition } from '@/app/(app)/events/page'; 
+import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
 import { z } from 'zod';
 import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore, subDays, addDays } from 'date-fns';
 
+// --- Shot Request Definitions ---
 export const shotRequestSchemaInternal = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
@@ -17,32 +18,34 @@ export const shotRequestSchemaInternal = z.object({
   assignedPersonnelId: z.string().optional(),
   notes: z.string().optional(),
   blockedReason: z.string().optional(),
-  initialCapturerId: z.string().optional(),
-  lastStatusModifierId: z.string().optional(),
-  lastStatusModifiedAt: z.string().optional(), 
+  initialCapturerId: z.string().optional(), // Who first marked as Captured/Completed
+  lastStatusModifierId: z.string().optional(), // Who made the last status change
+  lastStatusModifiedAt: z.string().optional(), // Timestamp of last status change (ISO string)
 });
-
 export type ShotRequestFormData = z.infer<typeof shotRequestSchemaInternal>;
-
 export type ShotRequest = ShotRequestFormData & {
   id: string;
   eventId: string;
 };
 
+// --- Event Definition (based on events/page.tsx but used globally now) ---
 export type Event = EventTypeDefinition & {
    personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
-   organizationId?: string; 
+   organizationId?: string;
+   discipline?: "Photography" | "Video" | "Both" | ""; // Ensure this matches events/page.tsx
 };
 
 const G9E_SUMMIT_PROJECT_ID = "proj_g9e_summit_2024";
 const G9E_ORG_ID = "org_g9e";
 const SUMMIT_PHOTOGRAPHERS = ["user001", "user002", "user004", "user006"]; // Alice, Bob, Diana, Fiona
+const OTHER_TEAM_MEMBER_IDS = ["user003", "user005"]; // Charlie (PM), Edward (Editor)
+
 
 const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shots: ShotRequest[] } => {
   const summitEvents: Event[] = [];
   const summitShots: ShotRequest[] = [];
-  let eventIdCounter = 200; 
-  let shotIdCounter = 200;
+  let eventIdCounter = 2000;
+  let shotIdCounter = 5000;
   const today = new Date();
 
   const summitDays = [
@@ -53,118 +56,133 @@ const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shots: Sho
   ];
 
   const priorities: Event['priority'][] = ["High", "Medium", "Critical", "Low"];
-  const disciplines: Event['discipline'][] = ["Photography", "Photography", ""];
+  const disciplines: Event['discipline'][] = ["Photography", "Photography", "Photography"]; // Focused on Photography
   const shotPriorities: ShotRequest['priority'][] = ["High", "Medium", "Critical", "Low"];
   const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
-
+  const sampleBlockedReasons = ["Access denied", "Talent unavailable", "Equipment malfunction", "Weather issues"];
+  const sampleNotes = ["Ensure good lighting", "Focus on candid moments", "Get wide and tight shots", "Check background details"];
 
   summitDays.forEach((day, dayIndex) => {
     SUMMIT_PHOTOGRAPHERS.forEach((photographerId, photographerIndex) => {
-      const photographerName = `Photographer ${String.fromCharCode(65 + photographerIndex)}`; // P. A, P. B etc.
+      const photographerInfo = { id: photographerId, name: `Photographer ${String.fromCharCode(65 + photographerIndex)}` };
+      
+      // Helper to create varied shot requests for a covered event
+      const createShotsForEvent = (eventId: string, eventNamePrefix: string, numShots: number) => {
+        for (let i = 0; i < numShots; i++) {
+          const shotStatus = shotStatuses[(shotIdCounter + i + dayIndex + photographerIndex) % shotStatuses.length];
+          let initialCapturer: string | undefined = undefined;
+          let lastModifier: string | undefined = undefined;
+          let lastModifiedDate: string | undefined = undefined;
+          let currentAssignedPersonnelId: string | undefined = photographerInfo.id;
+
+          if (shotStatus === "Captured" || shotStatus === "Completed") {
+            initialCapturer = SUMMIT_PHOTOGRAPHERS[(i + photographerIndex) % SUMMIT_PHOTOGRAPHERS.length];
+            lastModifier = initialCapturer;
+            lastModifiedDate = subDays(new Date(), (i % 3) + 1).toISOString(); // Captured 1-3 days ago
+          } else if (shotStatus === "Blocked" || shotStatus === "Request More") {
+            lastModifier = OTHER_TEAM_MEMBER_IDS[i % OTHER_TEAM_MEMBER_IDS.length]; // PM or Editor blocked/requested
+            lastModifiedDate = subDays(new Date(), (i % 2)).toISOString(); // Modified recently
+          }
+          
+          // Occasionally override default assignment
+          if (i % 4 === 0 && shotStatus === "Assigned") {
+            currentAssignedPersonnelId = SUMMIT_PHOTOGRAPHERS[(photographerIndex + 1) % SUMMIT_PHOTOGRAPHERS.length]; // Assign to a different photographer from the event team
+          } else if (shotStatus === "Unassigned") {
+            currentAssignedPersonnelId = undefined;
+          }
+
+
+          summitShots.push({
+            id: `sr_summit_${shotIdCounter++}`, eventId: eventId,
+            description: `${eventNamePrefix} Shot ${i+1} - ${photographerInfo.name}`,
+            priority: shotPriorities[(i + dayIndex) % shotPriorities.length], status: shotStatus,
+            assignedPersonnelId: currentAssignedPersonnelId,
+            initialCapturerId: initialCapturer,
+            lastStatusModifierId: lastModifier,
+            lastStatusModifiedAt: lastModifiedDate,
+            blockedReason: shotStatus === "Blocked" ? sampleBlockedReasons[i % sampleBlockedReasons.length] : undefined,
+            notes: sampleNotes[i % sampleNotes.length]
+          });
+        }
+      };
       
       // Morning Block
       const morningEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter++}`;
+      const numMorningShots = Math.floor(Math.random() * 5) + 3; // 3 to 7 shots
       summitEvents.push({
         id: morningEventId,
-        name: `${photographerName} - Summit Day ${dayIndex + 1} Morning Coverage`,
+        name: `${photographerInfo.name} - Summit Day ${dayIndex + 1} Morning Sessions`,
         projectId: G9E_SUMMIT_PROJECT_ID,
         project: "G9e Annual Summit 2024",
         date: day,
         time: "09:00 - 12:30",
         priority: priorities[(dayIndex + photographerIndex) % priorities.length],
-        assignedPersonnelIds: [photographerId, "user003"], // Assign PM too
+        assignedPersonnelIds: [photographerInfo.id, "user003"], // Assign PM too
         deliverables: 0, 
-        shotRequests: 0, // Will be updated
+        shotRequests: numMorningShots, // Initial count
         organizationId: G9E_ORG_ID,
-        discipline: disciplines[photographerIndex % disciplines.length],
+        discipline: "Photography",
         isQuickTurnaround: (dayIndex + photographerIndex) % 3 === 0,
         deadline: (dayIndex + photographerIndex) % 3 === 0 ? `${day}T18:00:00Z` : undefined,
         isCovered: true,
         personnelActivity: {},
       });
-      for (let i = 0; i < 3; i++) { // 3 shots for morning block
-        const shotStatus = shotStatuses[(shotIdCounter + i) % shotStatuses.length];
-        summitShots.push({
-          id: `sr_summit_${shotIdCounter++}`, eventId: morningEventId,
-          description: `Morning Keynote Shot ${i+1} - ${photographerName}`,
-          priority: shotPriorities[i % shotPriorities.length], status: shotStatus,
-          assignedPersonnelId: photographerId,
-          initialCapturerId: (shotStatus === "Captured" || shotStatus === "Completed") ? photographerId : undefined,
-          lastStatusModifierId: (shotStatus === "Captured" || shotStatus === "Completed") ? photographerId : (shotStatus === "Blocked" ? "user003" : undefined),
-          lastStatusModifiedAt: (shotStatus !== "Unassigned" && shotStatus !== "Assigned") ? subDays(new Date(), photographerIndex).toISOString() : undefined,
-          blockedReason: shotStatus === "Blocked" ? "Speaker unavailable" : undefined,
-          notes: `Notes for morning shot ${i+1}`
-        });
-      }
+      createShotsForEvent(morningEventId, "Morning Session", numMorningShots);
 
       // Lunch Break
       summitEvents.push({
         id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_lunch_${eventIdCounter++}`,
-        name: `${photographerName} - Summit Day ${dayIndex + 1} Lunch Break`,
+        name: `${photographerInfo.name} - Summit Day ${dayIndex + 1} Lunch Break`,
         projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: day,
-        time: "12:30 - 13:30", priority: "Low", assignedPersonnelIds: [photographerId],
+        time: "12:30 - 13:30", priority: "Low", assignedPersonnelIds: [photographerInfo.id],
         deliverables: 0, shotRequests: 0, organizationId: G9E_ORG_ID, discipline: "",
         isCovered: false, personnelActivity: {},
       });
 
       // Afternoon Block
       const afternoonEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter++}`;
+      const numAfternoonShots = Math.floor(Math.random() * 5) + 3; // 3 to 7 shots
       summitEvents.push({
         id: afternoonEventId,
-        name: `${photographerName} - Summit Day ${dayIndex + 1} Afternoon Workshops`,
+        name: `${photographerInfo.name} - Summit Day ${dayIndex + 1} Afternoon Workshops`,
         projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: day,
         time: "13:30 - 17:00", priority: priorities[(dayIndex + photographerIndex + 1) % priorities.length],
-        assignedPersonnelIds: [photographerId], deliverables: 0, shotRequests: 0,
-        organizationId: G9E_ORG_ID, discipline: disciplines[(photographerIndex + 1) % disciplines.length],
+        assignedPersonnelIds: [photographerInfo.id], deliverables: 0, shotRequests: numAfternoonShots,
+        organizationId: G9E_ORG_ID, discipline: "Photography",
         isCovered: true, personnelActivity: {},
       });
-       for (let i = 0; i < 4; i++) { // 4 shots for afternoon
-        const shotStatus = shotStatuses[(shotIdCounter + i + 1) % shotStatuses.length];
-        summitShots.push({
-          id: `sr_summit_${shotIdCounter++}`, eventId: afternoonEventId,
-          description: `Afternoon Workshop Shot ${i+1} - ${photographerName}`,
-          priority: shotPriorities[(i+1) % shotPriorities.length], status: shotStatus,
-          assignedPersonnelId: photographerId,
-          initialCapturerId: (shotStatus === "Captured" || shotStatus === "Completed") ? photographerId : undefined,
-          lastStatusModifierId: (shotStatus === "Captured" || shotStatus === "Completed") ? photographerId : (shotStatus === "Blocked" ? "user003" : undefined),
-          lastStatusModifiedAt: (shotStatus !== "Unassigned" && shotStatus !== "Assigned") ? subDays(new Date(), dayIndex).toISOString() : undefined,
-          blockedReason: shotStatus === "Blocked" ? "Access restricted" : undefined,
-          notes: `Detailed notes for afternoon shot ${i+1}`
-        });
-      }
-
-      // Evening Reception (for first two photographers on first two days, alternating for others)
+      createShotsForEvent(afternoonEventId, "Afternoon Workshop", numAfternoonShots);
+      
+      // Evening Reception (conditional)
       if ((dayIndex < 2 && photographerIndex < 2) || (dayIndex >=2 && photographerIndex % 2 === dayIndex % 2)) {
         const eveningEventId = `evt_summit_d${dayIndex+1}_p${photographerIndex+1}_eve_${eventIdCounter++}`;
+        const numEveningShots = Math.floor(Math.random() * 5) + 3; // 3 to 7 shots
         summitEvents.push({
             id: eveningEventId,
-            name: `${photographerName} - Summit Day ${dayIndex+1} Evening Networking`,
+            name: `${photographerInfo.name} - Summit Day ${dayIndex+1} Evening Networking`,
             projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: day,
             time: "18:30 - 20:30", priority: "Medium",
-            assignedPersonnelIds: [photographerId], deliverables: 0, shotRequests: 0,
+            assignedPersonnelIds: [photographerInfo.id], deliverables: 0, shotRequests: numEveningShots,
             organizationId: G9E_ORG_ID, discipline: "Photography",
             isQuickTurnaround: photographerIndex % 2 === 0,
             isCovered: true, personnelActivity: {},
         });
-        for (let i = 0; i < 2; i++) { // 2 shots for evening
-            const shotStatus = shotStatuses[(shotIdCounter + i + 2) % shotStatuses.length];
-            summitShots.push({
-              id: `sr_summit_${shotIdCounter++}`, eventId: eveningEventId,
-              description: `Evening Reception Shot ${i+1} - ${photographerName}`,
-              priority: shotPriorities[(i+2) % shotPriorities.length], status: shotStatus,
-              // No specific assignment, defaults to event personnel
-              initialCapturerId: (shotStatus === "Captured" || shotStatus === "Completed") ? SUMMIT_PHOTOGRAPHERS[(i+photographerIndex)%SUMMIT_PHOTOGRAPHERS.length] : undefined,
-              lastStatusModifierId: (shotStatus === "Captured" || shotStatus === "Completed") ? SUMMIT_PHOTOGRAPHERS[(i+photographerIndex)%SUMMIT_PHOTOGRAPHERS.length] : undefined,
-              lastStatusModifiedAt: (shotStatus !== "Unassigned" && shotStatus !== "Assigned") ? new Date().toISOString() : undefined,
-            });
-        }
+        createShotsForEvent(eveningEventId, "Evening Networking", numEveningShots);
       }
     });
   });
-
-  // Update shotRequests count on events
+  
+  // Final check to ensure shotRequest counts on events are accurate
   summitEvents.forEach(event => {
-    event.shotRequests = summitShots.filter(shot => shot.eventId === event.id).length;
+    if (event.isCovered) {
+      const actualShots = summitShots.filter(shot => shot.eventId === event.id).length;
+      if (event.shotRequests !== actualShots) {
+        // console.warn(`Correcting shot count for event ${event.name}: was ${event.shotRequests}, actual ${actualShots}`);
+        event.shotRequests = actualShots;
+      }
+    } else {
+        event.shotRequests = 0;
+    }
   });
   
   return { events: summitEvents, shots: summitShots };
@@ -173,7 +191,7 @@ const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shots: Sho
 type EventContextType = {
   allEvents: Event[];
   eventsForSelectedProjectAndOrg: Event[];
-  addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'>) => void;
+  addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }) => void;
   updateEvent: (eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => void;
   deleteEvent: (eventId: string) => void;
   isLoadingEvents: boolean;
@@ -202,7 +220,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoadingSettings) {
-      setIsLoadingEvents(true); 
+      setIsLoadingEvents(true);
       if (useDemoData) {
         const { events: summitEvents, shots: summitShots } = generateDynamicG9eSummitEventsAndShots();
         
@@ -216,7 +234,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         
         const finalEvents = summitEvents.map(event => ({
           ...event,
-          shotRequests: loadedShotsByEvent[event.id]?.length || 0,
+          shotRequests: loadedShotsByEvent[event.id]?.length || 0, // Ensure count is accurate
           personnelActivity: event.personnelActivity || {},
         }));
 
@@ -267,10 +285,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
             if (orgId !== undefined && updatedEvent.organizationId !== orgId) updatedEvent.organizationId = orgId;
             if (eventData.discipline !== undefined) updatedEvent.discipline = eventData.discipline;
             if (eventData.isCovered !== undefined) updatedEvent.isCovered = eventData.isCovered;
-            updatedEvent.personnelActivity = evt.personnelActivity || {}; 
-            if(eventData.personnelActivity) {
-                updatedEvent.personnelActivity = {...evt.personnelActivity, ...eventData.personnelActivity};
-            }
+            
+            // Preserve existing personnelActivity unless explicitly overwritten
+            updatedEvent.personnelActivity = eventData.personnelActivity ? { ...evt.personnelActivity, ...eventData.personnelActivity} : (evt.personnelActivity || {});
+            
             return updatedEvent;
         }
         return evt;
@@ -308,9 +326,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
       [eventId]: [...(prev[eventId] || []), newShot],
     }));
     setAllEventsState(prevEvents => prevEvents.map(evt =>
-      evt.id === eventId ? { ...evt, shotRequests: (evt.shotRequests || 0) + 1 } : evt
+      evt.id === eventId ? { ...evt, shotRequests: (prevShotRequestsByEventId => (prevShotRequestsByEventId[eventId] ? prevShotRequestsByEventId[eventId].length + 1 : 1))(shotRequestsByEventId) } : evt
     ));
-  }, []);
+  }, [shotRequestsByEventId]); // Added shotRequestsByEventId to dependency array
 
   const updateShotRequest = useCallback((eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => {
     setShotRequestsByEventId(prev => {
@@ -336,15 +354,18 @@ export function EventProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteShotRequest = useCallback((eventId: string, shotId: string) => {
+    let newShotRequestsCount = 0;
     setShotRequestsByEventId(prev => {
       const eventShots = prev[eventId] || [];
+      const updatedShots = eventShots.filter(shot => shot.id !== shotId);
+      newShotRequestsCount = updatedShots.length;
       return {
         ...prev,
-        [eventId]: eventShots.filter(shot => shot.id !== shotId),
+        [eventId]: updatedShots,
       };
     });
     setAllEventsState(prevEvents => prevEvents.map(evt =>
-      evt.id === eventId ? { ...evt, shotRequests: Math.max(0, (evt.shotRequests || 0) - 1) } : evt
+      evt.id === eventId ? { ...evt, shotRequests: newShotRequestsCount } : evt
     ));
   }, []);
 
