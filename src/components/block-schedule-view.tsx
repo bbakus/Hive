@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Users, Settings, Zap, Focus } from "lucide-react"; // Added Focus
+import { Users, Settings, Zap, Focus, Eye } from "lucide-react"; // Added Eye
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
