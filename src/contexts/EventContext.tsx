@@ -7,9 +7,10 @@ import { useProjectContext, type Project } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
 import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
-import { z } from 'zod'; // Needed for ShotRequest schema if defined here
+import { z } from 'zod';
+import { format, addHours, subHours, setHours, setMinutes, startOfDay } from 'date-fns'; // Added date-fns functions
 
-// Define ShotRequest types and schema here or import from a shared types file
+// Define ShotRequest types and schema here
 const shotRequestSchemaInternal = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   shotType: z.enum(["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"]),
@@ -25,7 +26,7 @@ export type ShotRequest = ShotRequestFormData & {
 
 export type Event = EventTypeDefinition;
 
-// Initial Mock Data for Shot Requests (moved here)
+// Initial Mock Data for Shot Requests
 const initialShotRequestsMock: ShotRequest[] = [
   { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd", shotType: "Wide", priority: "High", status: "Planned", notes: "Get this as gates open" },
   { id: "sr002", eventId: "evt001", description: "Close-up of lead singer - Song 3", shotType: "Close-up", priority: "Critical", status: "Planned" },
@@ -34,6 +35,11 @@ const initialShotRequestsMock: ShotRequest[] = [
   { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Wide shot of keynote speaker on Day 1 Morning", shotType: "Wide", priority: "High", status: "Planned" },
   { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening intently", shotType: "Medium", priority: "Medium", status: "Planned" },
   { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Planned" },
+  // Add some shots for the new dynamic today events
+  { id: "sr_today_001", eventId: "evt_today_early", description: "Early morning setup shots", shotType: "B-Roll", priority: "Medium", status: "Planned"},
+  { id: "sr_today_002", eventId: "evt_today_early", description: "First guest arrival", shotType: "Medium", priority: "High", status: "Planned"},
+  { id: "sr_today_003", eventId: "evt_today_late", description: "Main presentation wide shot", shotType: "Wide", priority: "Critical", status: "Planned"},
+  { id: "sr_today_004", eventId: "evt_today_late", description: "Speaker close-up", shotType: "Close-up", priority: "High", status: "Planned"},
 ];
 
 
@@ -173,7 +179,7 @@ const initialMockEvents: Event[] = [
     { id: "evt003", name: "VIP Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: false },
     { id: "evt004", name: "Artist Meet & Greet", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004", "user006"], organizationId: "org_g9e", discipline: "Photography", isCovered: true },
     { id: "evt005", name: "Closing Ceremony", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003", "user005"], isQuickTurnaround: true, deadline: "2024-09-17T23:59:00", organizationId: "org_damion_hamilton", discipline: "Video", isCovered: true },
-    { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Both", isCovered: true},
+    { id: "evt006", name: "Workshop Alpha", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt006").length, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Both", isCovered: true},
   ...generateG9eSummitEvents(),
 ];
 
@@ -189,11 +195,56 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoadingSettings) {
-      const loadedEvents = useDemoData ? initialMockEvents : [];
-      setAllEventsState(loadedEvents);
-
+      let loadedEvents = useDemoData ? [...initialMockEvents] : []; // Start with a copy
       const loadedShots: Record<string, ShotRequest[]> = {};
+
       if (useDemoData) {
+        // Dynamically add events for today
+        const today = new Date();
+        const todayStr = format(today, "yyyy-MM-dd");
+
+        const earlyTodayStart = setMinutes(setHours(startOfDay(today), 8), 0); // 8:00 AM
+        const earlyTodayEnd = setMinutes(setHours(startOfDay(today), 11), 30); // 11:30 AM
+
+        const lateTodayStart = setMinutes(setHours(startOfDay(today), 13), 0); // 1:00 PM
+        const lateTodayEnd = setMinutes(setHours(startOfDay(today), 17), 0); // 5:00 PM
+
+
+        loadedEvents.push({
+          id: "evt_today_early",
+          name: "Today's Early Shoot (Demo)",
+          projectId: "proj001", // Summer Music Festival
+          project: "Summer Music Festival 2024",
+          date: todayStr,
+          time: `${format(earlyTodayStart, "HH:mm")} - ${format(earlyTodayEnd, "HH:mm")}`,
+          priority: "High",
+          deliverables: 1,
+          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_early").length,
+          assignedPersonnelIds: ["user001", "user004"],
+          isQuickTurnaround: true,
+          deadline: format(addHours(today, 24), "yyyy-MM-dd'T'HH:mm:ss"),
+          organizationId: "org_g9e",
+          discipline: "Video",
+          isCovered: true,
+        });
+        loadedEvents.push({
+          id: "evt_today_late",
+          name: "Today's Late Session (Demo)",
+          projectId: g9eSummitProjectId, // G9e Corporate Summit
+          project: "G9e Corporate Summit 2024",
+          date: todayStr,
+          time: `${format(lateTodayStart, "HH:mm")} - ${format(lateTodayEnd, "HH:mm")}`,
+          priority: "Critical",
+          deliverables: 2,
+          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_late").length,
+          assignedPersonnelIds: ["user003", "user005", "user006"],
+          isQuickTurnaround: false,
+          organizationId: "org_g9e",
+          discipline: "Both",
+          isCovered: true,
+        });
+        
+        // Populate shot requests
         initialShotRequestsMock.forEach(shot => {
           if (!loadedShots[shot.eventId]) {
             loadedShots[shot.eventId] = [];
@@ -201,6 +252,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
           loadedShots[shot.eventId].push(shot);
         });
       }
+      setAllEventsState(loadedEvents);
       setShotRequestsByEventId(loadedShots);
       setIsLoadingEvents(false);
     }
@@ -215,8 +267,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
         id: `evt${String(prevEvents.length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
         project: projectForEvent?.name || "Unknown Project",
         deliverables: 0,
-        shotRequests: 0, // New events start with 0 shots
+        shotRequests: 0, 
         hasOverlap: false,
+        organizationId: projectForEvent?.organizationId || eventData.organizationId || "",
         discipline: eventData.discipline || "",
         isCovered: eventData.isCovered === undefined ? true : eventData.isCovered,
       };
@@ -238,7 +291,14 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
     setAllEventsState((prevEvents) =>
       prevEvents.map((evt) =>
-        evt.id === eventId ? { ...evt, ...eventData, project: projectName || evt.project, organizationId: orgId || evt.organizationId, discipline: eventData.discipline !== undefined ? eventData.discipline : evt.discipline, isCovered: eventData.isCovered !== undefined ? eventData.isCovered : evt.isCovered } : evt
+        evt.id === eventId ? { 
+            ...evt, 
+            ...eventData, 
+            project: projectName || evt.project, 
+            organizationId: orgId || evt.organizationId, 
+            discipline: eventData.discipline !== undefined ? eventData.discipline : evt.discipline,
+            isCovered: eventData.isCovered !== undefined ? eventData.isCovered : evt.isCovered 
+        } : evt
       )
     );
   }, [projects]);
@@ -268,7 +328,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
       ...prev,
       [eventId]: [...(prev[eventId] || []), newShot],
     }));
-    // Update shot count on the event
     setAllEventsState(prevEvents => prevEvents.map(evt => 
       evt.id === eventId ? { ...evt, shotRequests: (evt.shotRequests || 0) + 1 } : evt
     ));
@@ -294,7 +353,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
         [eventId]: eventShots.filter(shot => shot.id !== shotId),
       };
     });
-     // Update shot count on the event
     setAllEventsState(prevEvents => prevEvents.map(evt => 
       evt.id === eventId ? { ...evt, shotRequests: Math.max(0, (evt.shotRequests || 0) - 1) } : evt
     ));
@@ -353,3 +411,5 @@ export function useEventContext() {
   }
   return context;
 }
+
+    
