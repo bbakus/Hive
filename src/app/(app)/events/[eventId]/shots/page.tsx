@@ -2,13 +2,13 @@
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User } from 'lucide-react'; // Added User
 import {
   Dialog,
   DialogContent,
@@ -36,16 +36,17 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal as shotRequestSchema } from "@/contexts/EventContext";
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal } from "@/contexts/EventContext";
+import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 
 
 export default function ShotListPage() {
   const params = useParams();
   const eventId = params.eventId as string;
-  
+
   const { useDemoData, isLoading: isSettingsContextLoading } = useSettingsContext();
-  const { 
-    getEventById, 
+  const {
+    getEventById,
     isLoadingEvents: isEventContextLoading,
     getShotRequestsForEvent,
     addShotRequest,
@@ -55,7 +56,7 @@ export default function ShotListPage() {
 
   const [event, setEvent] = useState<Event | null | undefined>(undefined);
   const [currentShotRequests, setCurrentShotRequests] = useState<ShotRequest[]>([]);
-  
+
   const [isShotModalOpen, setIsShotModalOpen] = useState(false);
   const [editingShotRequest, setEditingShotRequest] = useState<ShotRequest | null>(null);
   const [isShotDeleteDialogOpen, setIsShotDeleteDialogOpen] = useState(false);
@@ -69,15 +70,16 @@ export default function ShotListPage() {
     handleSubmit,
     reset,
     control,
-    watch, 
-    setValue, 
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ShotRequestFormData>({
-    resolver: zodResolver(shotRequestSchema), 
+    resolver: zodResolver(shotRequestSchemaInternal),
     defaultValues: {
       description: "",
       priority: "Medium",
-      status: "Unassigned", 
+      status: "Unassigned",
+      assignedPersonnelId: "", // Default to empty string for "Event's Assigned Personnel"
       notes: "",
       blockedReason: "",
     },
@@ -94,11 +96,11 @@ export default function ShotListPage() {
 
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
-      setEvent(undefined); 
+      setEvent(undefined);
       setCurrentShotRequests([]);
       return;
     }
-    
+
     const foundEvent = getEventById(eventId);
     setEvent(foundEvent || null);
 
@@ -118,6 +120,7 @@ export default function ShotListPage() {
             description: editingShotRequest.description,
             priority: editingShotRequest.priority,
             status: editingShotRequest.status,
+            assignedPersonnelId: editingShotRequest.assignedPersonnelId || "",
             notes: editingShotRequest.notes || "",
             blockedReason: editingShotRequest.blockedReason || "",
           });
@@ -125,7 +128,8 @@ export default function ShotListPage() {
           reset({
             description: "",
             priority: "Medium",
-            status: "Unassigned", 
+            status: "Unassigned",
+            assignedPersonnelId: "",
             notes: "",
             blockedReason: "",
           });
@@ -133,7 +137,6 @@ export default function ShotListPage() {
     }
   }, [editingShotRequest, reset, isShotModalOpen]);
 
-  // Effect to clear blockedReason if status is not "Blocked"
   useEffect(() => {
     if (watchedStatus !== "Blocked") {
       setValue("blockedReason", "");
@@ -146,7 +149,10 @@ export default function ShotListPage() {
 
     let dataToSubmit = { ...data };
     if (data.status !== "Blocked") {
-      dataToSubmit.blockedReason = ""; 
+      dataToSubmit.blockedReason = "";
+    }
+    if (data.assignedPersonnelId === "") { // Ensure empty string becomes undefined
+        dataToSubmit.assignedPersonnelId = undefined;
     }
 
 
@@ -163,16 +169,17 @@ export default function ShotListPage() {
         description: `"${dataToSubmit.description.substring(0,30)}..." has been added.`,
       });
     }
-    refreshShotRequests(); 
+    refreshShotRequests();
     closeShotModal();
   };
-  
+
   const openAddShotModal = () => {
     setEditingShotRequest(null);
-    reset({ 
+    reset({
       description: "",
       priority: "Medium",
       status: "Unassigned",
+      assignedPersonnelId: "",
       notes: "",
       blockedReason: "",
     });
@@ -181,10 +188,11 @@ export default function ShotListPage() {
 
   const openEditShotModal = (shot: ShotRequest) => {
     setEditingShotRequest(shot);
-     reset({ 
+     reset({
       description: shot.description,
       priority: shot.priority,
       status: shot.status,
+      assignedPersonnelId: shot.assignedPersonnelId || "",
       notes: shot.notes || "",
       blockedReason: shot.blockedReason || "",
     });
@@ -195,7 +203,7 @@ export default function ShotListPage() {
     setIsShotModalOpen(false);
     setEditingShotRequest(null);
   };
-  
+
   const handleDeleteShotClick = (shotId: string) => {
     setShotRequestToDeleteId(shotId);
     setIsShotDeleteDialogOpen(true);
@@ -205,7 +213,7 @@ export default function ShotListPage() {
     if (shotRequestToDeleteId && eventId) {
       const shot = currentShotRequests.find(sr => sr.id === shotRequestToDeleteId);
       deleteShotRequest(eventId, shotRequestToDeleteId);
-      refreshShotRequests(); 
+      refreshShotRequests();
       toast({
         title: "Shot Request Deleted",
         description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
@@ -222,25 +230,42 @@ export default function ShotListPage() {
     if (shotToUpdate) {
       const updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
       if (newStatus !== "Blocked") {
-        updatePayload.blockedReason = ""; 
+        updatePayload.blockedReason = "";
       }
       updateShotRequest(eventId, shotId, updatePayload);
-      refreshShotRequests(); 
+      refreshShotRequests();
       toast({
         title: "Status Updated",
         description: `Shot status changed to "${newStatus}".`,
       });
 
       if (newStatus === "Request More") {
+        // In a real app, you'd look up the assigned user. For now, it's a generic simulation.
+        const assignedPerson = shotToUpdate.assignedPersonnelId
+          ? initialPersonnelMock.find(p => p.id === shotToUpdate.assignedPersonnelId)?.name
+          : (event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
+              ? initialPersonnelMock.find(p => p.id === event.assignedPersonnelIds![0])?.name // just take the first for demo
+              : "team");
+
         toast({
           title: "Notification Simulated",
-          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to the assigned user.`,
+          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." would be sent to ${assignedPerson || "the assigned user/team"}.`,
           variant: "default",
           duration: 5000,
         });
       }
     }
   };
+
+  const personnelAssignedToEvent = useMemo(() => {
+    if (!event || !event.assignedPersonnelIds) return [];
+    return initialPersonnelMock.filter(person => event.assignedPersonnelIds!.includes(person.id));
+  }, [event]);
+
+  const getPersonnelNameById = (id: string) => {
+    return initialPersonnelMock.find(p => p.id === id)?.name || "Unknown";
+  };
+
 
   if (isSettingsContextLoading || isEventContextLoading || event === undefined) {
     return <div className="flex items-center justify-center h-screen">Loading event shot list...</div>;
@@ -355,14 +380,40 @@ export default function ShotListPage() {
                 </div>
               </div>
 
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="assignedPersonnelId" className="text-right">Assign Shot To</Label>
+                <div className="col-span-3">
+                   <Controller
+                    name="assignedPersonnelId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
+                        <SelectTrigger className={errors.assignedPersonnelId ? "border-destructive" : ""}>
+                          <SelectValue placeholder="-- Event's Assigned Personnel --" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">-- Event's Assigned Personnel --</SelectItem>
+                          {personnelAssignedToEvent.map(person => (
+                            <SelectItem key={person.id} value={person.id}>{person.name} ({person.role})</SelectItem>
+                          ))}
+                           {personnelAssignedToEvent.length === 0 && <p className="p-2 text-xs text-muted-foreground">No personnel assigned to parent event.</p>}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Optional. Defaults to event's assigned team.</p>
+                  {errors.assignedPersonnelId && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelId.message}</p>}
+                </div>
+              </div>
+
               {watchedStatus === "Blocked" && (
                 <div className="grid grid-cols-4 items-start gap-4">
                   <Label htmlFor="blockedReason" className="text-right pt-2">Blocked Reason</Label>
                   <div className="col-span-3">
-                    <Textarea 
-                      id="blockedReason" 
-                      {...register("blockedReason")} 
-                      placeholder="Reason why this shot is blocked..." 
+                    <Textarea
+                      id="blockedReason"
+                      {...register("blockedReason")}
+                      placeholder="Reason why this shot is blocked..."
                       className={errors.blockedReason ? "border-destructive" : ""}
                     />
                     {errors.blockedReason && <p className="text-xs text-destructive mt-1">{errors.blockedReason.message}</p>}
@@ -404,6 +455,7 @@ export default function ShotListPage() {
                 <TableRow>
                   <TableHead>Description</TableHead>
                   <TableHead>Priority</TableHead>
+                  <TableHead>Assigned To</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -423,10 +475,24 @@ export default function ShotListPage() {
                     <TableCell>
                        <Badge variant={
                         shot.priority === "Critical" ? "destructive" :
-                        shot.priority === "High" ? "secondary" : 
-                        shot.priority === "Medium" ? "outline" : 
-                        "default" 
+                        shot.priority === "High" ? "secondary" :
+                        shot.priority === "Medium" ? "outline" :
+                        "default"
                       }>{shot.priority}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                        {shot.assignedPersonnelId ? (
+                            <span className="flex items-center gap-1">
+                                <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                {getPersonnelNameById(shot.assignedPersonnelId)}
+                            </span>
+                        ) : (
+                            <span className="text-muted-foreground italic">
+                                {event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
+                                ? `Event Team (${event.assignedPersonnelIds.length})`
+                                : "Event Team"}
+                            </span>
+                        )}
                     </TableCell>
                     <TableCell>
                       <Select
@@ -434,15 +500,15 @@ export default function ShotListPage() {
                         onValueChange={(newStatus) => handleStatusChange(shot.id, newStatus as ShotRequestFormData['status'])}
                       >
                         <SelectTrigger className="w-[130px] h-8 text-xs p-1.5">
-                           <Badge 
+                           <Badge
                             className="w-full justify-center"
                             variant={
                                 shot.status === "Captured" ? "default" :
-                                shot.status === "Completed" ? "default" : 
+                                shot.status === "Completed" ? "default" :
                                 shot.status === "Unassigned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
-                                shot.status === "Request More" ? "destructive" : 
+                                shot.status === "Request More" ? "destructive" :
                                 "outline"
                             }
                             >
@@ -452,7 +518,7 @@ export default function ShotListPage() {
                         <SelectContent>
                           {shotStatuses.map(s => (
                             <SelectItem key={s} value={s} className="text-xs">
-                              <Badge 
+                              <Badge
                                 className="w-full justify-center"
                                 variant={
                                 s === "Captured" ? "default" :
@@ -497,5 +563,3 @@ export default function ShotListPage() {
     </div>
   );
 }
-    
-
