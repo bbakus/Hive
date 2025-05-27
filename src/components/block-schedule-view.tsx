@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Users, Settings, Zap, Focus, Eye } from "lucide-react"; // Added Eye
+import { Users, Settings, Zap, Eye } from "lucide-react"; // Changed Focus to Eye
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
@@ -145,8 +145,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
               <div>
                 <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
                     {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0" title="Quick Turnaround"/>}
-                    {event.isCovered && <Focus className="h-3 w-3 text-accent flex-shrink-0" title="Covered Event"/>}
-                    {!event.isCovered && <Eye className="h-3 w-3 text-muted-foreground flex-shrink-0" title="Not Covered"/>}
+                    {event.isCovered && <Eye className="h-3 w-3 text-accent flex-shrink-0" title="Covered Event"/>}
+                    {(!event.isCovered && event.isCovered !== undefined) && <Eye className="h-3 w-3 text-muted-foreground flex-shrink-0" title="Not Covered"/>}
                     {event.name}
                 </p>
                 <p className="opacity-80 truncate leading-tight">{event.time}</p>
@@ -172,3 +172,4 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
     </div>
   );
 }
+
