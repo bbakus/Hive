@@ -37,16 +37,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
-
-const shotRequestSchema = z.object({
-  description: z.string().min(5, { message: "Description must be at least 5 characters." }),
-  shotType: z.enum(["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"]),
-  priority: z.enum(["Low", "Medium", "High", "Critical"]),
-  status: z.enum(["Planned", "Assigned", "Captured", "Reviewed", "Blocked"]),
-  notes: z.string().optional(),
-});
-
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchema } from "@/contexts/EventContext"; // Import schema from context
 
 export default function ShotListPage() {
   const params = useParams();
@@ -80,7 +71,7 @@ export default function ShotListPage() {
     control,
     formState: { errors },
   } = useForm<ShotRequestFormData>({
-    resolver: zodResolver(shotRequestSchema),
+    resolver: zodResolver(shotRequestSchema), // Use imported schema
     defaultValues: {
       description: "",
       shotType: "Medium",
@@ -148,7 +139,6 @@ export default function ShotListPage() {
         description: `"${data.description.substring(0,30)}..." has been added.`,
       });
     }
-    // Refresh local list after context update
     setCurrentShotRequests(getShotRequestsForEvent(eventId));
     closeShotModal();
   };
@@ -177,7 +167,6 @@ export default function ShotListPage() {
     if (shotRequestToDeleteId && eventId) {
       const shot = currentShotRequests.find(sr => sr.id === shotRequestToDeleteId);
       deleteShotRequest(eventId, shotRequestToDeleteId);
-      // Refresh local list
       setCurrentShotRequests(getShotRequestsForEvent(eventId));
       toast({
         title: "Shot Request Deleted",
@@ -187,6 +176,19 @@ export default function ShotListPage() {
       setShotRequestToDeleteId(null);
     }
     setIsShotDeleteDialogOpen(false);
+  };
+
+  const handleStatusChange = (shotId: string, newStatus: ShotRequestFormData['status']) => {
+    if (!eventId) return;
+    const shotToUpdate = currentShotRequests.find(sr => sr.id === shotId);
+    if (shotToUpdate) {
+      updateShotRequest(eventId, shotId, { ...shotToUpdate, status: newStatus });
+      setCurrentShotRequests(getShotRequestsForEvent(eventId)); // Refresh list from context
+      toast({
+        title: "Status Updated",
+        description: `Shot status changed to "${newStatus}".`,
+      });
+    }
   };
 
   if (isSettingsContextLoading || isEventContextLoading || event === undefined) {
@@ -206,6 +208,9 @@ export default function ShotListPage() {
         </div>
     );
   }
+
+  const shotStatuses: ShotRequestFormData['status'][] = ["Planned", "Assigned", "Captured", "Reviewed", "Blocked"];
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -310,7 +315,7 @@ export default function ShotListPage() {
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
-                          {["Planned", "Assigned", "Captured", "Reviewed", "Blocked"].map(s => (
+                          {shotStatuses.map(s => (
                             <SelectItem key={s} value={s}>{s}</SelectItem>
                           ))}
                         </SelectContent>
@@ -373,14 +378,45 @@ export default function ShotListPage() {
                       }>{shot.priority}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={
-                        shot.status === "Captured" ? "default" :
-                        shot.status === "Reviewed" ? "default" :
-                        shot.status === "Planned" ? "outline" :
-                        shot.status === "Assigned" ? "secondary" :
-                        shot.status === "Blocked" ? "destructive" :
-                        "outline"
-                      }>{shot.status}</Badge>
+                      <Select
+                        value={shot.status}
+                        onValueChange={(newStatus) => handleStatusChange(shot.id, newStatus as ShotRequestFormData['status'])}
+                      >
+                        <SelectTrigger className="w-[130px] h-8 text-xs p-1.5">
+                           <Badge 
+                            className="w-full justify-center"
+                            variant={
+                                shot.status === "Captured" ? "default" :
+                                shot.status === "Reviewed" ? "default" :
+                                shot.status === "Planned" ? "outline" :
+                                shot.status === "Assigned" ? "secondary" :
+                                shot.status === "Blocked" ? "destructive" :
+                                "outline"
+                            }
+                            >
+                            {shot.status}
+                            </Badge>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {shotStatuses.map(s => (
+                            <SelectItem key={s} value={s} className="text-xs">
+                              <Badge 
+                                className="w-full justify-center"
+                                variant={
+                                s === "Captured" ? "default" :
+                                s === "Reviewed" ? "default" :
+                                s === "Planned" ? "outline" :
+                                s === "Assigned" ? "secondary" :
+                                s === "Blocked" ? "destructive" :
+                                "outline"
+                                }
+                              >
+                                {s}
+                              </Badge>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditShotModal(shot)}>
@@ -408,3 +444,5 @@ export default function ShotListPage() {
     </div>
   );
 }
+
+    
