@@ -39,6 +39,7 @@ import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal } from "@/contexts/EventContext";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 import { format, parseISO } from "date-fns";
+import { usePhaseContext } from '@/contexts/PhaseContext';
 
 
 export default function ShotListPage() {
@@ -46,6 +47,7 @@ export default function ShotListPage() {
   const eventId = params.eventId as string;
 
   const { useDemoData, isLoading: isSettingsContextLoading } = useSettingsContext();
+  const { activePhase } = usePhaseContext();
   const {
     getEventById,
     isLoadingEvents: isEventContextLoading,
@@ -111,13 +113,7 @@ export default function ShotListPage() {
     const foundEvent = getEventById(eventId);
     setEvent(foundEvent || null); 
 
-    if (foundEvent && shotRequestsByEventId) {
-       setCurrentShotRequests(shotRequestsByEventId[eventId] || []);
-    } else if (!foundEvent) {
-       setCurrentShotRequests([]);
-    }
-
-  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById, shotRequestsByEventId]);
+  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById]);
 
 
   useEffect(() => {
@@ -130,7 +126,6 @@ export default function ShotListPage() {
             assignedPersonnelId: editingShotRequest.assignedPersonnelId || "",
             notes: editingShotRequest.notes || "",
             blockedReason: editingShotRequest.blockedReason || "",
-            // These audit fields are not typically edited in the form, they are set by actions
             initialCapturerId: editingShotRequest.initialCapturerId || "",
             lastStatusModifierId: editingShotRequest.lastStatusModifierId || "",
             lastStatusModifiedAt: editingShotRequest.lastStatusModifiedAt || "",
@@ -165,25 +160,19 @@ export default function ShotListPage() {
         description: data.description,
         priority: data.priority,
         status: data.status,
-        assignedPersonnelId: data.assignedPersonnelId || undefined, // Ensure empty string becomes undefined
+        assignedPersonnelId: data.assignedPersonnelId || undefined,
         notes: data.notes,
-        blockedReason: data.status === "Blocked" ? data.blockedReason : "", // Clear reason if not blocked
+        blockedReason: data.status === "Blocked" ? data.blockedReason : "",
     };
     
-    // Audit fields are handled by handleStatusChange or direct system actions, not directly in form submit
-    // unless it's the initial creation where status might dictate initial values.
-
     if (editingShotRequest) {
-      // Preserve existing audit fields unless status change implies update
       dataToSubmit.initialCapturerId = editingShotRequest.initialCapturerId;
       dataToSubmit.lastStatusModifierId = editingShotRequest.lastStatusModifierId;
       dataToSubmit.lastStatusModifiedAt = editingShotRequest.lastStatusModifiedAt;
       
-      // If status is being changed via form, it might imply a new 'lastModifier'
       if (editingShotRequest.status !== data.status) {
           dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
           dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
-          // Special handling if status changed to Captured/Completed via form for the first time
           if ((data.status === "Captured" || data.status === "Completed") && !editingShotRequest.initialCapturerId) {
               dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
           }
@@ -195,11 +184,10 @@ export default function ShotListPage() {
         description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
     } else {
-      // For new shots, lastModifier is the creator. Initial capturer not set yet.
       dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
       dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
       
-      addShotRequest(eventId, dataToSubmit as ShotRequestFormData); // Cast because audit fields are added
+      addShotRequest(eventId, dataToSubmit as ShotRequestFormData);
       toast({
         title: "Shot Request Added",
         description: `"${data.description.substring(0,30)}..." has been added.`,
@@ -255,17 +243,15 @@ export default function ShotListPage() {
       const oldStatus = shotToUpdate.status;
 
       if (newStatus === "Captured" || newStatus === "Completed") {
-        if (!shotToUpdate.initialCapturerId) { // First time capture/complete
+        if (!shotToUpdate.initialCapturerId) {
             updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
         } else { 
-            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain if already set
+            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
         }
       } else if ((oldStatus === "Captured" || oldStatus === "Completed") && shotToUpdate.initialCapturerId) {
-        // Moving away from captured/completed, retain initial capturer
         updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
       }
       
-      // Clear blockedReason if status is not Blocked
       if (newStatus !== "Blocked") {
         updatePayload.blockedReason = ""; 
       }
@@ -301,8 +287,9 @@ export default function ShotListPage() {
   }, [event]);
 
   const getPersonnelNameById = (id?: string) : string => {
-    if (!id) return "Unknown";
-    return initialPersonnelMock.find(p => p.id === id)?.name || "Unknown User";
+    if (!id) return "Unknown User";
+    const person = initialPersonnelMock.find(p => p.id === id);
+    return person ? person.name : "Unknown User";
   };
 
   const isLoading = isSettingsContextLoading || isEventContextLoading || event === undefined;
@@ -327,13 +314,15 @@ export default function ShotListPage() {
 
   const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
 
+  const backButtonHref = activePhase === "Shoot" ? "/shoot" : "/events";
+  const backButtonText = activePhase === "Shoot" ? "Back to Shoot Day Overview" : "Back to All Events";
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <Button asChild variant="outline" size="sm" className="mb-4">
-            <Link href="/events">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to All Events
+            <Link href={backButtonHref}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> {backButtonText}
             </Link>
         </Button>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -624,3 +613,6 @@ export default function ShotListPage() {
     </div>
   );
 }
+
+
+    
