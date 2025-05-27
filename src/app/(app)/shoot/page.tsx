@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, LogIn, LogOut, Filter, CheckSquare } from "lucide-react";
+import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, LogIn, LogOut, Filter, CheckSquare, Camera as CameraIcon } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
@@ -24,8 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-
-const MOCK_CURRENT_USER_ID = "user_photog_field"; // Simulated logged-in photographer
+import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page"; // Import personnel mock
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -107,57 +106,66 @@ export default function ShootPage() {
     return { captured, total };
   };
 
+  const getPersonnelNameById = (id: string): string => {
+    const person = initialPersonnelMock.find(p => p.id === id);
+    return person ? person.name : "Unknown User";
+  };
+
   const handleShotCheckChange = (shotId: string, eventId: string, newCheckedState: boolean) => {
     const shotsForEvent = getShotRequestsForEvent(eventId);
     const shotToUpdate = shotsForEvent.find(s => s.id === shotId);
 
     if (!shotToUpdate) return;
 
+    const MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE = "user_photog_field_sim"; // Simulate who is checking it off
+
     let newStatus: ShotRequest['status'] | undefined = undefined;
+    let updatePayload: Partial<ShotRequestFormData> = {};
+
     if (newCheckedState) {
-        if (shotToUpdate.status !== "Captured" && shotToUpdate.status !== "Completed") {
-            newStatus = "Captured";
+      if (shotToUpdate.status !== "Captured" && shotToUpdate.status !== "Completed") {
+        newStatus = "Captured";
+        updatePayload.status = newStatus;
+        if (!shotToUpdate.initialCapturerId) {
+          updatePayload.initialCapturerId = MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE;
         }
+        updatePayload.lastStatusModifierId = MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE;
+        updatePayload.lastStatusModifiedAt = new Date().toISOString();
+      }
     } else {
-        if (shotToUpdate.status === "Captured") { 
-            newStatus = "Assigned"; 
-        }
+      if (shotToUpdate.status === "Captured") { 
+        newStatus = "Assigned"; 
+        updatePayload.status = newStatus;
+        // Keep initialCapturerId, just update modifier
+        updatePayload.lastStatusModifierId = MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE; 
+        updatePayload.lastStatusModifiedAt = new Date().toISOString();
+      }
     }
 
     if (newStatus) {
-        const updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
-        if (newStatus === "Captured") {
-            if (!shotToUpdate.initialCapturerId) {
-                updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
-            }
-            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
-            updatePayload.lastStatusModifiedAt = new Date().toISOString();
-        } else if (newStatus === "Assigned" && shotToUpdate.status === "Captured") {
-            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
-            updatePayload.lastStatusModifiedAt = new Date().toISOString();
-        }
-        
-        updateShotRequest(eventId, shotId, updatePayload);
-        toast({
-            title: "Shot Status Updated",
-            description: `Shot "${shotToUpdate.description.substring(0,30)}..." marked as ${newStatus}.`
-        });
+      updateShotRequest(eventId, shotId, updatePayload);
+      toast({
+        title: "Shot Status Updated",
+        description: `Shot "${shotToUpdate.description.substring(0,30)}..." marked as ${newStatus}.`
+      });
     }
   };
 
-  const handleCheckIn = (eventId: string) => {
-    checkInUserToEvent(eventId, MOCK_CURRENT_USER_ID);
+  const handleCheckIn = (eventId: string, personnelId: string) => {
+    checkInUserToEvent(eventId, personnelId);
+    const personName = getPersonnelNameById(personnelId);
     toast({
       title: "Checked In",
-      description: `You've successfully checked in to the event.`,
+      description: `${personName} successfully checked in to the event.`,
     });
   };
 
-  const handleCheckOut = (eventId: string) => {
-    checkOutUserFromEvent(eventId, MOCK_CURRENT_USER_ID);
+  const handleCheckOut = (eventId: string, personnelId: string) => {
+    checkOutUserFromEvent(eventId, personnelId);
+    const personName = getPersonnelNameById(personnelId);
      toast({
       title: "Checked Out",
-      description: `You've successfully checked out from the event.`,
+      description: `${personName} successfully checked out from the event.`,
     });
   };
 
@@ -251,10 +259,6 @@ export default function ShootPage() {
             const eventStatusBadge = getEventStatusBadgeInfo(event);
             const shotsForEvent = getShotRequestsForEvent(event.id);
 
-            const currentUserActivity = event.personnelActivity?.[MOCK_CURRENT_USER_ID];
-            const isCheckedIn = !!currentUserActivity?.checkInTime && !currentUserActivity?.checkOutTime;
-            const wasCheckedOut = !!currentUserActivity?.checkInTime && !!currentUserActivity?.checkOutTime;
-
             return (
               <AccordionItem value={event.id} key={event.id} className="border bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow">
                 <AccordionTrigger className="p-4 hover:no-underline">
@@ -268,11 +272,6 @@ export default function ShootPage() {
                         <Clock className="h-3 w-3" /> {event.time}
                         {event.deadline && <span className="ml-2 text-amber-600 dark:text-amber-400">Deadline: {formatDeadline(event.deadline)}</span>}
                       </p>
-                       {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <Users className="h-3 w-3" /> {event.assignedPersonnelIds.length} Assigned
-                          </p>
-                        )}
                     </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mt-2 sm:mt-0">
                        <Badge variant={event.priority === "Critical" ? "destructive" : event.priority === "High" ? "secondary" : "outline"} className="text-xs">
@@ -288,55 +287,76 @@ export default function ShootPage() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="p-4 border-t">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex gap-2 items-center">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleCheckIn(event.id)}
-                        disabled={isCheckedIn || wasCheckedOut}
-                      > 
-                        <LogIn className="mr-2 h-4 w-4"/> Check In
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleCheckOut(event.id)}
-                        disabled={!isCheckedIn || wasCheckedOut}
-                      > 
-                        <LogOut className="mr-2 h-4 w-4"/> Check Out
-                      </Button>
-                       {isCheckedIn && (
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                             <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500"/>
-                            Checked In at {format(parseISO(currentUserActivity!.checkInTime!), "p")}
-                          </Badge>
-                        )}
-                        {wasCheckedOut && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            Checked Out at {format(parseISO(currentUserActivity!.checkOutTime!), "p")}
-                          </Badge>
-                        )}
-                    </div>
+                  {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 ? (
+                    event.assignedPersonnelIds.map(personnelId => {
+                      const person = initialPersonnelMock.find(p => p.id === personnelId);
+                      if (!person) return null;
+
+                      const currentUserActivity = event.personnelActivity?.[personnelId];
+                      const isCheckedIn = !!currentUserActivity?.checkInTime && !currentUserActivity?.checkOutTime;
+                      const wasCheckedOut = !!currentUserActivity?.checkInTime && !!currentUserActivity?.checkOutTime;
+
+                      return (
+                        <div key={personnelId} className="mb-4 p-3 border rounded-md bg-muted/30">
+                          <div className="flex justify-between items-center mb-2">
+                            <div>
+                                <p className="font-semibold text-sm">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></p>
+                                {person.cameraSerial && <p className="text-xs text-muted-foreground flex items-center gap-1"><CameraIcon className="h-3 w-3" /> S/N: {person.cameraSerial}</p>}
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleCheckIn(event.id, personnelId)}
+                                disabled={isCheckedIn || wasCheckedOut}
+                              > 
+                                <LogIn className="mr-2 h-4 w-4"/> Check In
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleCheckOut(event.id, personnelId)}
+                                disabled={!isCheckedIn || wasCheckedOut}
+                              > 
+                                <LogOut className="mr-2 h-4 w-4"/> Check Out
+                              </Button>
+                            </div>
+                          </div>
+                          {isCheckedIn && (
+                              <Badge variant="secondary" className="text-xs">
+                                <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500"/>
+                                Checked In at {format(parseISO(currentUserActivity!.checkInTime!), "p")}
+                              </Badge>
+                            )}
+                            {wasCheckedOut && (
+                              <Badge variant="outline" className="text-xs">
+                                Checked Out at {format(parseISO(currentUserActivity!.checkOutTime!), "p")}
+                              </Badge>
+                            )}
+                            {!currentUserActivity?.checkInTime && !wasCheckedOut && (
+                                 <p className="text-xs text-muted-foreground">Not yet checked in.</p>
+                            )}
+                             {wasCheckedOut && currentUserActivity?.checkInTime && currentUserActivity.checkOutTime && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Activity: {format(parseISO(currentUserActivity.checkInTime), "p")} - {format(parseISO(currentUserActivity.checkOutTime), "p")}
+                                </p>
+                            )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground mb-3">No personnel assigned to this event.</p>
+                  )}
+                  
+                  <Separator className="my-3" />
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium">Shot Checklist:</h4>
                     <Button variant="default" size="sm" asChild>
                       <Link href={`/events/${event.id}/shots`}>
                         <ListChecks className="mr-2 h-4 w-4" /> Full Shot List & Edit
                       </Link>
                     </Button>
                   </div>
-                 
-                  { (isCheckedIn || wasCheckedOut) && currentUserActivity?.checkInTime && (
-                    <p className="text-xs text-muted-foreground mb-3">
-                      {wasCheckedOut 
-                        ? `Activity: From ${format(parseISO(currentUserActivity.checkInTime), "p")} to ${format(parseISO(currentUserActivity.checkOutTime!), "p")}`
-                        : `Currently checked in since ${format(parseISO(currentUserActivity.checkInTime), "p")}.`}
-                    </p>
-                  )}
-                  {!currentUserActivity?.checkInTime && <p className="text-xs text-muted-foreground mb-3">Not yet checked in to this event.</p>}
-
-
-                  <Separator className="my-3" />
-                  <h4 className="text-sm font-medium mb-2">Shot Checklist:</h4>
                   {shotsForEvent.length > 0 ? (
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {shotsForEvent.map(shot => (
@@ -379,4 +399,3 @@ export default function ShootPage() {
     </div>
   );
 }
-

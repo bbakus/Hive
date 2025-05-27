@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare } from "lucide-react";
+import { UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare, Camera } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +44,7 @@ const personnelSchema = z.object({
   role: z.string().min(2, { message: "Role must be at least 2 characters." }),
   avatar: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   status: z.enum(["Available", "Assigned", "On Leave"]),
+  cameraSerial: z.string().optional(),
 });
 
 type PersonnelFormData = z.infer<typeof personnelSchema>;
@@ -57,13 +58,13 @@ export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "
 
 // Initial Mock data
 export const initialPersonnelMock: Personnel[] = [
-  { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png" },
+  { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN12345A" },
   { id: "user002", name: "Bob The Builder", role: "Editor", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
-  { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png" },
+  { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN67890B" },
   { id: "user004", name: "Diana Prince", role: "Photographer", status: "On Leave", avatar: "https://placehold.co/40x40.png" },
-  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned" },
+  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", cameraSerial: "SN24680C" },
   { id: "user006", name: "Fiona Gallagher", role: "Project Manager", status: "Available" },
-  { id: "user007", name: "George Jetson", role: "Photographer", status: "Assigned" },
+  { id: "user007", name: "George Jetson", role: "Photographer", status: "Assigned", cameraSerial: "SN13579D" },
   { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
 ];
 // --- End Personnel Definitions ---
@@ -97,6 +98,7 @@ export default function PersonnelPage() {
       role: "Photographer",
       avatar: "",
       status: "Available",
+      cameraSerial: "",
     },
   });
   
@@ -115,6 +117,7 @@ export default function PersonnelPage() {
         role: "Photographer",
         avatar: "",
         status: "Available",
+        cameraSerial: "",
       });
     }
   }, [editingPersonnel, reset, isPersonnelModalOpen]);
@@ -194,7 +197,8 @@ export default function PersonnelPage() {
     }
     return personnelList.filter(member =>
       member.name.toLowerCase().includes(filterText.toLowerCase()) ||
-      member.role.toLowerCase().includes(filterText.toLowerCase())
+      member.role.toLowerCase().includes(filterText.toLowerCase()) ||
+      (member.cameraSerial && member.cameraSerial.toLowerCase().includes(filterText.toLowerCase()))
     );
   }, [personnelList, filterText]);
 
@@ -263,6 +267,13 @@ export default function PersonnelPage() {
                 <div className="col-span-3">
                   <Input id="avatar" {...register("avatar")} placeholder="https://example.com/avatar.png" className={errors.avatar ? "border-destructive" : ""} />
                   {errors.avatar && <p className="text-xs text-destructive mt-1">{errors.avatar.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="cameraSerial" className="text-right">Camera S/N</Label>
+                <div className="col-span-3">
+                  <Input id="cameraSerial" {...register("cameraSerial")} placeholder="Optional camera serial number" className={errors.cameraSerial ? "border-destructive" : ""} />
+                  {errors.cameraSerial && <p className="text-xs text-destructive mt-1">{errors.cameraSerial.message}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
@@ -374,7 +385,7 @@ export default function PersonnelPage() {
             <div className="relative w-full sm:w-72">
               <Input
                 type="text"
-                placeholder="Filter by name or role..."
+                placeholder="Filter by name, role, or S/N..."
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
                 className="pl-10"
@@ -390,6 +401,7 @@ export default function PersonnelPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Camera S/N</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -407,6 +419,15 @@ export default function PersonnelPage() {
                       </div>
                     </TableCell>
                     <TableCell>{member.role}</TableCell>
+                    <TableCell>
+                      {member.cameraSerial ? (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Camera className="h-3.5 w-3.5" /> {member.cameraSerial}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">N/A</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={
                         member.status === "Available" ? "default" :
