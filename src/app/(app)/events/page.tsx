@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -38,7 +38,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, isSameDay, addHours } from "date-fns";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -80,20 +80,13 @@ export const eventSchema = z.object({
 
 export type EventFormData = z.infer<typeof eventSchema>;
 
-export type Event = EventFormData & {
-  id: string;
-  project?: string;
-  deliverables: number;
-  shotRequests: number;
+export type Event = import("@/contexts/EventContext").Event & { // Ensure this matches the context one
   hasOverlap?: boolean;
-  organizationId?: string;
-  discipline?: "Photography" | "Video" | "Both" | "";
-  isCovered?: boolean;
-  personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
 };
 
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
+  if (!dateStr || !timeStr) return null;
   const baseDate = parseISO(dateStr);
   if (!isValid(baseDate)) return null;
 
@@ -112,10 +105,10 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  if (isBefore(endDate, startDate)) { // Handle overnight events crossing midnight
+  if (isBefore(endDate, startDate) || (isSameDay(startDate, endDate) && endHour * 60 + endMinute === 0 && startHour * 60 + startMinute > 0) ){ // Handle overnight events crossing midnight, or ending at 00:00
     endDate = addHours(endDate, 24);
   }
-
+  
   return { start: startDate, end: endDate };
 };
 
@@ -151,18 +144,15 @@ export function formatDeadline(deadlineString?: string): string | null {
   }
 }
 
-// Helper function to get discipline icon
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
-  if (discipline === "Video") return <VideoIconLucide className="h-3.5 w-3.5 opacity-80" />;
-  if (discipline === "Both") return <><Camera className="h-3.5 w-3.5 opacity-80" /><VideoIconLucide className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
+  // Remove VideoIcon as we are focusing on photography
   return null;
 };
 
-// Helper function to get coverage icon
 const getCoverageIcon = (isCovered?: boolean) => {
   if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
-  return null; // Or a "Not Covered" icon if desired
+  return null; 
 };
 
 
@@ -246,7 +236,7 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
-              <SelectItem value="Video">Video Only</SelectItem>
+              {/* Removed "Video Only" and "Both" */}
             </SelectContent>
           </Select>
         </div>
@@ -377,10 +367,10 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                           Assigned: {event.assignedPersonnelIds.length}
                         </p>
                       )}
-                      <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center">
-                        <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
-                        Shot Requests: {event.shotRequests}
-                      </Link>
+                       <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center">
+                          <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                          Shot Requests: {event.shotRequests}
+                       </Link>
                       <p className="text-muted-foreground flex items-center gap-1">
                         {getDisciplineIcon(event.discipline)}
                         {event.discipline || "N/A"}
@@ -452,12 +442,12 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                 <TableRow key={event.id}>
                   <TableCell className="font-medium flex items-center gap-1.5">
                     {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
-                    {getCoverageIcon(event.isCovered)}
+                     {getCoverageIcon(event.isCovered)}
                     {event.name}
                   </TableCell>
                   {!selectedProject && <TableCell>{event.project}</TableCell>}
                   <TableCell className="flex items-center">
-                    {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
+                    {event.date ? format(parseISO(event.date), "PPP") : 'N/A'} <span className="text-muted-foreground ml-1">({event.time})</span>
                     {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -478,7 +468,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                     {event.assignedPersonnelIds?.length || 0}
                   </TableCell>
                   <TableCell>
-                    <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
+                     <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
                       {event.shotRequests}
                     </Link>
                   </TableCell>
@@ -490,11 +480,11 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                         <span className="sr-only">View/Manage Shots</span>
                       </Link>
                     </Button>
-                    <Button variant="ghost" size="icon" className="hover:text-accent" onClick={()={() => openEditEventModal(event)}}>
+                    <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
                       <Edit className="h-4 w-4" />
                       <span className="sr-only">Edit Event</span>
                     </Button>
-                    <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={()={() => handleDeleteClick(event.id)}}>
+                    <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(event.id)}>
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Delete Event</span>
                     </Button>
@@ -582,10 +572,10 @@ function BlockScheduleTabContent({
 
 
 export default function EventsPage() {
-  const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
+  const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [],
+    eventsForSelectedProjectAndOrg = [], // Default to empty array
     addEvent,
     updateEvent,
     deleteEvent,
@@ -625,6 +615,7 @@ export default function EventsPage() {
       discipline: "",
       isCovered: true,
       personnelActivity: {},
+      organizationId: selectedProject?.organizationId || ""
     }
   });
 
@@ -637,6 +628,8 @@ export default function EventsPage() {
       }
     }
 
+    const selectedProjInfo = allProjectsFromContext.find(p => p.id === (editingEvent?.projectId || selectedProject?.id));
+    
     if (editingEvent) {
       reset({
         name: editingEvent.name,
@@ -647,13 +640,13 @@ export default function EventsPage() {
         assignedPersonnelIds: editingEvent.assignedPersonnelIds || [],
         isQuickTurnaround: editingEvent.isQuickTurnaround || false,
         deadline: editingEvent.deadline || "",
-        organizationId: editingEvent.organizationId || "",
+        organizationId: editingEvent.organizationId || selectedProjInfo?.organizationId || "",
         discipline: editingEvent.discipline || "",
         isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
         personnelActivity: editingEvent.personnelActivity || {},
       });
     } else {
-      const firstProjectForOrg = selectedProject ? selectedProject : (allProjects.length > 0 ? allProjects[0] : null);
+      const firstProjectForOrg = selectedProject || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0] : null);
       reset({
         name: "",
         projectId: firstProjectForOrg?.id || "",
@@ -669,7 +662,7 @@ export default function EventsPage() {
         personnelActivity: {},
       });
     }
-  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
+  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjectsFromContext, activeBlockScheduleDateKey]);
 
 
   const assignedPersonnelForFilter = useMemo(() => {
@@ -695,6 +688,9 @@ export default function EventsPage() {
       filtered = filtered.filter(event => {
         const times = parseEventTimes(event.date, event.time);
         if (!times) return false;
+        const eventDayStart = startOfDay(times.start);
+        const eventDayEnd = endOfDay(times.start); // Use event's date for end of day consistency
+        
         if (filterTimeStatus === "upcoming") return isAfter(times.start, now);
         if (filterTimeStatus === "past") return isBefore(times.end, now);
         if (filterTimeStatus === "now") return isWithinInterval(now, { start: times.start, end: times.end });
@@ -708,12 +704,12 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
-        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both" || event.discipline === "";
-        if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
+        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both" || event.discipline === ""; // "" is considered N/A
+        // No other discipline types relevant for now as per photography focus
         return true;
       });
     }
-
+    
     if (filterCoverageStatus !== "all") {
       if (filterCoverageStatus === "covered") {
         filtered = filtered.filter(event => event.isCovered === true);
@@ -726,12 +722,13 @@ export default function EventsPage() {
       filtered = filtered.filter(event => selectedEventDates.includes(event.date));
     }
 
+
     const eventsGroupedByDay: Record<string, Event[]> = filtered.reduce((acc, event) => {
         const date = event.date;
         if (!acc[date]) acc[date] = [];
         acc[date].push(event);
         return acc;
-    }, {});
+    }, {} as Record<string, Event[]>);
 
     return filtered.map(event => {
       let hasOverlap = false;
@@ -743,7 +740,14 @@ export default function EventsPage() {
         }
       }
       return { ...event, hasOverlap };
-    }).sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime() || (parseEventTimes(a.date, a.time)?.start.getTime() || 0) - (parseEventTimes(b.date, b.time)?.start.getTime() || 0) );
+    }).sort((a,b) => {
+      const dateA = a.date ? parseISO(a.date).getTime() : 0;
+      const dateB = b.date ? parseISO(b.date).getTime() : 0;
+      if (dateA !== dateB) return dateA - dateB;
+      const timeA = a.date && a.time ? (parseEventTimes(a.date, a.time)?.start.getTime() || 0) : 0;
+      const timeB = b.date && b.time ? (parseEventTimes(b.date, b.time)?.start.getTime() || 0) : 0;
+      return timeA - timeB;
+    });
   }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, selectedEventDates, filterCoverageStatus]);
 
 
@@ -771,6 +775,7 @@ export default function EventsPage() {
   }, [displayableEvents]);
 
   const uniqueEventDatesForFilter = useMemo(() => {
+    // Use eventsForSelectedProjectAndOrg before other filters for date selection
     const dates = new Set((eventsForSelectedProjectAndOrg || []).map(event => event.date));
     return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   }, [eventsForSelectedProjectAndOrg]);
@@ -789,7 +794,7 @@ export default function EventsPage() {
 
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
-    const selectedProjInfo = allProjects.find(p => p.id === data.projectId);
+    const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
     if (!selectedProjInfo) {
       toast({ title: "Error", description: "Selected project not found.", variant: "destructive" });
       return;
@@ -798,10 +803,10 @@ export default function EventsPage() {
     const eventPayload = {
       ...data,
       project: selectedProjInfo.name,
-      organizationId: selectedProjInfo.organizationId,
+      organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
-      personnelActivity: data.personnelActivity || {},
+      personnelActivity: editingEvent?.personnelActivity || data.personnelActivity || {},
     };
 
     if (editingEvent) {
@@ -816,9 +821,9 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' | 'organizationId'> & { organizationId: string } = {
+      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string } = {
         ...data,
-        organizationId: selectedProjInfo.organizationId,
+        organizationId: data.organizationId || selectedProjInfo.organizationId,
         discipline: data.discipline || "",
         isCovered: data.isCovered === undefined ? true : data.isCovered,
       };
@@ -833,8 +838,8 @@ export default function EventsPage() {
 
   const openAddEventModal = () => {
     setEditingEvent(null);
-    const currentProjectId = selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : "");
-    const projectInfo = allProjects.find(p => p.id === currentProjectId);
+    const currentProjectId = selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : "");
+    const projectInfo = allProjectsFromContext.find(p => p.id === currentProjectId);
     reset({
       name: "",
       projectId: currentProjectId,
@@ -854,6 +859,7 @@ export default function EventsPage() {
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
+    const projectInfo = allProjectsFromContext.find(p => p.id === event.projectId);
     reset({
       name: event.name,
       projectId: event.projectId,
@@ -863,7 +869,7 @@ export default function EventsPage() {
       assignedPersonnelIds: event.assignedPersonnelIds || [],
       isQuickTurnaround: event.isQuickTurnaround || false,
       deadline: event.deadline || "",
-      organizationId: event.organizationId || "",
+      organizationId: event.organizationId || projectInfo?.organizationId || "",
       discipline: event.discipline || "",
       isCovered: event.isCovered === undefined ? true : event.isCovered,
       personnelActivity: event.personnelActivity || {},
@@ -963,20 +969,20 @@ export default function EventsPage() {
                         <Select
                           onValueChange={(value) => {
                             field.onChange(value);
-                            const projInfo = allProjects.find(p => p.id === value);
+                            const projInfo = allProjectsFromContext.find(p => p.id === value);
                             setValue("organizationId", projInfo?.organizationId || "");
                           }}
                           value={field.value}
-                          defaultValue={field.value || (selectedProject?.id || (allProjects.length > 0 ? allProjects[0].id : ""))}
+                          defaultValue={field.value || (selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : ""))}
                         >
                           <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
                             <SelectValue placeholder="Select project" />
                           </SelectTrigger>
                           <SelectContent>
-                            {allProjects.map((proj) => (
+                            {allProjectsFromContext.map((proj) => (
                               <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
                             ))}
-                             {allProjects.length === 0 && <p className="p-2 text-xs text-muted-foreground">No projects available. Add one first.</p>}
+                             {allProjectsFromContext.length === 0 && <p className="p-2 text-xs text-muted-foreground">No projects available. Add one first.</p>}
                           </SelectContent>
                         </Select>
                       )}
@@ -1064,8 +1070,7 @@ export default function EventsPage() {
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
-                            <SelectItem value="Video">Video</SelectItem>
-                            <SelectItem value="Both">Both</SelectItem>
+                            {/* Removed Video and Both */}
                           </SelectContent>
                         </Select>
                       )}
