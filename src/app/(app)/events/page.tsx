@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Focus, Video } from "lucide-react"; 
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Video } from "lucide-react"; 
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, isSameDay } from "date-fns";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, isSameDay, addHours } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -86,7 +86,7 @@ export type Event = EventFormData & {
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
-  organizationId?: string; // Now mandatory at type level, optional in form schema
+  organizationId?: string; 
   discipline?: "Photography" | "";
   isCovered?: boolean;
   personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
@@ -136,7 +136,7 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
     return sharedPersonnel; 
   }
   
-  return false; // Only consider it an overlap if shared personnel AND time overlap
+  return false; 
 };
 
 
@@ -278,10 +278,8 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
-        if (filterDiscipline === "Photography") return event.discipline === "Photography";
-        // if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
-        // if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
-        return true; // "all" or unhandled
+        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "";
+        return true; 
       });
     }
     
@@ -392,7 +390,6 @@ export default function EventsPage() {
         organizationId: selectedProjInfo.organizationId,
         discipline: data.discipline || "",
         isCovered: data.isCovered === undefined ? true : data.isCovered,
-        // personnelActivity is not part of this Omit, it will be added in addEvent
       };
       addEvent(newEventDataForContext);
       toast({
@@ -469,13 +466,11 @@ export default function EventsPage() {
 
   const getDisciplineIcon = (discipline?: Event['discipline']) => {
     if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
-    // if (discipline === "Video") return <Video className="h-3.5 w-3.5 opacity-80" />;
-    // if (discipline === "Both") return <><Camera className="h-3.5 w-3.5 opacity-80" /><Video className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
     return null;
   };
 
   const getCoverageIcon = (isCovered?: boolean) => {
-    if (isCovered === true) return <Focus className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
+    if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
     return null;
   };
 
@@ -551,7 +546,6 @@ export default function EventsPage() {
                     <SelectContent>
                         <SelectItem value="all">All Disciplines</SelectItem>
                         <SelectItem value="Photography">Photography Only</SelectItem>
-                        {/* <SelectItem value="Video">Video Only</SelectItem> */}
                     </SelectContent>
                 </Select>
             </div>
@@ -752,8 +746,6 @@ export default function EventsPage() {
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
-                            {/* <SelectItem value="Video">Video</SelectItem>
-                            <SelectItem value="Both">Both Photo & Video</SelectItem> */}
                           </SelectContent>
                         </Select>
                       )}
@@ -822,7 +814,7 @@ export default function EventsPage() {
                     defaultValue={[]}
                     render={({ field }) => (
                       <div className="space-y-2">
-                        {initialPersonnelMock.filter(p=> p.role !== "Client").map((person) => ( // Filter out 'Client' role
+                        {initialPersonnelMock.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").map((person) => ( 
                           <div key={person.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`person-${person.id}`}
@@ -842,7 +834,7 @@ export default function EventsPage() {
                             </Label>
                           </div>
                         ))}
-                        {initialPersonnelMock.filter(p=> p.role !== "Client").length === 0 && <p className="text-muted-foreground text-xs">No personnel in system. Add them via Personnel page.</p>}
+                        {initialPersonnelMock.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").length === 0 && <p className="text-muted-foreground text-xs">No photography team members in system. Add them via Personnel page.</p>}
                       </div>
                     )}
                   />
