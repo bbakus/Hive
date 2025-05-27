@@ -6,12 +6,12 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info } from "lucide-react";
+import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page"; // Re-using these helpers
-import { isToday, isAfter, isBefore, isWithinInterval, format, set } from "date-fns";
+import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page"; 
+import { isToday, isAfter, isBefore, isWithinInterval, format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ShootPage() {
@@ -40,7 +40,7 @@ export default function ShootPage() {
     });
   }, [currentTime, eventsForSelectedProjectAndOrg]);
 
-  const happeningNowEvents = useMemo(() => {
+  const inProgressEvents = useMemo(() => {
     if (!currentTime || !todaysCoveredEvents) return [];
     return todaysCoveredEvents.filter(event => {
       const times = parseEventTimes(event.date, event.time);
@@ -48,7 +48,7 @@ export default function ShootPage() {
     });
   }, [currentTime, todaysCoveredEvents]);
 
-  const upcomingTodayEvents = useMemo(() => {
+  const upcomingEvents = useMemo(() => {
     if (!currentTime || !todaysCoveredEvents) return [];
     return todaysCoveredEvents.filter(event => {
       const times = parseEventTimes(event.date, event.time);
@@ -56,13 +56,13 @@ export default function ShootPage() {
     });
   }, [currentTime, todaysCoveredEvents]);
 
-  const completedTodayEvents = useMemo(() => {
+  const completedEvents = useMemo(() => {
     if (!currentTime || !todaysCoveredEvents) return [];
     return todaysCoveredEvents.filter(event => {
       const times = parseEventTimes(event.date, event.time);
-      return times && isBefore(times.end, currentTime) && !happeningNowEvents.find(e => e.id === event.id);
+      return times && isBefore(times.end, currentTime) && !inProgressEvents.find(e => e.id === event.id);
     });
-  }, [currentTime, todaysCoveredEvents, happeningNowEvents]);
+  }, [currentTime, todaysCoveredEvents, inProgressEvents]);
 
   if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
     return (
@@ -98,7 +98,7 @@ export default function ShootPage() {
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle className="text-lg flex items-center gap-1.5">
-                {event.isQuickTurnaround && <Badge variant="destructive" className="text-xs px-1.5 py-0.5 h-auto mr-1">Quick Turn</Badge>}
+                {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" title="Quick Turnaround"/>}
                 {event.name}
                 </CardTitle>
                 <CardDescription className="flex items-center gap-1">
@@ -161,8 +161,8 @@ export default function ShootPage() {
         </Alert>
       )}
 
-      {/* Happening Now Section */}
-      {happeningNowEvents.length > 0 && (
+      {/* In Progress Section */}
+      {inProgressEvents.length > 0 && (
         <Card className="shadow-lg border-accent">
           <CardHeader>
             <CardTitle className="text-accent flex items-center gap-2">
@@ -170,38 +170,38 @@ export default function ShootPage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
                 </div>
-                Happening Now ({happeningNowEvents.length})
+                In Progress ({inProgressEvents.length})
             </CardTitle>
             <CardDescription>Events currently in progress.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {happeningNowEvents.map(event => <EventItemCard key={`now-${event.id}`} event={event} />)}
+            {inProgressEvents.map(event => <EventItemCard key={`now-${event.id}`} event={event} />)}
           </CardContent>
         </Card>
       )}
 
-      {/* Upcoming Today Section */}
-      {upcomingTodayEvents.length > 0 && (
+      {/* Upcoming Section */}
+      {upcomingEvents.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Upcoming Today ({upcomingTodayEvents.length})</CardTitle>
+            <CardTitle>Upcoming ({upcomingEvents.length})</CardTitle>
             <CardDescription>Events scheduled for later today.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {upcomingTodayEvents.map(event => <EventItemCard key={`upcoming-${event.id}`} event={event} />)}
+            {upcomingEvents.map(event => <EventItemCard key={`upcoming-${event.id}`} event={event} />)}
           </CardContent>
         </Card>
       )}
 
-      {/* Completed Today Section */}
-      {completedTodayEvents.length > 0 && (
+      {/* Completed Section */}
+      {completedEvents.length > 0 && (
          <Card className="shadow-lg opacity-70">
           <CardHeader>
-            <CardTitle>Completed Today ({completedTodayEvents.length})</CardTitle>
+            <CardTitle>Completed ({completedEvents.length})</CardTitle>
             <CardDescription>Events that have finished today.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {completedTodayEvents.map(event => <EventItemCard key={`completed-${event.id}`} event={event} />)}
+            {completedEvents.map(event => <EventItemCard key={`completed-${event.id}`} event={event} />)}
           </CardContent>
         </Card>
       )}
