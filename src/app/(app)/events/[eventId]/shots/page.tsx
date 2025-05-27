@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useParams, useRouter } from 'next/navigation'; // Added useRouter
-import { useMemo, useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  // DialogTrigger, // Removed if not used directly
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -38,7 +37,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event } from "@/contexts/EventContext"; // Import Event type from context
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 
 const shotRequestSchema = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
@@ -48,36 +47,23 @@ const shotRequestSchema = z.object({
   notes: z.string().optional(),
 });
 
-type ShotRequestFormData = z.infer<typeof shotRequestSchema>;
-
-export type ShotRequest = ShotRequestFormData & {
-  id: string;
-  eventId: string;
-};
-
-// This mock data is now for initial shot requests if demo data is on.
-// The parent event data comes from EventContext.
-const initialShotRequestsMock: ShotRequest[] = [
-  { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd", shotType: "Wide", priority: "High", status: "Planned", notes: "Get this as gates open" },
-  { id: "sr002", eventId: "evt001", description: "Close-up of lead singer - Song 3", shotType: "Close-up", priority: "Critical", status: "Planned" },
-  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various songs", shotType: "B-Roll", priority: "Medium", status: "Planned" },
-  { id: "sr004", eventId: "evt002", description: "Speaker walking onto stage", shotType: "Medium", priority: "High", status: "Captured" },
-  // Add a few mock shots for G9e Summit Events to test
-  { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Wide shot of keynote speaker on Day 1 Morning", shotType: "Wide", priority: "High", status: "Planned" },
-  { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening intently", shotType: "Medium", priority: "Medium", status: "Planned" },
-  { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Planned" },
-];
-
 
 export default function ShotListPage() {
   const params = useParams();
   const eventId = params.eventId as string;
   
-  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { getEventById, isLoadingEvents: isLoadingContextEvents } = useEventContext();
+  const { useDemoData, isLoading: isSettingsContextLoading } = useSettingsContext();
+  const { 
+    getEventById, 
+    isLoadingEvents: isEventContextLoading,
+    getShotRequestsForEvent,
+    addShotRequest,
+    updateShotRequest,
+    deleteShotRequest
+  } = useEventContext();
 
-  const [event, setEvent] = useState<Event | null | undefined>(undefined); // undefined: loading, null: not found
-  const [shotRequests, setShotRequests] = useState<ShotRequest[]>([]);
+  const [event, setEvent] = useState<Event | null | undefined>(undefined);
+  const [currentShotRequests, setCurrentShotRequests] = useState<ShotRequest[]>([]);
   
   const [isShotModalOpen, setIsShotModalOpen] = useState(false);
   const [editingShotRequest, setEditingShotRequest] = useState<ShotRequest | null>(null);
@@ -105,46 +91,42 @@ export default function ShotListPage() {
   });
 
   useEffect(() => {
-    if (isLoadingSettings || isLoadingContextEvents) {
-      setEvent(undefined); // Mark as loading if contexts are not ready
-      setShotRequests([]);
-      return;
-    }
-
-    if (!eventId) {
-      setEvent(null); // No eventId means we can't find an event
-      setShotRequests([]);
+    if (isSettingsContextLoading || isEventContextLoading || !eventId) {
+      setEvent(undefined); 
+      setCurrentShotRequests([]);
       return;
     }
     
-    // Contexts are loaded, and eventId exists. Attempt to get the event.
     const foundEvent = getEventById(eventId);
-    setEvent(foundEvent || null); // If getEventById returns undefined, it means not found, so set to null.
+    setEvent(foundEvent || null);
 
     if (foundEvent) {
-      // Load shot requests for this event (mocked for now)
-      const shotsToUse = useDemoData ? initialShotRequestsMock : [];
-      const eventSpecificShots = shotsToUse.filter(sr => sr.eventId === eventId);
-      setShotRequests(eventSpecificShots);
+      setCurrentShotRequests(getShotRequestsForEvent(eventId));
     } else {
-      setShotRequests([]); // No event found, so no shot requests
+      setCurrentShotRequests([]);
     }
 
-  }, [eventId, useDemoData, isLoadingSettings, isLoadingContextEvents, getEventById]);
+  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById, getShotRequestsForEvent]);
 
 
   useEffect(() => {
-    if (isShotModalOpen) { // Only reset form when modal opens
+    if (isShotModalOpen) {
         if (editingShotRequest) {
-        reset(editingShotRequest);
+          reset({
+            description: editingShotRequest.description,
+            shotType: editingShotRequest.shotType,
+            priority: editingShotRequest.priority,
+            status: editingShotRequest.status,
+            notes: editingShotRequest.notes || "",
+          });
         } else {
-        reset({
+          reset({
             description: "",
             shotType: "Medium",
             priority: "Medium",
             status: "Planned",
             notes: "",
-        });
+          });
         }
     }
   }, [editingShotRequest, reset, isShotModalOpen]);
@@ -154,27 +136,20 @@ export default function ShotListPage() {
     if (!eventId) return;
 
     if (editingShotRequest) {
-      setShotRequests(prevRequests => 
-        prevRequests.map(sr => 
-          sr.id === editingShotRequest.id ? { ...editingShotRequest, ...data } : sr
-        )
-      );
+      updateShotRequest(eventId, editingShotRequest.id, data);
       toast({
         title: "Shot Request Updated",
         description: `"${data.description.substring(0,30)}..." has been updated.`,
       });
     } else {
-      const newShotRequest: ShotRequest = {
-        ...data,
-        id: `sr${String(shotRequests.length + initialShotRequestsMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-        eventId: eventId,
-      };
-      setShotRequests((prevRequests) => [...prevRequests, newShotRequest]);
+      addShotRequest(eventId, data);
       toast({
         title: "Shot Request Added",
         description: `"${data.description.substring(0,30)}..." has been added.`,
       });
     }
+    // Refresh local list after context update
+    setCurrentShotRequests(getShotRequestsForEvent(eventId));
     closeShotModal();
   };
   
@@ -190,7 +165,7 @@ export default function ShotListPage() {
 
   const closeShotModal = () => {
     setIsShotModalOpen(false);
-    // No need to reset editingShotRequest here, useEffect handles it based on isShotModalOpen
+    setEditingShotRequest(null);
   };
   
   const handleDeleteShotClick = (shotId: string) => {
@@ -199,9 +174,11 @@ export default function ShotListPage() {
   };
 
   const confirmDeleteShot = () => {
-    if (shotRequestToDeleteId) {
-      const shot = shotRequests.find(sr => sr.id === shotRequestToDeleteId);
-      setShotRequests(prevRequests => prevRequests.filter(sr => sr.id !== shotRequestToDeleteId));
+    if (shotRequestToDeleteId && eventId) {
+      const shot = currentShotRequests.find(sr => sr.id === shotRequestToDeleteId);
+      deleteShotRequest(eventId, shotRequestToDeleteId);
+      // Refresh local list
+      setCurrentShotRequests(getShotRequestsForEvent(eventId));
       toast({
         title: "Shot Request Deleted",
         description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
@@ -212,11 +189,11 @@ export default function ShotListPage() {
     setIsShotDeleteDialogOpen(false);
   };
 
-  if (isLoadingSettings || isLoadingContextEvents || event === undefined) {
+  if (isSettingsContextLoading || isEventContextLoading || event === undefined) {
     return <div className="flex items-center justify-center h-screen">Loading event shot list...</div>;
   }
 
-  if (event === null) { // Changed from !event to event === null to distinguish "not found" from "loading"
+  if (event === null) {
     return (
         <div className="flex flex-col items-center justify-center h-screen gap-4">
             <p className="text-xl text-muted-foreground">Event not found.</p>
@@ -363,7 +340,7 @@ export default function ShotListPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Manage Shot Requests</CardTitle>
-            <CardDescription>Define and track all required shots for this event. ({shotRequests.length} shots)</CardDescription>
+            <CardDescription>Define and track all required shots for this event. ({currentShotRequests.length} shots)</CardDescription>
           </div>
           <Button onClick={openAddShotModal}>
             <PlusCircle className="mr-2 h-5 w-5" />
@@ -371,7 +348,7 @@ export default function ShotListPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          {shotRequests.length > 0 ? (
+          {currentShotRequests.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -383,7 +360,7 @@ export default function ShotListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {shotRequests.map((shot) => (
+                {currentShotRequests.map((shot) => (
                   <TableRow key={shot.id}>
                     <TableCell className="font-medium max-w-xs truncate" title={shot.description}>{shot.description}</TableCell>
                     <TableCell>{shot.shotType}</TableCell>
@@ -423,7 +400,7 @@ export default function ShotListPage() {
             <div className="text-center py-12 text-muted-foreground">
               <Camera size={48} className="mx-auto mb-4" />
               <p className="text-lg font-medium">No shot requests defined for this event yet.</p>
-              <p>Click "Add Shot Request" to get started. {useDemoData && shotRequests.length === 0 ? "(Or ensure demo data for this event includes shots)" : ""}</p>
+              <p>Click "Add Shot Request" to get started.</p>
             </div>
           )}
         </CardContent>
@@ -431,5 +408,3 @@ export default function ShotListPage() {
     </div>
   );
 }
-
-    
