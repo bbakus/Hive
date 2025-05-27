@@ -6,11 +6,11 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, ChevronDown, LogIn, LogOut, Filter } from "lucide-react";
+import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, LogIn, LogOut, Filter } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import { useEventContext, type Event, type ShotRequest } from "@/contexts/EventContext";
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page"; 
+import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
 import { isToday, isAfter, isBefore, isWithinInterval, format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -23,12 +23,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+
+const MOCK_CURRENT_USER_ID = "user_photog_field"; // Simulated logged-in photographer
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
-  const { eventsForSelectedProjectAndOrg, isLoadingEvents, getShotRequestsForEvent } = useEventContext();
+  const { 
+    eventsForSelectedProjectAndOrg, 
+    isLoadingEvents, 
+    getShotRequestsForEvent,
+    updateShotRequest 
+  } = useEventContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const { toast } = useToast();
 
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "in_progress" | "past">("all");
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
@@ -96,6 +105,47 @@ export default function ShootPage() {
     return { captured, total };
   };
 
+  const handleShotCheckChange = (shotId: string, eventId: string, newCheckedState: boolean) => {
+    const shotsForEvent = getShotRequestsForEvent(eventId);
+    const shotToUpdate = shotsForEvent.find(s => s.id === shotId);
+
+    if (!shotToUpdate) return;
+
+    let newStatus: ShotRequest['status'] | undefined = undefined;
+    if (newCheckedState) {
+        if (shotToUpdate.status !== "Captured" && shotToUpdate.status !== "Completed") {
+            newStatus = "Captured";
+        }
+    } else {
+        if (shotToUpdate.status === "Captured") { // Only uncheck if it was "Captured"
+            newStatus = "Assigned"; // Or "Unassigned" depending on desired flow
+        }
+    }
+
+    if (newStatus) {
+        const updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
+        if (newStatus === "Captured") {
+            if (!shotToUpdate.initialCapturerId) {
+                updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
+            }
+            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+            updatePayload.lastStatusModifiedAt = new Date().toISOString();
+        } else if (newStatus === "Assigned" && shotToUpdate.status === "Captured") {
+            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+            updatePayload.lastStatusModifiedAt = new Date().toISOString();
+            // Optionally clear initialCapturerId if unchecking means it's no longer considered initially captured.
+            // updatePayload.initialCapturerId = ""; // Or undefined
+        }
+        
+        updateShotRequest(eventId, shotId, updatePayload);
+        toast({
+            title: "Shot Status Updated",
+            description: `Shot "${shotToUpdate.description.substring(0,30)}..." marked as ${newStatus}.`
+        });
+    }
+  };
+
+
   if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
     return (
       <div className="flex flex-col gap-8">
@@ -152,7 +202,7 @@ export default function ShootPage() {
                         <SelectItem value="all">All Today's Events</SelectItem>
                         <SelectItem value="upcoming">Upcoming</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="past">Past</SelectItem>
+                        <SelectItem value="past">Past (Completed)</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -239,8 +289,13 @@ export default function ShootPage() {
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {shotsForEvent.map(shot => (
                         <div key={shot.id} className="flex items-center gap-3 p-2 rounded-md border bg-background/50">
-                          <Checkbox id={`shot-check-${shot.id}`} disabled checked={shot.status === "Captured" || shot.status === "Completed"} aria-label={`Checkbox for shot ${shot.description}`}/> 
-                          <label htmlFor={`shot-check-${shot.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={shot.description}>
+                          <Checkbox 
+                            id={`shot-check-${event.id}-${shot.id}`} 
+                            checked={shot.status === "Captured" || shot.status === "Completed"}
+                            onCheckedChange={(checked) => handleShotCheckChange(shot.id, event.id, !!checked)}
+                            aria-label={`Checkbox for shot ${shot.description}`}
+                          /> 
+                          <label htmlFor={`shot-check-${event.id}-${shot.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={shot.description}>
                             {shot.description}
                           </label>
                           <Badge 
@@ -272,3 +327,4 @@ export default function ShootPage() {
     </div>
   );
 }
+
