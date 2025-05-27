@@ -19,13 +19,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Checkbox } from "@/components/ui/checkbox";
+// Checkbox was removed as per previous request, direct buttons are used now
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox"; // Re-added for Quick Turnaround filter
 import { useToast } from "@/hooks/use-toast";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
-
 
 // MOCK_CURRENT_USER_ID simulates the logged-in photographer for actions on this page
 const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
@@ -392,7 +392,7 @@ export default function ShootPage() {
                     </Button>
                   </div>
                   {shotsForEvent.length > 0 ? (
-                    <div className="space-y-1"> {/* No ScrollArea, vertical stack */}
+                    <div className="space-y-1">
                       {shotsForEvent.map(shot => (
                         <div key={shot.id} className="flex items-center gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
                            <Badge
@@ -405,7 +405,7 @@ export default function ShootPage() {
                                 shot.status === "Request More" ? "destructive" :
                                 "outline"
                             }
-                            className="text-xs whitespace-nowrap px-2 py-0.5 flex-shrink-0"
+                            className="text-xs whitespace-nowrap px-2 py-0.5 flex-shrink-0 w-[120px] justify-center"
                           >
                             {shot.status}
                           </Badge>
@@ -445,3 +445,4 @@ export default function ShootPage() {
     </div>
   );
 }
+
