@@ -6,12 +6,12 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, LogIn, LogOut, Filter } from "lucide-react";
+import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, LogIn, LogOut, Filter, CheckSquare } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
-import { isToday, isAfter, isBefore, isWithinInterval, format } from "date-fns";
+import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
@@ -33,7 +33,9 @@ export default function ShootPage() {
     eventsForSelectedProjectAndOrg, 
     isLoadingEvents, 
     getShotRequestsForEvent,
-    updateShotRequest 
+    updateShotRequest,
+    checkInUserToEvent,
+    checkOutUserFromEvent
   } = useEventContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -117,8 +119,8 @@ export default function ShootPage() {
             newStatus = "Captured";
         }
     } else {
-        if (shotToUpdate.status === "Captured") { // Only uncheck if it was "Captured"
-            newStatus = "Assigned"; // Or "Unassigned" depending on desired flow
+        if (shotToUpdate.status === "Captured") { 
+            newStatus = "Assigned"; 
         }
     }
 
@@ -133,8 +135,6 @@ export default function ShootPage() {
         } else if (newStatus === "Assigned" && shotToUpdate.status === "Captured") {
             updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
             updatePayload.lastStatusModifiedAt = new Date().toISOString();
-            // Optionally clear initialCapturerId if unchecking means it's no longer considered initially captured.
-            // updatePayload.initialCapturerId = ""; // Or undefined
         }
         
         updateShotRequest(eventId, shotId, updatePayload);
@@ -143,6 +143,22 @@ export default function ShootPage() {
             description: `Shot "${shotToUpdate.description.substring(0,30)}..." marked as ${newStatus}.`
         });
     }
+  };
+
+  const handleCheckIn = (eventId: string) => {
+    checkInUserToEvent(eventId, MOCK_CURRENT_USER_ID);
+    toast({
+      title: "Checked In",
+      description: `You've successfully checked in to the event.`,
+    });
+  };
+
+  const handleCheckOut = (eventId: string) => {
+    checkOutUserFromEvent(eventId, MOCK_CURRENT_USER_ID);
+     toast({
+      title: "Checked Out",
+      description: `You've successfully checked out from the event.`,
+    });
   };
 
 
@@ -235,6 +251,10 @@ export default function ShootPage() {
             const eventStatusBadge = getEventStatusBadgeInfo(event);
             const shotsForEvent = getShotRequestsForEvent(event.id);
 
+            const currentUserActivity = event.personnelActivity?.[MOCK_CURRENT_USER_ID];
+            const isCheckedIn = !!currentUserActivity?.checkInTime && !currentUserActivity?.checkOutTime;
+            const wasCheckedOut = !!currentUserActivity?.checkInTime && !!currentUserActivity?.checkOutTime;
+
             return (
               <AccordionItem value={event.id} key={event.id} className="border bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow">
                 <AccordionTrigger className="p-4 hover:no-underline">
@@ -269,13 +289,34 @@ export default function ShootPage() {
                 </AccordionTrigger>
                 <AccordionContent className="p-4 border-t">
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" disabled> 
+                    <div className="flex gap-2 items-center">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleCheckIn(event.id)}
+                        disabled={isCheckedIn || wasCheckedOut}
+                      > 
                         <LogIn className="mr-2 h-4 w-4"/> Check In
                       </Button>
-                      <Button variant="outline" size="sm" disabled> 
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleCheckOut(event.id)}
+                        disabled={!isCheckedIn || wasCheckedOut}
+                      > 
                         <LogOut className="mr-2 h-4 w-4"/> Check Out
                       </Button>
+                       {isCheckedIn && (
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                             <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500"/>
+                            Checked In at {format(parseISO(currentUserActivity!.checkInTime!), "p")}
+                          </Badge>
+                        )}
+                        {wasCheckedOut && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Checked Out at {format(parseISO(currentUserActivity!.checkOutTime!), "p")}
+                          </Badge>
+                        )}
                     </div>
                     <Button variant="default" size="sm" asChild>
                       <Link href={`/events/${event.id}/shots`}>
@@ -283,6 +324,17 @@ export default function ShootPage() {
                       </Link>
                     </Button>
                   </div>
+                 
+                  { (isCheckedIn || wasCheckedOut) && currentUserActivity?.checkInTime && (
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {wasCheckedOut 
+                        ? `Activity: From ${format(parseISO(currentUserActivity.checkInTime), "p")} to ${format(parseISO(currentUserActivity.checkOutTime!), "p")}`
+                        : `Currently checked in since ${format(parseISO(currentUserActivity.checkInTime), "p")}.`}
+                    </p>
+                  )}
+                  {!currentUserActivity?.checkInTime && <p className="text-xs text-muted-foreground mb-3">Not yet checked in to this event.</p>}
+
+
                   <Separator className="my-3" />
                   <h4 className="text-sm font-medium mb-2">Shot Checklist:</h4>
                   {shotsForEvent.length > 0 ? (

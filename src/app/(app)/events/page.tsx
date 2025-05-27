@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Focus } from "lucide-react"; 
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Focus, Video } from "lucide-react"; 
 import {
   Dialog,
   DialogContent,
@@ -70,8 +70,12 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", "" ]).optional(), // Only Photography or N/A
+  discipline: z.enum(["Photography", ""] ).optional(), 
   isCovered: z.boolean().optional(),
+  personnelActivity: z.record(z.object({
+    checkInTime: z.string().optional(),
+    checkOutTime: z.string().optional(),
+  })).optional(),
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
@@ -82,9 +86,10 @@ export type Event = EventFormData & {
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
-  organizationId?: string;
+  organizationId?: string; // Now mandatory at type level, optional in form schema
   discipline?: "Photography" | "";
   isCovered?: boolean;
+  personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
 };
 
 
@@ -107,8 +112,8 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = setHours(startOfDay(baseDate), endHour);
   endDate = setMinutes(endDate, endMinute);
 
-  if (isBefore(endDate, startDate)) {
-    endDate.setDate(endDate.getDate() + 1);
+  if (isBefore(endDate, startDate)) { // Handle overnight events crossing midnight
+    endDate = addHours(endDate, 24);
   }
 
   return { start: startDate, end: endDate };
@@ -131,7 +136,7 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
     return sharedPersonnel; 
   }
   
-  return true; 
+  return false; // Only consider it an overlap if shared personnel AND time overlap
 };
 
 
@@ -150,7 +155,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], // Default to empty array
+    eventsForSelectedProjectAndOrg = [], 
     addEvent,
     updateEvent,
     deleteEvent,
@@ -166,7 +171,7 @@ export default function EventsPage() {
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
   const [filterAssignedMemberId, setFilterAssignedMemberId] = useState<string>("all");
-  const [filterDiscipline, setFilterDiscipline] = useState<string>("all"); // "all", "Photography"
+  const [filterDiscipline, setFilterDiscipline] = useState<string>("all");
   const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
   const [filterCoverageStatus, setFilterCoverageStatus] = useState<"all" | "covered" | "not_covered">("all");
 
@@ -189,6 +194,7 @@ export default function EventsPage() {
       assignedPersonnelIds: [],
       discipline: "",
       isCovered: true, 
+      personnelActivity: {},
     }
   });
 
@@ -214,6 +220,7 @@ export default function EventsPage() {
         organizationId: editingEvent.organizationId || "",
         discipline: editingEvent.discipline || "",
         isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
+        personnelActivity: editingEvent.personnelActivity || {},
       });
     } else {
       const firstProjectForOrg = selectedProject ? selectedProject : (allProjects.length > 0 ? allProjects[0] : null);
@@ -229,6 +236,7 @@ export default function EventsPage() {
         organizationId: firstProjectForOrg?.organizationId || "",
         discipline: "",
         isCovered: true,
+        personnelActivity: {},
       });
     }
   }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjects, activeBlockScheduleDateKey]);
@@ -271,7 +279,9 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
         if (filterDiscipline === "Photography") return event.discipline === "Photography";
-        return true; 
+        // if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
+        // if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
+        return true; // "all" or unhandled
       });
     }
     
@@ -362,6 +372,7 @@ export default function EventsPage() {
       organizationId: selectedProjInfo.organizationId,
       discipline: data.discipline || "", 
       isCovered: data.isCovered === undefined ? true : data.isCovered,
+      personnelActivity: data.personnelActivity || {},
     };
 
     if (editingEvent) {
@@ -376,11 +387,12 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'> = {
+      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> = {
         ...data,
         organizationId: selectedProjInfo.organizationId,
         discipline: data.discipline || "",
         isCovered: data.isCovered === undefined ? true : data.isCovered,
+        // personnelActivity is not part of this Omit, it will be added in addEvent
       };
       addEvent(newEventDataForContext);
       toast({
@@ -407,6 +419,7 @@ export default function EventsPage() {
       organizationId: projectInfo?.organizationId || "",
       discipline: "",
       isCovered: true,
+      personnelActivity: {},
     });
     setIsEventModalOpen(true);
   };
@@ -425,6 +438,7 @@ export default function EventsPage() {
       organizationId: event.organizationId || "",
       discipline: event.discipline || "",
       isCovered: event.isCovered === undefined ? true : event.isCovered,
+      personnelActivity: event.personnelActivity || {},
     });
     setIsEventModalOpen(true);
   };
@@ -455,6 +469,8 @@ export default function EventsPage() {
 
   const getDisciplineIcon = (discipline?: Event['discipline']) => {
     if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
+    // if (discipline === "Video") return <Video className="h-3.5 w-3.5 opacity-80" />;
+    // if (discipline === "Both") return <><Camera className="h-3.5 w-3.5 opacity-80" /><Video className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
     return null;
   };
 
@@ -535,6 +551,7 @@ export default function EventsPage() {
                     <SelectContent>
                         <SelectItem value="all">All Disciplines</SelectItem>
                         <SelectItem value="Photography">Photography Only</SelectItem>
+                        {/* <SelectItem value="Video">Video Only</SelectItem> */}
                     </SelectContent>
                 </Select>
             </div>
@@ -735,6 +752,8 @@ export default function EventsPage() {
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
+                            {/* <SelectItem value="Video">Video</SelectItem>
+                            <SelectItem value="Both">Both Photo & Video</SelectItem> */}
                           </SelectContent>
                         </Select>
                       )}
