@@ -25,7 +25,7 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { PhaseProvider, usePhaseContext, type Phase, PHASES as AppPhasesArray } from "@/contexts/PhaseContext";
-import { EventProvider } from "@/contexts/EventContext"; // Import EventProvider
+import { EventProvider } from "@/contexts/EventContext";
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
@@ -111,19 +111,25 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-      // Preserve "Shoot" if already in that phase on events page, otherwise default to "Plan"
-      determinedPhase = activePhase === 'Shoot' ? 'Shoot' : 'Plan';
+      // If already in "Shoot" phase and navigating within /events (e.g. to a shot list), keep "Shoot"
+      // Otherwise, /events primarily belongs to "Plan"
+      if (activePhase === 'Shoot' && (currentPath.includes('/shots'))) {
+         determinedPhase = 'Shoot';
+      } else {
+        determinedPhase = 'Plan';
+      }
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/scheduler' || currentPath.startsWith('/scheduler/')) {
       determinedPhase = 'Plan';
+    } else if (currentPath === '/shoot' || currentPath.startsWith('/shoot/')) {
+      determinedPhase = 'Shoot';
     } else if (currentPath === '/post-production' || currentPath.startsWith('/post-production/')) {
       determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
     } else if (currentPath === '/settings' || currentPath.startsWith('/support/')) {
-      // For footer items, try to keep the current main content phase, or default to Dashboard
-      determinedPhase = activePhase || 'Dashboard';
+      determinedPhase = activePhase || 'Dashboard'; // Keep current main phase or default
     }
 
 
