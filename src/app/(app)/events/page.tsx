@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video as VideoIconLucide } from "lucide-react";
@@ -38,14 +38,13 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay, lightFormat } from "date-fns";
-import type { DateRange } from "react-day-picker";
+import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay, lightFormat, type DateRange } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event as EventContextEvent } from "@/contexts/EventContext"; 
+import { useEventContext, type Event as EventContextEvent } from "@/contexts/EventContext";
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
@@ -71,7 +70,7 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", "Video", "Both", ""]).optional(),
+  discipline: z.enum(["Photography", ""]).optional(), // "Video", "Both" removed
   isCovered: z.boolean().optional(),
   personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
@@ -81,10 +80,10 @@ export const eventSchema = z.object({
 
 export type EventFormData = z.infer<typeof eventSchema>;
 
-export type Event = EventContextEvent & { 
-  hasOverlap?: boolean; 
+export type Event = EventContextEvent & {
+  hasOverlap?: boolean;
   organizationId?: string;
-  discipline?: "Photography" | "Video" | "Both" | "";
+  discipline?: "Photography" | ""; // "Video", "Both" removed
 };
 
 
@@ -111,30 +110,30 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   if (isBefore(endDate, startDate) || (isSameDay(startDate, endDate) && endHour * 60 + endMinute === 0 && startHour * 60 + startMinute > 0) ){
     endDate = addHours(endDate, 24);
   }
-  
+
   return { start: startDate, end: endDate };
 };
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.id === eventB.id) return false; 
+  if (eventA.id === eventB.id) return false;
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; 
+  if (!timesA || !timesB) return false;
 
-  
+
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  
+
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-  
-  return false; 
+
+  return false;
 };
 
 
@@ -151,7 +150,6 @@ export function formatDeadline(deadlineString?: string): string | null {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80" />;
-  
   return null;
 };
 
@@ -241,7 +239,6 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
-              
             </SelectContent>
           </Select>
         </div>
@@ -343,14 +340,14 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                       {/* Main Info Section - Left */}
                       <div className="flex-grow space-y-1">
                         <CardTitle className="text-lg flex items-center gap-1.5">
-                          {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0" title="Quick Turnaround"/>}
                           {getCoverageIcon(event.isCovered)}
                           <span className="truncate" title={event.name}>{event.name}</span>
+                          {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
                         </CardTitle>
                         <div className="text-xs text-muted-foreground space-y-0.5">
                             <p className="flex items-center gap-1">
                                 {event.time}
-                                {event.hasOverlap && <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
+                                {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
                                 <Badge variant={
                                 event.priority === "Critical" ? "destructive" :
                                 event.priority === "High" ? "secondary" :
@@ -358,9 +355,9 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                 } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
                             </p>
                             {!selectedProject && event.project && (
-                            <p className="text-xs mt-0.5 truncate" title={event.project}>
-                                Project: {event.project}
-                            </p>
+                              <p className="text-xs mt-0.5 truncate" title={event.project}>
+                                  Project: {event.project}
+                              </p>
                             )}
                         </div>
                         <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
@@ -455,9 +452,9 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
               {displayableEvents.map((event) => (
                 <TableRow key={event.id}>
                   <TableCell className="font-medium flex items-center gap-1.5">
-                    {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 flex-shrink-0" title="Quick Turnaround"/>}
                      {getCoverageIcon(event.isCovered)}
                     {event.name}
+                    {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
                   </TableCell>
                   {!selectedProject && <TableCell>{event.project}</TableCell>}
                   <TableCell className="flex items-center">
@@ -589,7 +586,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], 
+    eventsForSelectedProjectAndOrg = [],
     addEvent,
     updateEvent,
     deleteEvent,
@@ -643,7 +640,7 @@ export default function EventsPage() {
     }
 
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === (editingEvent?.projectId || selectedProject?.id));
-    
+
     if (editingEvent) {
       reset({
         name: editingEvent.name,
@@ -702,7 +699,7 @@ export default function EventsPage() {
       filtered = filtered.filter(event => {
         const times = parseEventTimes(event.date, event.time);
         if (!times) return false;
-        
+
         if (filterTimeStatus === "upcoming") return isAfter(times.start, now);
         if (filterTimeStatus === "past") return isBefore(times.end, now);
         if (filterTimeStatus === "now") return isWithinInterval(now, { start: times.start, end: times.end });
@@ -714,10 +711,12 @@ export default function EventsPage() {
       filtered = filtered.filter(event => event.assignedPersonnelIds?.includes(filterAssignedMemberId));
     }
 
-    if (filterDiscipline === "Photography") {
-        filtered = filtered.filter(event => event.discipline === "Photography");
+    if (filterDiscipline !== "all") {
+      if (filterDiscipline === "Photography") {
+          filtered = filtered.filter(event => event.discipline === "Photography");
+      }
     }
-    
+
     if (filterCoverageStatus !== "all") {
       if (filterCoverageStatus === "covered") {
         filtered = filtered.filter(event => event.isCovered === true);
@@ -809,7 +808,7 @@ export default function EventsPage() {
 
     const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' > & { organizationId: string } = {
       ...data,
-      organizationId: data.organizationId || selectedProjInfo.organizationId, 
+      organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
     };
@@ -817,10 +816,10 @@ export default function EventsPage() {
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        project: selectedProjInfo.name, 
-        deliverables: editingEvent.deliverables, 
-        shotRequests: editingEvent.shotRequests, 
-        personnelActivity: editingEvent.personnelActivity || data.personnelActivity || {}, 
+        project: selectedProjInfo.name,
+        deliverables: editingEvent.deliverables,
+        shotRequests: editingEvent.shotRequests,
+        personnelActivity: editingEvent.personnelActivity || data.personnelActivity || {},
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -1099,7 +1098,7 @@ export default function EventsPage() {
                         render={({ field }) => (
                             <Checkbox
                             id="event-isCovered"
-                            checked={field.value === undefined ? true : field.value} 
+                            checked={field.value === undefined ? true : field.value}
                             onCheckedChange={field.onChange}
                             className="mr-2"
                             />
@@ -1232,4 +1231,3 @@ export default function EventsPage() {
     </div>
   );
 }
-    

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Users, Settings, Zap, Eye } from "lucide-react"; // Changed Focus to Eye
+import { Users, Settings, Zap, Eye, Camera as CameraIcon } from "lucide-react";
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
@@ -78,13 +78,24 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
     return {
       position: 'absolute',
       top: `${top}px`,
-      height: `${Math.max(height, 45)}px`, 
+      height: `${Math.max(height, 45)}px`,
       left: `${leftPercentage}%`,
       width: `${widthPercentage}%`,
       zIndex: startMinute + 10,
       overflow: 'hidden',
     };
   };
+
+  const getCoverageIcon = (isCovered?: boolean) => {
+    if (isCovered === true) return <Eye className="h-3 w-3 text-accent flex-shrink-0" title="Covered Event" />;
+    return <Eye className="h-3 w-3 text-muted-foreground flex-shrink-0" title="Not Covered" />;
+  };
+
+  const getDisciplineIcon = (discipline?: Event['discipline']) => {
+    if (discipline === "Photography") return <CameraIcon className="h-3 w-3 opacity-80" />;
+    return null;
+  };
+
 
   return (
     <div className="flex flex-col min-h-[600px] bg-background rounded-lg shadow">
@@ -124,7 +135,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
               className={cn(
                 "absolute rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
                 getPriorityColor(event.priority),
-                event.isCovered === false && "opacity-60 bg-muted/50 border-muted-foreground/30 hover:opacity-90" 
+                event.isCovered === false && "opacity-60 bg-muted/50 border-muted-foreground/30 hover:opacity-90"
               )}
               title={`${event.name} (${event.time}) - Project: ${event.project} ${event.isCovered === false ? '- Not Covered' : '- Covered'}`}
             >
@@ -144,15 +155,20 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
               )}
               <div>
                 <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
-                    {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0" title="Quick Turnaround"/>}
-                    {event.isCovered && <Eye className="h-3 w-3 text-accent flex-shrink-0" title="Covered Event"/>}
-                    {(!event.isCovered && event.isCovered !== undefined) && <Eye className="h-3 w-3 text-muted-foreground flex-shrink-0" title="Not Covered"/>}
+                    {getCoverageIcon(event.isCovered)}
                     {event.name}
+                    {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0 ml-1" title="Quick Turnaround"/>}
                 </p>
                 <p className="opacity-80 truncate leading-tight">{event.time}</p>
               </div>
               <div className="mt-0.5 space-y-0.5">
                 {event.project && <p className="opacity-70 truncate leading-tight">Proj: {event.project}</p>}
+                {event.discipline && (
+                    <p className="opacity-70 truncate leading-tight flex items-center gap-0.5">
+                        {getDisciplineIcon(event.discipline)}
+                        {event.discipline}
+                    </p>
+                )}
                 {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
                   <p className="opacity-70 truncate leading-tight flex items-center">
                     <Users className="mr-1 h-3 w-3 shrink-0" />
@@ -172,4 +188,3 @@ export function BlockScheduleView({ selectedDate, eventsForDate, onEditEvent }: 
     </div>
   );
 }
-
