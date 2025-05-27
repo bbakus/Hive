@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, ChevronDown, LogIn, LogOut } from "lucide-react";
+import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, ChevronDown, LogIn, LogOut, Filter } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -28,9 +30,12 @@ export default function ShootPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
+  const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "in_progress" | "past">("all");
+  const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
+
   useEffect(() => {
     setCurrentTime(new Date());
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute for liveness
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute
     return () => clearInterval(timer);
   }, []);
 
@@ -46,27 +51,43 @@ export default function ShootPage() {
     });
   }, [currentTime, eventsForSelectedProjectAndOrg]);
 
-  const getEventStatus = (event: Event): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } => {
-    if (!currentTime) return { label: "Pending", variant: "outline" };
+  const getEventStatus = (event: Event, now: Date): "in_progress" | "upcoming" | "past" => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return { label: "Time Error", variant: "destructive" };
+    if (!times) return "upcoming"; // Default or error case
 
-    if (isWithinInterval(currentTime, { start: times.start, end: times.end })) {
-      return { label: "In Progress", variant: "secondary" };
+    if (isWithinInterval(now, { start: times.start, end: times.end })) {
+      return "in_progress";
     }
-    if (isAfter(times.start, currentTime)) {
-      return { label: "Upcoming", variant: "outline" };
+    if (isAfter(times.start, now)) {
+      return "upcoming";
     }
-    if (isBefore(times.end, currentTime)) {
-      return { label: "Completed", variant: "default" };
-    }
-    return { label: "Scheduled", variant: "outline" };
+    return "past";
   };
 
-  const getShotProgress = (eventId: string): { captured: number; total: number } => {
-    const shots = getShotRequestsForEvent(eventId);
-    const captured = shots.filter(shot => shot.status === "Captured" || shot.status === "Completed").length;
-    return { captured, total: shots.length };
+  const filteredTodaysEvents = useMemo(() => {
+    if (!currentTime) return [];
+    let filtered = todaysCoveredEvents;
+
+    if (filterQuickTurnaround) {
+      filtered = filtered.filter(event => event.isQuickTurnaround);
+    }
+
+    if (filterTimeStatus !== "all") {
+      filtered = filtered.filter(event => getEventStatus(event, currentTime) === filterTimeStatus);
+    }
+    return filtered;
+  }, [todaysCoveredEvents, filterTimeStatus, filterQuickTurnaround, currentTime]);
+
+
+  const getEventStatusBadgeInfo = (event: Event): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } => {
+    if (!currentTime) return { label: "Pending", variant: "outline" };
+    const status = getEventStatus(event, currentTime);
+    switch (status) {
+      case "in_progress": return { label: "In Progress", variant: "secondary" };
+      case "upcoming": return { label: "Upcoming", variant: "outline" };
+      case "past": return { label: "Completed", variant: "default" };
+      default: return { label: "Scheduled", variant: "outline" };
+    }
   };
 
   if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
@@ -109,22 +130,53 @@ export default function ShootPage() {
         </p>
       </div>
 
-      {todaysCoveredEvents.length === 0 && (
+      <Card className="shadow-md">
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Today's Events</CardTitle>
+            <CardDescription>Refine the events shown below for today.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <Label htmlFor="filter-time-status">Time Status</Label>
+                <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
+                    <SelectTrigger id="filter-time-status">
+                        <SelectValue placeholder="Filter by time status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Today's Events</SelectItem>
+                        <SelectItem value="upcoming">Upcoming</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="past">Past (Completed)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center space-x-2 pt-6">
+                <Checkbox
+                    id="filter-quick-turnaround"
+                    checked={filterQuickTurnaround}
+                    onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+                />
+                <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround Only</Label>
+            </div>
+        </CardContent>
+      </Card>
+
+      {filteredTodaysEvents.length === 0 && (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>No Covered Events Today</AlertTitle>
+          <AlertTitle>No Covered Events Today Matching Filters</AlertTitle>
           <AlertDescription>
-            There are no events marked for production coverage scheduled for today ({format(currentTime, "PPP")}) in the project "{selectedProject.name}".
-            Check the "Events Setup" under the Plan phase to schedule or mark events for coverage.
+            There are no events marked for production coverage scheduled for today ({format(currentTime, "PPP")}) in "{selectedProject.name}" that match your current filter criteria.
+            Adjust filters or check "Events Setup" under the Plan phase.
           </AlertDescription>
         </Alert>
       )}
 
-      {todaysCoveredEvents.length > 0 && (
+      {filteredTodaysEvents.length > 0 && (
         <Accordion type="multiple" className="w-full space-y-3">
-          {todaysCoveredEvents.map(event => {
+          {filteredTodaysEvents.map(event => {
             const shotProgress = getShotProgress(event.id);
-            const eventStatus = getEventStatus(event);
+            const eventStatusBadge = getEventStatusBadgeInfo(event);
             const shotsForEvent = getShotRequestsForEvent(event.id);
 
             return (
@@ -140,13 +192,18 @@ export default function ShootPage() {
                         <Clock className="h-3 w-3" /> {event.time}
                         {event.deadline && <span className="ml-2 text-amber-600 dark:text-amber-400">Deadline: {formatDeadline(event.deadline)}</span>}
                       </p>
+                       {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <Users className="h-3 w-3" /> {event.assignedPersonnelIds.length} Assigned
+                          </p>
+                        )}
                     </div>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 mt-2 sm:mt-0">
                        <Badge variant={event.priority === "Critical" ? "destructive" : event.priority === "High" ? "secondary" : "outline"} className="text-xs">
                         {event.priority}
                       </Badge>
-                      <Badge variant={eventStatus.variant} className="text-xs">
-                        {eventStatus.label}
+                      <Badge variant={eventStatusBadge.variant} className="text-xs">
+                        {eventStatusBadge.label}
                       </Badge>
                       <p className="text-xs text-muted-foreground whitespace-nowrap">
                         Shots: {shotProgress.captured} / {shotProgress.total}
