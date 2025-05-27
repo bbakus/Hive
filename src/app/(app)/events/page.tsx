@@ -4,10 +4,10 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Video as VideoIconLucide } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video as VideoIconLucide } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +45,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext } from "@/contexts/EventContext";
+import { useEventContext, type Event as EventContextEvent } from "@/contexts/EventContext"; // Renamed to avoid conflict
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
@@ -71,7 +71,7 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", ""] ).optional(),
+  discipline: z.enum(["Photography", "Video", "Both", ""]).optional(),
   isCovered: z.boolean().optional(),
   personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
@@ -81,11 +81,7 @@ export const eventSchema = z.object({
 
 export type EventFormData = z.infer<typeof eventSchema>;
 
-export type Event = z.infer<typeof eventSchema> & {
-  id: string;
-  project: string;
-  deliverables: number;
-  shotRequests: number;
+export type Event = EventContextEvent & { // Use the type from EventContext which now has organizationId
   hasOverlap?: boolean; // Added by overlap checking logic
 };
 
@@ -155,7 +151,9 @@ export function formatDeadline(deadlineString?: string): string | null {
 }
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
+  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80" />;
+  if (discipline === "Video") return <VideoIconLucide className="h-3.5 w-3.5 opacity-80" />;
+  if (discipline === "Both") return <><CameraIcon className="h-3.5 w-3.5 opacity-80" /><VideoIconLucide className="h-3.5 w-3.5 opacity-80 ml-0.5" /></>;
   return null;
 };
 
@@ -245,6 +243,7 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
+              <SelectItem value="Video">Video Only</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -342,7 +341,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               <div className="space-y-4">
                 {dayEvents.map((event) => (
                   <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-2 flex flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <CardHeader className="pb-3 flex-row justify-between items-start gap-x-4">
                       <div className="flex-grow min-w-0"> {/* Left side for Name and Project */}
                         <CardTitle className="text-lg flex items-center gap-1.5">
                           {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0" title="Quick Turnaround"/>}
@@ -350,9 +349,9 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                           <span className="truncate" title={event.name}>{event.name}</span>
                         </CardTitle>
                         {!selectedProject && event.project && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate" title={event.project}>
+                          <CardDescription className="text-xs mt-0.5 truncate" title={event.project}>
                             Project: {event.project}
-                          </p>
+                          </CardDescription>
                         )}
                       </div>
                       <div className="flex-shrink-0 text-right space-y-1"> {/* Right side for Priority and Time */}
@@ -368,7 +367,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="pt-1 pb-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+                    <CardContent className="pt-0 pb-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                       {event.deadline && (
                         <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
                           Deadline: {formatDeadline(event.deadline)}
@@ -591,7 +590,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [],
+    eventsForSelectedProjectAndOrg = [], // Default to empty array
     addEvent,
     updateEvent,
     deleteEvent,
@@ -717,10 +716,11 @@ export default function EventsPage() {
     }
 
     if (filterDiscipline !== "all") {
-      filtered = filtered.filter(event => {
-        if (filterDiscipline === "Photography") return event.discipline === "Photography"; 
-        return true; // if "all" or unknown filter value, include all
-      });
+        filtered = filtered.filter(event => {
+            if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both";
+            if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
+            return true; // if "all" or unknown filter value, include all
+        });
     }
     
     if (filterCoverageStatus !== "all") {
@@ -812,12 +812,11 @@ export default function EventsPage() {
       return;
     }
 
-    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'hasOverlap' | 'project'> & { organizationId: string } = {
+    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' > & { organizationId: string } = {
       ...data,
-      organizationId: data.organizationId || selectedProjInfo.organizationId,
+      organizationId: data.organizationId || selectedProjInfo.organizationId, // Ensure organizationId is present
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
-      personnelActivity: editingEvent?.personnelActivity || data.personnelActivity || {},
     };
 
     if (editingEvent) {
@@ -826,6 +825,7 @@ export default function EventsPage() {
         project: selectedProjInfo.name, // Ensure project name is updated if projectId changed
         deliverables: editingEvent.deliverables, // Preserve these counts
         shotRequests: editingEvent.shotRequests, // Preserve these counts
+        personnelActivity: editingEvent.personnelActivity || data.personnelActivity || {}, // Preserve or update
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -833,7 +833,7 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      addEvent(eventPayload);
+      addEvent({...eventPayload, personnelActivity: {}});
       toast({
         title: "Event Added",
         description: `"${data.name}" has been successfully added.`,
@@ -1076,6 +1076,8 @@ export default function EventsPage() {
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
+                            <SelectItem value="Video">Video</SelectItem>
+                            <SelectItem value="Both">Both</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
