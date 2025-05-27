@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Video as VideoIconLucide } from "lucide-react";
@@ -39,12 +39,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event } from "@/contexts/EventContext";
+import { useEventContext } from "@/contexts/EventContext";
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
@@ -55,7 +56,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import type { DateRange } from "react-day-picker";
+import { Separator } from "@/components/ui/separator";
 
 
 export const eventSchema = z.object({
@@ -70,7 +71,7 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", "Video", "Both", ""] ).optional(),
+  discipline: z.enum(["Photography", ""] ).optional(),
   isCovered: z.boolean().optional(),
   personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
@@ -80,8 +81,13 @@ export const eventSchema = z.object({
 
 export type EventFormData = z.infer<typeof eventSchema>;
 
-// Event type definition is now primarily sourced from EventContext,
-// but we keep this here as EventFormData might be used locally for forms.
+export type Event = z.infer<typeof eventSchema> & {
+  id: string;
+  project: string;
+  deliverables: number;
+  shotRequests: number;
+  hasOverlap?: boolean; // Added by overlap checking logic
+};
 
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
@@ -112,23 +118,28 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 };
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.id === eventB.id) return false;
+  if (eventA.id === eventB.id) return false; // Don't compare an event with itself
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false;
+  if (!timesA || !timesB) return false; // Invalid time format
 
+  // Basic time overlap check
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
+  // Check for shared personnel if both events have personnel assigned
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-
-  return false; // No personnel overlap check if either event has no assigned personnel
+  
+  // If one or both events have no personnel, overlap is still true if times clash (useful for general scheduling)
+  // However, for the specific "AlertTriangle" scenario, we care about shared personnel.
+  // If you want the triangle for ANY time overlap regardless of personnel, remove the personnel check block above.
+  return false; // Default to no "personnel-based" overlap if personnel checks don't apply
 };
 
 
@@ -182,7 +193,7 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <Card className="shadow-md">
+    <Card className="shadow-md mb-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
         <CardDescription>Refine the events shown across all views below.</CardDescription>
@@ -328,59 +339,67 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               <h3 className="text-xl font-semibold mb-3 border-b pb-2">
                 {format(parseISO(date), "EEEE, MMMM do, yyyy")}
               </h3>
-              <div className="space-y-4"> {/* Changed from grid to space-y-4 for full-width rows */}
+              <div className="space-y-4">
                 {dayEvents.map((event) => (
                   <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" title="Quick Turnaround"/>}
+                    <CardHeader className="pb-2 flex flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                      <div className="flex-grow min-w-0"> {/* Left side for Name and Project */}
+                        <CardTitle className="text-lg flex items-center gap-1.5">
+                          {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0" title="Quick Turnaround"/>}
                           {getCoverageIcon(event.isCovered)}
-                          {event.name}
-                        </span>
+                          <span className="truncate" title={event.name}>{event.name}</span>
+                        </CardTitle>
+                        {!selectedProject && event.project && (
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate" title={event.project}>
+                            Project: {event.project}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 text-right space-y-1"> {/* Right side for Priority and Time */}
                         <Badge variant={
                           event.priority === "Critical" ? "destructive" :
                           event.priority === "High" ? "secondary" :
                           event.priority === "Medium" ? "outline" : "default"
-                        }>{event.priority}</Badge>
-                      </CardTitle>
-                      <CardDescription className="flex items-center">
-                        {event.time}
-                        {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
-                      </CardDescription>
+                        } className="text-xs whitespace-nowrap">{event.priority}</Badge>
+                        <p className="text-sm text-muted-foreground flex items-center justify-end gap-1 whitespace-nowrap">
+                          {event.time}
+                          {event.hasOverlap && <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
+                        </p>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="pt-1 pb-3 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                       {event.deadline && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                        <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
                           Deadline: {formatDeadline(event.deadline)}
                         </p>
                       )}
-                    </CardHeader>
-                    <CardContent className="flex-grow space-y-1 text-xs">
-                      {!selectedProject && event.project && (
-                        <p className="text-muted-foreground">Project: {event.project}</p>
-                      )}
                       {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                        <p className="text-muted-foreground flex items-center">
-                          <Users className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                        <p className="flex items-center gap-1 whitespace-nowrap">
+                          <Users className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
                           Assigned: {event.assignedPersonnelIds.length}
                         </p>
                       )}
-                       <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center">
-                          <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                       <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center gap-1 whitespace-nowrap">
+                          <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
                           Shot Requests: {event.shotRequests}
                        </Link>
-                      <p className="text-muted-foreground flex items-center gap-1">
-                        {getDisciplineIcon(event.discipline)}
-                        {event.discipline || "N/A"}
-                      </p>
-                      <p className="text-muted-foreground">Deliverables: {event.deliverables}</p>
+                      {event.discipline && (
+                        <p className="flex items-center gap-1 whitespace-nowrap">
+                          {getDisciplineIcon(event.discipline)}
+                          {event.discipline || "N/A"}
+                        </p>
+                      )}
+                      <p className="whitespace-nowrap">Deliverables: {event.deliverables}</p>
                     </CardContent>
-                    <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center gap-2">
-                      <Button variant="outline" size="sm" asChild className="w-full sm:w-auto flex-1">
+
+                    <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center justify-end gap-2">
+                      <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                         <Link href={`/events/${event.id}/shots`}>
                           <Eye className="mr-2 h-4 w-4" /> Manage Shots
                         </Link>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto flex-1">
+                      <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
                         <Edit className="mr-2 h-4 w-4" /> Edit Event
                       </Button>
                     </CardFooter>
@@ -438,14 +457,14 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
               {displayableEvents.map((event) => (
                 <TableRow key={event.id}>
                   <TableCell className="font-medium flex items-center gap-1.5">
-                    {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
+                    {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 flex-shrink-0" title="Quick Turnaround"/>}
                      {getCoverageIcon(event.isCovered)}
                     {event.name}
                   </TableCell>
                   {!selectedProject && <TableCell>{event.project}</TableCell>}
                   <TableCell className="flex items-center">
                     {event.date ? format(parseISO(event.date), "PPP") : 'N/A'} <span className="text-muted-foreground ml-1">({event.time})</span>
-                    {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
+                    {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {event.deadline ? formatDeadline(event.deadline) : "N/A"}
@@ -699,8 +718,8 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
-        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both" || !event.discipline; // include if Photography, Both, or empty/N/A
-        return true;
+        if (filterDiscipline === "Photography") return event.discipline === "Photography"; 
+        return true; // if "all" or unknown filter value, include all
       });
     }
     
@@ -793,9 +812,8 @@ export default function EventsPage() {
       return;
     }
 
-    const eventPayload = {
+    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'hasOverlap' | 'project'> & { organizationId: string } = {
       ...data,
-      project: selectedProjInfo.name,
       organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
@@ -805,8 +823,9 @@ export default function EventsPage() {
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables,
-        shotRequests: editingEvent.shotRequests,
+        project: selectedProjInfo.name, // Ensure project name is updated if projectId changed
+        deliverables: editingEvent.deliverables, // Preserve these counts
+        shotRequests: editingEvent.shotRequests, // Preserve these counts
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -814,13 +833,7 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string } = {
-        ...data,
-        organizationId: data.organizationId || selectedProjInfo.organizationId,
-        discipline: data.discipline || "",
-        isCovered: data.isCovered === undefined ? true : data.isCovered,
-      };
-      addEvent(newEventDataForContext);
+      addEvent(eventPayload);
       toast({
         title: "Event Added",
         description: `"${data.name}" has been successfully added.`,
@@ -1091,7 +1104,7 @@ export default function EventsPage() {
                         render={({ field }) => (
                             <Checkbox
                             id="event-isCovered"
-                            checked={field.value === undefined ? true : field.value} // Default to true if undefined
+                            checked={field.value === undefined ? true : field.value} 
                             onCheckedChange={field.onChange}
                             className="mr-2"
                             />
@@ -1224,5 +1237,4 @@ export default function EventsPage() {
     </div>
   );
 }
-
     
