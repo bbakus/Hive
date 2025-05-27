@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User, CheckCircle, Info } from 'lucide-react';
+import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User, CheckCircle, Info, UserCheck } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -50,7 +50,6 @@ export default function ShotListPage() {
     getEventById,
     isLoadingEvents: isEventContextLoading,
     shotRequestsByEventId, 
-    getShotRequestsForEvent,
     addShotRequest,
     updateShotRequest,
     deleteShotRequest
@@ -105,20 +104,20 @@ export default function ShotListPage() {
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
       setEvent(undefined); 
+      setCurrentShotRequests([]);
       return;
     }
 
     const foundEvent = getEventById(eventId);
     setEvent(foundEvent || null); 
 
-    // relies on the other useEffect to set currentShotRequests from shotRequestsByEventId
-    if (foundEvent && (!shotRequestsByEventId[eventId] || currentShotRequests.length === 0)) {
-       setCurrentShotRequests(getShotRequestsForEvent(eventId));
+    if (foundEvent && shotRequestsByEventId) {
+       setCurrentShotRequests(shotRequestsByEventId[eventId] || []);
     } else if (!foundEvent) {
        setCurrentShotRequests([]);
     }
 
-  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById, getShotRequestsForEvent, shotRequestsByEventId, currentShotRequests.length]);
+  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById, shotRequestsByEventId]);
 
 
   useEffect(() => {
@@ -131,6 +130,7 @@ export default function ShotListPage() {
             assignedPersonnelId: editingShotRequest.assignedPersonnelId || "",
             notes: editingShotRequest.notes || "",
             blockedReason: editingShotRequest.blockedReason || "",
+            // These audit fields are not typically edited in the form, they are set by actions
             initialCapturerId: editingShotRequest.initialCapturerId || "",
             lastStatusModifierId: editingShotRequest.lastStatusModifierId || "",
             lastStatusModifiedAt: editingShotRequest.lastStatusModifiedAt || "",
@@ -161,27 +161,45 @@ export default function ShotListPage() {
   const handleShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
     if (!eventId) return;
 
-    let dataToSubmit: Partial<ShotRequestFormData> = { ...data };
-     if (data.status !== "Blocked") {
-        dataToSubmit.blockedReason = "";
-    }
-    if (data.assignedPersonnelId === "") { 
-        dataToSubmit.assignedPersonnelId = undefined;
-    }
+    let dataToSubmit: Partial<ShotRequestFormData> = { 
+        description: data.description,
+        priority: data.priority,
+        status: data.status,
+        assignedPersonnelId: data.assignedPersonnelId || undefined, // Ensure empty string becomes undefined
+        notes: data.notes,
+        blockedReason: data.status === "Blocked" ? data.blockedReason : "", // Clear reason if not blocked
+    };
     
-    dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
-    dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
+    // Audit fields are handled by handleStatusChange or direct system actions, not directly in form submit
+    // unless it's the initial creation where status might dictate initial values.
 
     if (editingShotRequest) {
-      dataToSubmit.initialCapturerId = editingShotRequest.initialCapturerId || data.initialCapturerId;
+      // Preserve existing audit fields unless status change implies update
+      dataToSubmit.initialCapturerId = editingShotRequest.initialCapturerId;
+      dataToSubmit.lastStatusModifierId = editingShotRequest.lastStatusModifierId;
+      dataToSubmit.lastStatusModifiedAt = editingShotRequest.lastStatusModifiedAt;
       
+      // If status is being changed via form, it might imply a new 'lastModifier'
+      if (editingShotRequest.status !== data.status) {
+          dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+          dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
+          // Special handling if status changed to Captured/Completed via form for the first time
+          if ((data.status === "Captured" || data.status === "Completed") && !editingShotRequest.initialCapturerId) {
+              dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
+          }
+      }
+
       updateShotRequest(eventId, editingShotRequest.id, dataToSubmit);
       toast({
         title: "Shot Request Updated",
         description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
     } else {
-      addShotRequest(eventId, data as ShotRequestFormData);
+      // For new shots, lastModifier is the creator. Initial capturer not set yet.
+      dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+      dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
+      
+      addShotRequest(eventId, dataToSubmit as ShotRequestFormData); // Cast because audit fields are added
       toast({
         title: "Shot Request Added",
         description: `"${data.description.substring(0,30)}..." has been added.`,
@@ -192,33 +210,11 @@ export default function ShotListPage() {
 
   const openAddShotModal = () => {
     setEditingShotRequest(null);
-    reset({
-      description: "",
-      priority: "Medium",
-      status: "Unassigned",
-      assignedPersonnelId: "",
-      notes: "",
-      blockedReason: "",
-      initialCapturerId: "",
-      lastStatusModifierId: "",
-      lastStatusModifiedAt: "",
-    });
     setIsShotModalOpen(true);
   };
 
   const openEditShotModal = (shot: ShotRequest) => {
     setEditingShotRequest(shot);
-     reset({
-      description: shot.description,
-      priority: shot.priority,
-      status: shot.status,
-      assignedPersonnelId: shot.assignedPersonnelId || "",
-      notes: shot.notes || "",
-      blockedReason: shot.blockedReason || "",
-      initialCapturerId: shot.initialCapturerId || "",
-      lastStatusModifierId: shot.lastStatusModifierId || "",
-      lastStatusModifiedAt: shot.lastStatusModifiedAt || "",
-    });
     setIsShotModalOpen(true);
   };
 
@@ -252,6 +248,7 @@ export default function ShotListPage() {
     if (shotToUpdate) {
       let updatePayload: Partial<ShotRequestFormData> = { 
         status: newStatus,
+        lastStatusModifierId: MOCK_CURRENT_USER_ID,
         lastStatusModifiedAt: new Date().toISOString(),
       };
 
@@ -260,17 +257,12 @@ export default function ShotListPage() {
       if (newStatus === "Captured" || newStatus === "Completed") {
         if (!shotToUpdate.initialCapturerId) { // First time capture/complete
             updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
-            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
-        } else { // Re-capturing or re-completing
-            // Retain initialCapturerId, only update last modifier
-            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
-            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+        } else { 
+            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain if already set
         }
-      } else if (oldStatus === "Captured" || oldStatus === "Completed") { // Moving away from captured/completed
-        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain initial capturer
-        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID; // Current user made this change
-      } else { // For other transitions
-        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+      } else if ((oldStatus === "Captured" || oldStatus === "Completed") && shotToUpdate.initialCapturerId) {
+        // Moving away from captured/completed, retain initial capturer
+        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
       }
       
       // Clear blockedReason if status is not Blocked
@@ -291,7 +283,7 @@ export default function ShotListPage() {
               ? getPersonnelNameById(event.assignedPersonnelIds[0]) 
               : "the assigned team");
         
-        const modifierName = getPersonnelNameById(updatePayload.lastStatusModifierId) || MOCK_CURRENT_USER_NAME;
+        const modifierName = getPersonnelNameById(MOCK_CURRENT_USER_ID) || MOCK_CURRENT_USER_NAME;
 
         toast({
           title: "Notification Simulated",
@@ -313,8 +305,9 @@ export default function ShotListPage() {
     return initialPersonnelMock.find(p => p.id === id)?.name || "Unknown User";
   };
 
+  const isLoading = isSettingsContextLoading || isEventContextLoading || event === undefined;
 
-  if (isSettingsContextLoading || isEventContextLoading || event === undefined) {
+  if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Loading event shot list...</div>;
   }
 
@@ -524,8 +517,16 @@ export default function ShotListPage() {
                                 Initially Captured by: {getPersonnelNameById(shot.initialCapturerId)}
                              </p>
                         )}
-                        {shot.lastStatusModifierId && (shot.lastStatusModifierId !== shot.initialCapturerId || (shot.status !== "Captured" && shot.status !== "Completed")) && (
-                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                        {shot.status === "Completed" && shot.lastStatusModifierId && (
+                            <p className="text-xs text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">
+                                <UserCheck className="h-3.5 w-3.5" />
+                                Completed by: {getPersonnelNameById(shot.lastStatusModifierId)}
+                                {shot.lastStatusModifiedAt ? ` on ${format(parseISO(shot.lastStatusModifiedAt), "MMM d, p")}` : ""}
+                            </p>
+                        )}
+                        {shot.status !== "Completed" && shot.lastStatusModifierId && 
+                            (shot.lastStatusModifierId !== shot.initialCapturerId || !shot.initialCapturerId) && (
+                             <p className="text-xs text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">
                                 <Info className="h-3.5 w-3.5" />
                                 Last update: {getPersonnelNameById(shot.lastStatusModifierId)}
                                 {shot.lastStatusModifiedAt ? ` on ${format(parseISO(shot.lastStatusModifiedAt), "MMM d, p")}`: ""}
