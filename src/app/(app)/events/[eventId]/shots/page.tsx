@@ -76,9 +76,8 @@ export default function ShotListPage() {
     resolver: zodResolver(shotRequestSchema), 
     defaultValues: {
       description: "",
-      shotType: "Medium",
       priority: "Medium",
-      status: "Unassigned", // Default new shots to "Unassigned"
+      status: "Unassigned", 
       notes: "",
       blockedReason: "",
     },
@@ -117,7 +116,6 @@ export default function ShotListPage() {
         if (editingShotRequest) {
           reset({
             description: editingShotRequest.description,
-            shotType: editingShotRequest.shotType,
             priority: editingShotRequest.priority,
             status: editingShotRequest.status,
             notes: editingShotRequest.notes || "",
@@ -126,9 +124,8 @@ export default function ShotListPage() {
         } else {
           reset({
             description: "",
-            shotType: "Medium",
             priority: "Medium",
-            status: "Unassigned", // Default for new shots
+            status: "Unassigned", 
             notes: "",
             blockedReason: "",
           });
@@ -174,7 +171,6 @@ export default function ShotListPage() {
     setEditingShotRequest(null);
     reset({ 
       description: "",
-      shotType: "Medium",
       priority: "Medium",
       status: "Unassigned",
       notes: "",
@@ -187,7 +183,6 @@ export default function ShotListPage() {
     setEditingShotRequest(shot);
      reset({ 
       description: shot.description,
-      shotType: shot.shotType,
       priority: shot.priority,
       status: shot.status,
       notes: shot.notes || "",
@@ -315,28 +310,6 @@ export default function ShotListPage() {
                   {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="shotType" className="text-right">Shot Type</Label>
-                <div className="col-span-3">
-                  <Controller
-                    name="shotType"
-                    control={control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <SelectTrigger className={errors.shotType ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select shot type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"].map(type => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.shotType && <p className="text-xs text-destructive mt-1">{errors.shotType.message}</p>}
-                </div>
-              </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="priority" className="text-right">Priority</Label>
                 <div className="col-span-3">
@@ -430,7 +403,6 @@ export default function ShotListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Description</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -448,7 +420,6 @@ export default function ShotListPage() {
                             </p>
                         )}
                     </TableCell>
-                    <TableCell>{shot.shotType}</TableCell>
                     <TableCell>
                        <Badge variant={
                         shot.priority === "Critical" ? "destructive" :

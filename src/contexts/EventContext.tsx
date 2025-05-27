@@ -3,17 +3,16 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { useProjectContext, type Project } from './ProjectContext';
+import { useProjectContext } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
 import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
 import { z } from 'zod';
-import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid } from 'date-fns';
+import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore } from 'date-fns';
 
 // --- Shot Request Definitions ---
 export const shotRequestSchemaInternal = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
-  shotType: z.enum(["Wide", "Medium", "Close-up", "B-Roll", "Product", "Lifestyle", "Portrait", "Other"]),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
   status: z.enum(["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"]),
   notes: z.string().optional(),
@@ -24,25 +23,64 @@ export type ShotRequest = ShotRequestFormData & {
   id: string;
   eventId: string;
 };
-export const SHOT_TYPES_PHOTOGRAPHY = ["Wide", "Medium", "Close-up", "B-Roll", "Product", "Lifestyle", "Portrait", "Other"] as const;
 // --- End Shot Request Definitions ---
 
 export type Event = EventTypeDefinition;
 
-const initialShotRequestsMock: ShotRequest[] = [
-  { id: "sr001", eventId: "evt001", description: "Opening wide shot of festival grounds", shotType: "Wide", priority: "High", status: "Unassigned", notes: "Get this as gates open" },
-  { id: "sr002", eventId: "evt001", description: "Close-up of headline act performance", shotType: "Close-up", priority: "Critical", status: "Assigned" },
-  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various angles", shotType: "B-Roll", priority: "Medium", status: "Unassigned" },
-  { id: "sr004", eventId: "evt002", description: "Speaker on stage - wide and medium", shotType: "Medium", priority: "High", status: "Captured" },
-  { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Keynote speaker - wide shot", shotType: "Wide", priority: "High", status: "Unassigned" },
-  { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening during keynote", shotType: "Medium", priority: "Medium", status: "Assigned" },
-  { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction shots", shotType: "B-Roll", priority: "Medium", status: "Unassigned" },
-  { id: "sr_today_comp_001", eventId: "evt_today_completed_test", description: "Group photo after session", shotType: "Portrait", priority: "Medium", status: "Completed"},
-  { id: "sr_today_prog_001", eventId: "evt_today_inprogress_test", description: "Action shot of product demo", shotType: "Product", priority: "High", status: "Captured"},
-  { id: "sr_today_prog_002", eventId: "evt_today_inprogress_test", description: "Behind the scenes setup", shotType: "B-Roll", priority: "Low", status: "Unassigned"},
-  { id: "sr_today_upc_001", eventId: "evt_today_upcoming_test", description: "Venue ambiance shots before event", shotType: "Wide", priority: "Medium", status: "Unassigned"},
-  { id: "sr_blocked_test_001", eventId: "evt001", description: "Specific requested portrait - talent unavailable", shotType: "Portrait", priority: "High", status: "Blocked", blockedReason: "Talent was not available at scheduled time."}
+
+const initialShotRequestsMock: Omit<ShotRequest, 'id' | 'eventId'>[] = [
+  { description: "Opening wide shot of festival grounds, as gates open", priority: "High", status: "Unassigned", notes: "Get this as gates open" },
+  { description: "Close-up of headline act performance, key moments", priority: "Critical", status: "Assigned" },
+  { description: "Audience reaction shots - various angles, B-Roll style", priority: "Medium", status: "Unassigned" },
+  { description: "Speaker on stage - wide and medium compositions", priority: "High", status: "Captured" },
+  { description: "Keynote speaker - wide shot capturing stage and audience", priority: "High", status: "Unassigned" },
+  { description: "Audience listening during keynote - medium shots", priority: "Medium", status: "Assigned" },
+  { description: "Workshop interaction shots - candid B-Roll", priority: "Medium", status: "Unassigned" },
+  { description: "Group photo after session, well-lit portrait style", priority: "Medium", status: "Completed"},
+  { description: "Action shot of product demo, focus on product features", priority: "High", status: "Captured"},
+  { description: "Behind the scenes setup, B-Roll documentation", priority: "Low", status: "Unassigned"},
+  { description: "Venue ambiance shots before event, wide establishing shots", priority: "Medium", status: "Unassigned"},
+  { description: "Specific requested portrait of VIP - talent unavailable", priority: "High", status: "Blocked", blockedReason: "Talent was not available at scheduled time."},
+  { description: "Crowd surfing shot - Today's Early Shoot", priority: "High", status: "Unassigned"},
+  { description: "Band leaving stage, B-Roll - Today's Early Shoot", priority: "Medium", status: "Unassigned"},
+  { description: "Detailed product close-up - Today's Late Session", priority: "Critical", status: "Assigned"},
+  { description: "Wide shot of empty venue after event - Today's Late Session", priority: "Low", status: "Captured"},
+  { description: "Dynamic shot of speaker using product - In Progress Demo", priority: "High", status: "Assigned" },
+  { description: "Candid interactions at networking booth - In Progress Demo", priority: "Medium", status: "Unassigned" },
+  { description: "Venue exteriors and branding - Upcoming Demo", priority: "Medium", status: "Unassigned" },
+  { description: "Guest arrival shots - Upcoming Demo", priority: "High", status: "Unassigned" },
+  { description: "Final team photo - Completed Demo", priority: "Medium", status: "Completed" },
 ];
+
+// Helper to add unique IDs and eventId to mock shots
+const mapInitialShotsToEvents = (events: Event[], shotsData: Omit<ShotRequest, 'id' | 'eventId'>[]): ShotRequest[] => {
+  const result: ShotRequest[] = [];
+  let shotCounter = 1;
+  
+  const eventIds = events.map(e => e.id);
+  
+  // Assign some generic shots to some events
+  const shotsToAssign = [...shotsData]; // Clone to avoid modifying original
+
+  eventIds.forEach((eventId, index) => {
+    // Assign a few shots to some events for demo purposes
+    if ((index % 3 === 0 || eventId.includes("_test")) && shotsToAssign.length > 0) {
+      const numShotsForEvent = (eventId.includes("_test")) ? 2 : Math.min(shotsToAssign.length, (index % 2) + 2); // Assign 1 or 2 shots
+      for (let i = 0; i < numShotsForEvent; i++) {
+        if (shotsToAssign.length === 0) break;
+        const shotBase = shotsToAssign.shift();
+        if (shotBase) {
+             result.push({
+                ...shotBase,
+                id: `sr${String(shotCounter++).padStart(3, '0')}`,
+                eventId: eventId,
+            });
+        }
+      }
+    }
+  });
+  return result;
+};
 
 
 type EventContextType = {
@@ -70,7 +108,7 @@ const g9eOrgId = "org_g9e";
 const generateG9eSummitEvents = (): Event[] => {
   const summitEvents: Event[] = [];
   let eventIdCounter = 100;
-  const disciplines: Event['discipline'][] = ["Photography", "Photography", ""]; // Focus on photography
+  const disciplines: Event['discipline'][] = ["Photography", "Photography", ""]; 
 
   g9eSummitDays.forEach((day, dayIndex) => {
     g9eSummitPhotographers.forEach((photographerId, photographerIndex) => {
@@ -79,16 +117,8 @@ const generateG9eSummitEvents = (): Event[] => {
       const afternoonDiscipline = disciplines[(dayIndex + photographerIndex + 1) % disciplines.length];
       const eveningDiscipline = disciplines[(dayIndex + photographerIndex + 2) % disciplines.length];
 
-      const morningEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter}`;
-      const afternoonEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter + 2}`; 
-      const eveningEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter + 3}`; 
-
-      const morningShots = initialShotRequestsMock.filter(s => s.eventId === morningEventId).length;
-      const afternoonShots = initialShotRequestsMock.filter(s => s.eventId === afternoonEventId).length;
-      const eveningShots = initialShotRequestsMock.filter(s => s.eventId === eveningEventId).length;
-
       summitEvents.push({
-        id: morningEventId,
+        id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter}`,
         name: `${photographerName} - Summit Day ${dayIndex + 1} Morning Keynotes`,
         projectId: g9eSummitProjectId,
         project: "G9e Corporate Summit 2024",
@@ -97,7 +127,7 @@ const generateG9eSummitEvents = (): Event[] => {
         priority: "High",
         assignedPersonnelIds: [photographerId],
         deliverables: 1,
-        shotRequests: morningShots > 0 ? morningShots : ( (dayIndex + photographerIndex) % 2 === 0 ? 3 : 2),
+        shotRequests: 0, // Will be calculated later
         organizationId: g9eOrgId,
         discipline: morningDiscipline,
         isQuickTurnaround: (dayIndex + photographerIndex) % 3 === 0,
@@ -123,7 +153,7 @@ const generateG9eSummitEvents = (): Event[] => {
       });
 
       summitEvents.push({
-        id: afternoonEventId,
+        id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter}`, 
         name: `${photographerName} - Summit Day ${dayIndex + 1} Afternoon Breakouts`,
         projectId: g9eSummitProjectId,
         project: "G9e Corporate Summit 2024",
@@ -132,7 +162,7 @@ const generateG9eSummitEvents = (): Event[] => {
         priority: "High",
         assignedPersonnelIds: [photographerId],
         deliverables: 1,
-        shotRequests: afternoonShots > 0 ? afternoonShots : ( (dayIndex + photographerIndex + 1) % 2 === 0 ? 4 : 2),
+        shotRequests: 0, // Will be calculated later
         organizationId: g9eOrgId,
         discipline: afternoonDiscipline,
         isCovered: true,
@@ -140,14 +170,14 @@ const generateG9eSummitEvents = (): Event[] => {
       
       if (dayIndex === 0 && photographerIndex < 2) {
          summitEvents.push({
-            id: `evt_summit_internal_prep_${photographerIndex}_${eventIdCounter++}`,
+            id: `evt_summit_internal_prep_${photographerIndex}_${eventIdCounter+100}`, // Ensure unique ID
             name: `Internal Team Sync - Team ${String.fromCharCode(65 + photographerIndex)}`,
             projectId: g9eSummitProjectId,
             project: "G9e Corporate Summit 2024",
             date: day,
             time: "08:00 - 08:45",
             priority: "Medium",
-            assignedPersonnelIds: [photographerId, "user003"], // Project Manager
+            assignedPersonnelIds: [photographerId, "user003"], 
             deliverables: 0,
             shotRequests: 0,
             organizationId: g9eOrgId,
@@ -158,7 +188,7 @@ const generateG9eSummitEvents = (): Event[] => {
 
       if (photographerIndex % 2 === 0) {
         summitEvents.push({
-          id: eveningEventId,
+          id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter + 200}`,  // Ensure unique ID
           name: `${photographerName} - Summit Day ${dayIndex + 1} Networking Dinner`,
           projectId: g9eSummitProjectId,
           project: "G9e Corporate Summit 2024",
@@ -167,7 +197,7 @@ const generateG9eSummitEvents = (): Event[] => {
           priority: "Medium",
           assignedPersonnelIds: [photographerId],
           deliverables: 0,
-          shotRequests: eveningShots > 0 ? eveningShots : 1,
+          shotRequests: 0, // Will be calculated later
           organizationId: g9eOrgId,
           discipline: eveningDiscipline,
           isQuickTurnaround: (dayIndex + photographerIndex) % 4 === 0,
@@ -180,15 +210,45 @@ const generateG9eSummitEvents = (): Event[] => {
   return summitEvents;
 };
 
-const initialMockEvents: Event[] = [
-    { id: "evt001", name: "Music Festival - Main Stage Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: initialShotRequestsMock.filter(s=>s.eventId==="evt001").length, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00:00", organizationId: "org_g9e", discipline: "Photography", isCovered: true },
-    { id: "evt002", name: "Tech Conference Keynote", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: initialShotRequestsMock.filter(s=>s.eventId==="evt002").length, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00:00", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
+const initialMockEventsRaw: Event[] = [
+    { id: "evt001", name: "Music Festival - Main Stage Day 1", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 0, assignedPersonnelIds: ["user001", "user002"], isQuickTurnaround: true, deadline: "2024-07-16T10:00:00", organizationId: "org_g9e", discipline: "Photography", isCovered: true },
+    { id: "evt002", name: "Tech Conference Keynote", projectId: "proj002", project: "Tech Conference X", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user003", "user007"], deadline: "2024-09-15T12:00:00", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
     { id: "evt003", name: "Gala Dinner - Client Reception", projectId: "proj003", project: "Corporate Gala Dinner", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: [], isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: false },
-    { id: "evt004", name: "Festival Artist Portraits", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt004").length, assignedPersonnelIds: ["user004"], organizationId: "org_g9e", discipline: "Photography", isCovered: true },
+    { id: "evt004", name: "Festival Artist Portraits", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 0, assignedPersonnelIds: ["user004"], organizationId: "org_g9e", discipline: "Photography", isCovered: true },
     { id: "evt005", name: "Tech Conference Closing Remarks", projectId: "proj002", project: "Tech Conference X", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 0, assignedPersonnelIds: ["user001", "user003"], isQuickTurnaround: true, deadline: "2024-09-17T23:59:00", organizationId: "org_damion_hamilton", discipline: "Photography", isCovered: true },
-    { id: "evt006", name: "Festival Workshop Photography", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt006").length, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Photography", isCovered: true},
+    { id: "evt006", name: "Festival Workshop Photography", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 0, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Photography", isCovered: true},
   ...generateG9eSummitEvents(),
 ];
+
+// Function to combine events and dynamically created today's events
+const getInitialEventsWithDynamicToday = (useDemo: boolean): Event[] => {
+  if (!useDemo) return [];
+  let baseEvents = [...initialMockEventsRaw];
+  const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+
+  const dynamicTodayEvents: Event[] = [
+    {
+      id: "evt_today_completed_test", name: "Demo: Recently Completed Shoot", projectId: "proj001", project: "Summer Music Festival 2024",
+      date: todayStr, time: `${format(subHours(now, 2), "HH:mm")} - ${format(subHours(now, 1), "HH:mm")}`, priority: "Medium", deliverables: 1,
+      shotRequests: 0, assignedPersonnelIds: ["user001"],
+      isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: true,
+    },
+    {
+      id: "evt_today_inprogress_test", name: "Demo: Current Live Shoot", projectId: "proj001", project: "Summer Music Festival 2024",
+      date: todayStr, time: `${format(subHours(now, 0.5), "HH:mm")} - ${format(addHours(now, 0.5), "HH:mm")}`, priority: "High", deliverables: 2,
+      shotRequests: 0, assignedPersonnelIds: ["user002", "user003"],
+      isQuickTurnaround: true, deadline: format(addHours(now, 4), "yyyy-MM-dd'T'HH:mm:ss"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
+    },
+    {
+      id: "evt_today_upcoming_test", name: "Demo: Upcoming Photo Session Today", projectId: "proj001", project: "Summer Music Festival 2024",
+      date: todayStr, time: `${format(addHours(now, 1), "HH:mm")} - ${format(addHours(now, 2), "HH:mm")}`, priority: "Critical", deliverables: 0,
+      shotRequests: 0, assignedPersonnelIds: ["user004", "user005"],
+      isQuickTurnaround: true, deadline: format(addHours(now, 6), "yyyy-MM-dd'T'HH:mm:ss"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
+    }
+  ];
+  return [...baseEvents, ...dynamicTodayEvents];
+};
 
 
 export function EventProvider({ children }: { children: ReactNode }) {
@@ -202,51 +262,25 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoadingSettings) {
-      let loadedEvents = useDemoData ? [...initialMockEvents] : []; 
-      const loadedShots: Record<string, ShotRequest[]> = {};
+      let loadedEvents = getInitialEventsWithDynamicToday(useDemoData);
+      const initialShots = mapInitialShotsToEvents(loadedEvents, initialShotRequestsMock);
+      
+      const loadedShotsByEvent: Record<string, ShotRequest[]> = {};
+      initialShots.forEach(shot => {
+        if (!loadedShotsByEvent[shot.eventId]) {
+          loadedShotsByEvent[shot.eventId] = [];
+        }
+        loadedShotsByEvent[shot.eventId].push(shot);
+      });
 
-      if (useDemoData) {
-        const now = new Date();
-        const todayStr = format(now, "yyyy-MM-dd");
-        
-        const completedStart = subHours(now, 2);
-        const completedEnd = subHours(now, 1);
-        const inProgressStart = subHours(now, 0.5); 
-        const inProgressEnd = addHours(now, 0.5);   
-        const upcomingStart = addHours(now, 1);
-        const upcomingEnd = addHours(now, 2);
-
-        const dynamicEventsToAdd: Event[] = [
-             {
-              id: "evt_today_completed_test", name: "Demo: Recently Completed Shoot", projectId: "proj001", project: "Summer Music Festival 2024",
-              date: todayStr, time: `${format(completedStart, "HH:mm")} - ${format(completedEnd, "HH:mm")}`, priority: "Medium", deliverables: 1,
-              shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_completed_test").length, assignedPersonnelIds: ["user001"],
-              isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: true,
-            },
-            {
-              id: "evt_today_inprogress_test", name: "Demo: Current Live Shoot", projectId: "proj001", project: "Summer Music Festival 2024",
-              date: todayStr, time: `${format(inProgressStart, "HH:mm")} - ${format(inProgressEnd, "HH:mm")}`, priority: "High", deliverables: 2,
-              shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_inprogress_test").length, assignedPersonnelIds: ["user002", "user003"],
-              isQuickTurnaround: true, deadline: format(addHours(now, 4), "yyyy-MM-dd'T'HH:mm:ss"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
-            },
-            {
-              id: "evt_today_upcoming_test", name: "Demo: Upcoming Photo Session Today", projectId: "proj001", project: "Summer Music Festival 2024",
-              date: todayStr, time: `${format(upcomingStart, "HH:mm")} - ${format(upcomingEnd, "HH:mm")}`, priority: "Critical", deliverables: 0,
-              shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_upcoming_test").length, assignedPersonnelIds: ["user004", "user005"],
-              isQuickTurnaround: true, deadline: format(addHours(now, 6), "yyyy-MM-dd'T'HH:mm:ss"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
-            }
-        ];
-        loadedEvents = [...loadedEvents, ...dynamicEventsToAdd];
-        
-        initialShotRequestsMock.forEach(shot => {
-          if (!loadedShots[shot.eventId]) {
-            loadedShots[shot.eventId] = [];
-          }
-          loadedShots[shot.eventId].push(shot);
-        });
-      }
+      // Update shotRequests count on each event
+      loadedEvents = loadedEvents.map(event => ({
+        ...event,
+        shotRequests: loadedShotsByEvent[event.id]?.length || 0,
+      }));
+      
       setAllEventsState(loadedEvents);
-      setShotRequestsByEventId(loadedShots);
+      setShotRequestsByEventId(loadedShotsByEvent);
       setIsLoadingEvents(false);
     }
   }, [useDemoData, isLoadingSettings]);
@@ -326,7 +360,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
         shot.id === shotId ? { ...shot, ...updatedData } : shot
       );
       
-      if (updatedData.status && updatedData.status !== "Blocked" && newEventShots.find(s => s.id === shotId)?.blockedReason) {
+      // Clear blockedReason if status is not "Blocked"
+      const targetShot = newEventShots.find(s => s.id === shotId);
+      if (targetShot && targetShot.status !== "Blocked" && targetShot.blockedReason) {
         newEventShots = newEventShots.map(shot => 
           shot.id === shotId ? { ...shot, blockedReason: "" } : shot
         );
