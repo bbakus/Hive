@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Video } from "lucide-react"; 
+import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera, Video as VideoIconLucide } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -70,7 +70,7 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", ""] ).optional(), 
+  discipline: z.enum(["Photography", "Video", "Both", ""] ).optional(),
   isCovered: z.boolean().optional(),
   personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
@@ -78,7 +78,7 @@ export const eventSchema = z.object({
   })).optional(),
 });
 
-type EventFormData = z.infer<typeof eventSchema>;
+export type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventFormData & {
   id: string;
@@ -86,8 +86,8 @@ export type Event = EventFormData & {
   deliverables: number;
   shotRequests: number;
   hasOverlap?: boolean;
-  organizationId?: string; 
-  discipline?: "Photography" | "";
+  organizationId?: string;
+  discipline?: "Photography" | "Video" | "Both" | "";
   isCovered?: boolean;
   personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
 };
@@ -125,7 +125,7 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; 
+  if (!timesA || !timesB) return false;
 
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
@@ -133,10 +133,10 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
-    return sharedPersonnel; 
+    return sharedPersonnel;
   }
-  
-  return false; 
+
+  return false;
 };
 
 
@@ -151,11 +151,441 @@ export function formatDeadline(deadlineString?: string): string | null {
   }
 }
 
+// Helper function to get discipline icon
+const getDisciplineIcon = (discipline?: Event['discipline']) => {
+  if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
+  if (discipline === "Video") return <VideoIconLucide className="h-3.5 w-3.5 opacity-80" />;
+  if (discipline === "Both") return <><Camera className="h-3.5 w-3.5 opacity-80" /><VideoIconLucide className="h-3.5 w-3.5 opacity-80 ml-1" /></>;
+  return null;
+};
+
+// Helper function to get coverage icon
+const getCoverageIcon = (isCovered?: boolean) => {
+  if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
+  return null; // Or a "Not Covered" icon if desired
+};
+
+
+type EventFiltersProps = {
+  filterQuickTurnaround: boolean;
+  setFilterQuickTurnaround: (checked: boolean) => void;
+  filterTimeStatus: string;
+  setFilterTimeStatus: (value: string) => void;
+  filterAssignedMemberId: string;
+  setFilterAssignedMemberId: (value: string) => void;
+  assignedPersonnelForFilter: Personnel[];
+  filterDiscipline: string;
+  setFilterDiscipline: (value: string) => void;
+  filterCoverageStatus: string;
+  setFilterCoverageStatus: (value: string) => void;
+  selectedEventDates: string[];
+  setSelectedEventDates: (dates: string[]) => void;
+  uniqueEventDatesForFilter: string[];
+};
+
+function EventFilters({
+  filterQuickTurnaround, setFilterQuickTurnaround,
+  filterTimeStatus, setFilterTimeStatus,
+  filterAssignedMemberId, setFilterAssignedMemberId,
+  assignedPersonnelForFilter,
+  filterDiscipline, setFilterDiscipline,
+  filterCoverageStatus, setFilterCoverageStatus,
+  selectedEventDates, setSelectedEventDates,
+  uniqueEventDatesForFilter
+}: EventFiltersProps) {
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
+        <CardDescription>Refine the events shown across all views below.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="filter-quick-turnaround"
+            checked={filterQuickTurnaround}
+            onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+          />
+          <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround Only</Label>
+        </div>
+        <div>
+          <Label htmlFor="filter-time-status">Time Status</Label>
+          <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
+            <SelectTrigger id="filter-time-status">
+              <SelectValue placeholder="Filter by time status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time Statuses</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="past">Past</SelectItem>
+              <SelectItem value="now">Happening Now</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="filter-assigned-member">Assigned Team Member</Label>
+          <Select value={filterAssignedMemberId} onValueChange={setFilterAssignedMemberId} disabled={assignedPersonnelForFilter.length === 0}>
+            <SelectTrigger id="filter-assigned-member">
+              <SelectValue placeholder="Filter by team member" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Team Members</SelectItem>
+              {assignedPersonnelForFilter.map(person => (
+                <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
+              ))}
+              {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel assigned in current project/org.</p>}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="filter-discipline">Discipline</Label>
+          <Select value={filterDiscipline} onValueChange={setFilterDiscipline}>
+            <SelectTrigger id="filter-discipline">
+              <SelectValue placeholder="Filter by discipline" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Disciplines</SelectItem>
+              <SelectItem value="Photography">Photography Only</SelectItem>
+              <SelectItem value="Video">Video Only</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="filter-coverage-status">Coverage Status</Label>
+          <Select value={filterCoverageStatus} onValueChange={(value) => setFilterCoverageStatus(value as any)}>
+            <SelectTrigger id="filter-coverage-status">
+              <SelectValue placeholder="Filter by coverage status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Events</SelectItem>
+              <SelectItem value="covered">Covered Events Only</SelectItem>
+              <SelectItem value="not_covered">Non-Covered Events Only</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="lg:col-span-1">
+          <Label htmlFor="filter-specific-dates">Filter by Specific Dates</Label>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" id="filter-specific-dates" className={cn("w-full justify-start text-left font-normal", selectedEventDates.length === 0 && "text-muted-foreground")}>
+                <CalendarIconLucide className="mr-2 h-4 w-4" />
+                {selectedEventDates.length === 0
+                  ? "All Event Dates"
+                  : selectedEventDates.length === 1
+                  ? format(parseISO(selectedEventDates[0]), "PPP")
+                  : `${selectedEventDates.length} dates selected`}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-64 max-h-72 overflow-y-auto" align="start">
+              <DropdownMenuLabel>Select Dates</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {uniqueEventDatesForFilter.length > 0 ? (
+                uniqueEventDatesForFilter.map(dateStr => (
+                  <DropdownMenuCheckboxItem
+                    key={dateStr}
+                    checked={selectedEventDates.includes(dateStr)}
+                    onCheckedChange={(checked) => {
+                      setSelectedEventDates(
+                        checked
+                          ? [...selectedEventDates, dateStr]
+                          : selectedEventDates.filter(d => d !== dateStr)
+                      );
+                    }}
+                  >
+                    {format(parseISO(dateStr), "PPP")}
+                  </DropdownMenuCheckboxItem>
+                ))
+              ) : (
+                <DropdownMenuItem disabled>No event dates available</DropdownMenuItem>
+              )}
+              {selectedEventDates.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setSelectedEventDates([])}
+                    className="text-destructive focus:text-destructive-foreground focus:bg-destructive/90 hover:text-destructive-foreground hover:bg-destructive"
+                  >
+                    Clear Selection
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type DailyOverviewTabContentProps = {
+  groupedAndSortedEventsForDisplay: [string, Event[]][];
+  selectedProject: Project | null;
+  useDemoData: boolean;
+  openEditEventModal: (event: Event) => void;
+};
+
+function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedProject, useDemoData, openEditEventModal }: DailyOverviewTabContentProps) {
+  return (
+    <Card className="shadow-lg mt-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
+        <CardDescription>
+          Visualizes events grouped by day. Events with potential time conflicts (overlapping time and shared personnel) are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
+          {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {groupedAndSortedEventsForDisplay.length > 0 ? (
+          groupedAndSortedEventsForDisplay.map(([date, dayEvents]) => (
+            <div key={date}>
+              <h3 className="text-xl font-semibold mb-3 border-b pb-2">
+                {format(parseISO(date), "EEEE, MMMM do, yyyy")}
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {dayEvents.map((event) => (
+                  <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" title="Quick Turnaround"/>}
+                          {getCoverageIcon(event.isCovered)}
+                          {event.name}
+                        </span>
+                        <Badge variant={
+                          event.priority === "Critical" ? "destructive" :
+                          event.priority === "High" ? "secondary" :
+                          event.priority === "Medium" ? "outline" : "default"
+                        }>{event.priority}</Badge>
+                      </CardTitle>
+                      <CardDescription className="flex items-center">
+                        {event.time}
+                        {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
+                      </CardDescription>
+                      {event.deadline && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          Deadline: {formatDeadline(event.deadline)}
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-1 text-xs">
+                      {!selectedProject && event.project && (
+                        <p className="text-muted-foreground">Project: {event.project}</p>
+                      )}
+                      {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
+                        <p className="text-muted-foreground flex items-center">
+                          <Users className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                          Assigned: {event.assignedPersonnelIds.length}
+                        </p>
+                      )}
+                      <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center">
+                        <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
+                        Shot Requests: {event.shotRequests}
+                      </Link>
+                      <p className="text-muted-foreground flex items-center gap-1">
+                        {getDisciplineIcon(event.discipline)}
+                        {event.discipline || "N/A"}
+                      </p>
+                      <p className="text-muted-foreground">Deliverables: {event.deliverables}</p>
+                    </CardContent>
+                    <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center gap-2">
+                      <Button variant="outline" size="sm" asChild className="w-full sm:w-auto flex-1">
+                        <Link href={`/events/${event.id}/shots`}>
+                          <Eye className="mr-2 h-4 w-4" /> Manage Shots
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto flex-1">
+                        <Edit className="mr-2 h-4 w-4" /> Edit Event
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-muted-foreground text-center py-8">
+            No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type EventListTabContentProps = {
+  displayableEvents: Event[];
+  selectedProject: Project | null;
+  useDemoData: boolean;
+  openEditEventModal: (event: Event) => void;
+  handleDeleteClick: (eventId: string) => void;
+};
+
+function EventListTabContent({ displayableEvents, selectedProject, useDemoData, openEditEventModal, handleDeleteClick }: EventListTabContentProps) {
+  return (
+    <Card className="shadow-lg mt-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
+        <CardDescription>
+          {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
+          ({displayableEvents.length} events found)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {displayableEvents.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event Name</TableHead>
+                {!selectedProject && <TableHead>Project</TableHead>}
+                <TableHead>Date & Time</TableHead>
+                <TableHead>Deadline</TableHead>
+                <TableHead>Discipline</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Assigned</TableHead>
+                <TableHead>Shot Requests</TableHead>
+                <TableHead>Deliverables</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {displayableEvents.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell className="font-medium flex items-center gap-1.5">
+                    {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
+                    {getCoverageIcon(event.isCovered)}
+                    {event.name}
+                  </TableCell>
+                  {!selectedProject && <TableCell>{event.project}</TableCell>}
+                  <TableCell className="flex items-center">
+                    {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
+                    {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {event.deadline ? formatDeadline(event.deadline) : "N/A"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground flex items-center gap-1">
+                    {getDisciplineIcon(event.discipline)}
+                    {event.discipline || "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={
+                      event.priority === "Critical" ? "destructive" :
+                      event.priority === "High" ? "secondary" :
+                      event.priority === "Medium" ? "outline" : "default"
+                    }>{event.priority}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {event.assignedPersonnelIds?.length || 0}
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
+                      {event.shotRequests}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{event.deliverables}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
+                      <Link href={`/events/${event.id}/shots`}>
+                        <Eye className="h-4 w-4" />
+                        <span className="sr-only">View/Manage Shots</span>
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="hover:text-accent" onClick={()={() => openEditEventModal(event)}}>
+                      <Edit className="h-4 w-4" />
+                      <span className="sr-only">Edit Event</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={()={() => handleDeleteClick(event.id)}}>
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Delete Event</span>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground text-center py-8">
+            No events found {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type BlockScheduleTabContentProps = {
+  groupedAndSortedEventsForDisplay: [string, Event[]][];
+  activeBlockScheduleDateKey: string | null;
+  setActiveBlockScheduleDateKey: (key: string | null) => void;
+  openEditEventModal: (event: Event) => void;
+  selectedProject: Project | null;
+  useDemoData: boolean;
+};
+
+function BlockScheduleTabContent({
+  groupedAndSortedEventsForDisplay,
+  activeBlockScheduleDateKey,
+  setActiveBlockScheduleDateKey,
+  openEditEventModal,
+  selectedProject,
+  useDemoData
+}: BlockScheduleTabContentProps) {
+  return (
+    <Card className="shadow-lg mt-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
+        <CardDescription>
+          View events for a selected day laid out on an hourly timeline. Select a day tab below to view its schedule.
+          {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
+          ({groupedAndSortedEventsForDisplay.reduce((sum, [, dayEvents]) => sum + dayEvents.length, 0)} total events matching filters)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {groupedAndSortedEventsForDisplay.length > 0 && activeBlockScheduleDateKey ? (
+          <Tabs
+            value={activeBlockScheduleDateKey}
+            onValueChange={(value) => setActiveBlockScheduleDateKey(value || null)}
+            className="w-full"
+          >
+            <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
+              {groupedAndSortedEventsForDisplay.map(([dateKey, _]) => (
+                <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
+                  {format(parseISO(dateKey), "EEE, MMM d")}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {groupedAndSortedEventsForDisplay.map(([dateKey, dayEvents]) => (
+              <TabsContent key={`content-${dateKey}`} value={dateKey}>
+                <BlockScheduleView
+                  selectedDate={parseISO(dateKey)}
+                  eventsForDate={dayEvents}
+                  onEditEvent={openEditEventModal}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
+        ) : (
+          <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
+            <CalendarIconLucide size={48} className="mb-4 text-muted" />
+            <p className="text-lg font-medium">
+              No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display in timeline based on current filters.
+            </p>
+            <p>
+              {useDemoData ? 'Add some events for the selected project, adjust your project/event filters, or ensure demo data is loaded.' : 'Add events or adjust filters to see the timeline view.'}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
 export default function EventsPage() {
   const { selectedProject, projects: allProjects, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], 
+    eventsForSelectedProjectAndOrg = [],
     addEvent,
     updateEvent,
     deleteEvent,
@@ -193,7 +623,7 @@ export default function EventsPage() {
       deadline: "",
       assignedPersonnelIds: [],
       discipline: "",
-      isCovered: true, 
+      isCovered: true,
       personnelActivity: {},
     }
   });
@@ -278,11 +708,12 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       filtered = filtered.filter(event => {
-        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "";
-        return true; 
+        if (filterDiscipline === "Photography") return event.discipline === "Photography" || event.discipline === "Both" || event.discipline === "";
+        if (filterDiscipline === "Video") return event.discipline === "Video" || event.discipline === "Both";
+        return true;
       });
     }
-    
+
     if (filterCoverageStatus !== "all") {
       if (filterCoverageStatus === "covered") {
         filtered = filtered.filter(event => event.isCovered === true);
@@ -368,7 +799,7 @@ export default function EventsPage() {
       ...data,
       project: selectedProjInfo.name,
       organizationId: selectedProjInfo.organizationId,
-      discipline: data.discipline || "", 
+      discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
       personnelActivity: data.personnelActivity || {},
     };
@@ -376,8 +807,8 @@ export default function EventsPage() {
     if (editingEvent) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables, 
-        shotRequests: editingEvent.shotRequests, 
+        deliverables: editingEvent.deliverables,
+        shotRequests: editingEvent.shotRequests,
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
       toast({
@@ -385,7 +816,7 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> = {
+      const newEventDataForContext: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' | 'organizationId'> & { organizationId: string } = {
         ...data,
         organizationId: selectedProjInfo.organizationId,
         discipline: data.discipline || "",
@@ -464,16 +895,6 @@ export default function EventsPage() {
     setIsDeleteDialogOpen(false);
   };
 
-  const getDisciplineIcon = (discipline?: Event['discipline']) => {
-    if (discipline === "Photography") return <Camera className="h-3.5 w-3.5 opacity-80" />;
-    return null;
-  };
-
-  const getCoverageIcon = (isCovered?: boolean) => {
-    if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
-    return null;
-  };
-
 
   if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents) {
       return <div>Loading event data and filters...</div>;
@@ -494,125 +915,22 @@ export default function EventsPage() {
         </Button>
       </div>
 
-      <Card className="shadow-md">
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
-            <CardDescription>Refine the events shown across all views below.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="flex items-center space-x-2">
-                <Checkbox
-                    id="filter-quick-turnaround"
-                    checked={filterQuickTurnaround}
-                    onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-                />
-                <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround Only</Label>
-            </div>
-            <div>
-                <Label htmlFor="filter-time-status">Time Status</Label>
-                <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
-                    <SelectTrigger id="filter-time-status">
-                        <SelectValue placeholder="Filter by time status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Time Statuses</SelectItem>
-                        <SelectItem value="upcoming">Upcoming</SelectItem>
-                        <SelectItem value="past">Past</SelectItem>
-                        <SelectItem value="now">Happening Now</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div>
-                <Label htmlFor="filter-assigned-member">Assigned Team Member</Label>
-                <Select value={filterAssignedMemberId} onValueChange={setFilterAssignedMemberId} disabled={assignedPersonnelForFilter.length === 0}>
-                    <SelectTrigger id="filter-assigned-member">
-                        <SelectValue placeholder="Filter by team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Team Members</SelectItem>
-                        {assignedPersonnelForFilter.map(person => (
-                            <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
-                        ))}
-                         {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel assigned in current project/org.</p>}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div>
-                <Label htmlFor="filter-discipline">Discipline</Label>
-                <Select value={filterDiscipline} onValueChange={setFilterDiscipline}>
-                    <SelectTrigger id="filter-discipline">
-                        <SelectValue placeholder="Filter by discipline" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Disciplines</SelectItem>
-                        <SelectItem value="Photography">Photography Only</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div>
-                <Label htmlFor="filter-coverage-status">Coverage Status</Label>
-                <Select value={filterCoverageStatus} onValueChange={(value) => setFilterCoverageStatus(value as any)}>
-                    <SelectTrigger id="filter-coverage-status">
-                        <SelectValue placeholder="Filter by coverage status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Events</SelectItem>
-                        <SelectItem value="covered">Covered Events Only</SelectItem>
-                        <SelectItem value="not_covered">Non-Covered Events Only</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="lg:col-span-1">
-              <Label htmlFor="filter-specific-dates">Filter by Specific Dates</Label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" id="filter-specific-dates" className={cn("w-full justify-start text-left font-normal", selectedEventDates.length === 0 && "text-muted-foreground")}>
-                    <CalendarIconLucide className="mr-2 h-4 w-4" />
-                    {selectedEventDates.length === 0
-                      ? "All Event Dates"
-                      : selectedEventDates.length === 1
-                      ? format(parseISO(selectedEventDates[0]), "PPP")
-                      : `${selectedEventDates.length} dates selected`}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 max-h-72 overflow-y-auto" align="start">
-                  <DropdownMenuLabel>Select Dates</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {uniqueEventDatesForFilter.length > 0 ? (
-                    uniqueEventDatesForFilter.map(dateStr => (
-                      <DropdownMenuCheckboxItem
-                        key={dateStr}
-                        checked={selectedEventDates.includes(dateStr)}
-                        onCheckedChange={(checked) => {
-                          setSelectedEventDates(prev =>
-                            checked
-                              ? [...prev, dateStr]
-                              : prev.filter(d => d !== dateStr)
-                          );
-                        }}
-                      >
-                        {format(parseISO(dateStr), "PPP")}
-                      </DropdownMenuCheckboxItem>
-                    ))
-                  ) : (
-                    <DropdownMenuItem disabled>No event dates available</DropdownMenuItem>
-                  )}
-                  {selectedEventDates.length > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => setSelectedEventDates([])}
-                        className="text-destructive focus:text-destructive-foreground focus:bg-destructive/90 hover:text-destructive-foreground hover:bg-destructive"
-                      >
-                        Clear Selection
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-        </CardContent>
-      </Card>
+      <EventFilters
+        filterQuickTurnaround={filterQuickTurnaround}
+        setFilterQuickTurnaround={setFilterQuickTurnaround}
+        filterTimeStatus={filterTimeStatus}
+        setFilterTimeStatus={setFilterTimeStatus}
+        filterAssignedMemberId={filterAssignedMemberId}
+        setFilterAssignedMemberId={setFilterAssignedMemberId}
+        assignedPersonnelForFilter={assignedPersonnelForFilter}
+        filterDiscipline={filterDiscipline}
+        setFilterDiscipline={setFilterDiscipline}
+        filterCoverageStatus={filterCoverageStatus}
+        setFilterCoverageStatus={setFilterCoverageStatus}
+        selectedEventDates={selectedEventDates}
+        setSelectedEventDates={setSelectedEventDates}
+        uniqueEventDatesForFilter={uniqueEventDatesForFilter}
+      />
 
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
@@ -627,7 +945,7 @@ export default function EventsPage() {
           <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div className="space-y-4">
-                
+
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
                   <div className="col-span-3">
@@ -739,13 +1057,15 @@ export default function EventsPage() {
                       name="discipline"
                       control={control}
                       render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || ""}>
+                        <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
                           <SelectTrigger className={errors.discipline ? "border-destructive" : ""}>
                             <SelectValue placeholder="Select discipline (optional)" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="">N/A</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
+                            <SelectItem value="Video">Video</SelectItem>
+                            <SelectItem value="Both">Both</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
@@ -814,7 +1134,7 @@ export default function EventsPage() {
                     defaultValue={[]}
                     render={({ field }) => (
                       <div className="space-y-2">
-                        {initialPersonnelMock.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").map((person) => ( 
+                        {initialPersonnelMock.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").map((person) => (
                           <div key={person.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`person-${person.id}`}
@@ -875,232 +1195,37 @@ export default function EventsPage() {
         </TabsList>
 
         <TabsContent value="daily-overview">
-          <Card className="shadow-lg mt-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
-              <CardDescription>
-                Visualizes events grouped by day. Events with potential time conflicts (overlapping time and shared personnel) are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
-                {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {groupedAndSortedEventsForDisplay.length > 0 ? (
-                groupedAndSortedEventsForDisplay.map(([date, dayEvents]) => (
-                  <div key={date}>
-                    <h3 className="text-xl font-semibold mb-3 border-b pb-2">
-                      {format(parseISO(date), "EEEE, MMMM do, yyyy")}
-                    </h3>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {dayEvents.map((event) => (
-                        <Card key={event.id} className="flex flex-col shadow-md hover:shadow-lg transition-shadow">
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-lg flex items-center justify-between">
-                              <span className="flex items-center gap-1.5">
-                                {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500" title="Quick Turnaround"/>}
-                                {getCoverageIcon(event.isCovered)}
-                                {event.name}
-                              </span>
-                              <Badge variant={
-                                event.priority === "Critical" ? "destructive" :
-                                event.priority === "High" ? "secondary" :
-                                event.priority === "Medium" ? "outline" : "default"
-                              }>{event.priority}</Badge>
-                            </CardTitle>
-                            <CardDescription className="flex items-center">
-                              {event.time}
-                              {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
-                            </CardDescription>
-                             {event.deadline && (
-                              <p className="text-xs text-amber-600 dark:text-amber-400">
-                                Deadline: {formatDeadline(event.deadline)}
-                              </p>
-                            )}
-                          </CardHeader>
-                          <CardContent className="flex-grow space-y-1 text-xs">
-                            {!selectedProject && event.project && (
-                              <p className="text-muted-foreground">Project: {event.project}</p>
-                            )}
-                             {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                              <p className="text-muted-foreground flex items-center">
-                                <Users className="mr-1.5 h-3.5 w-3.5 opacity-80" />
-                                Assigned: {event.assignedPersonnelIds.length}
-                              </p>
-                            )}
-                             <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center">
-                                <ListChecks className="mr-1.5 h-3.5 w-3.5 opacity-80" />
-                                Shot Requests: {event.shotRequests}
-                            </Link>
-                             <p className="text-muted-foreground flex items-center gap-1">
-                              {getDisciplineIcon(event.discipline)}
-                              {event.discipline ? event.discipline : 'N/A'}
-                            </p>
-                            <p className="text-muted-foreground">Deliverables: {event.deliverables}</p>
-                          </CardContent>
-                          <CardFooter className="border-t pt-3 flex flex-col sm:flex-row items-center gap-2">
-                             <Button variant="outline" size="sm" asChild className="w-full sm:w-auto flex-1">
-                                <Link href={`/events/${event.id}/shots`}>
-                                  <Eye className="mr-2 h-4 w-4" /> Manage Shots
-                                </Link>
-                              </Button>
-                               <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto flex-1">
-                                <Edit className="mr-2 h-4 w-4" /> Edit Event
-                              </Button>
-                          </CardFooter>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground text-center py-8">
-                  No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+            <DailyOverviewTabContent
+                groupedAndSortedEventsForDisplay={groupedAndSortedEventsForDisplay}
+                selectedProject={selectedProject}
+                useDemoData={useDemoData}
+                openEditEventModal={openEditEventModal}
+            />
         </TabsContent>
 
         <TabsContent value="event-list">
-          <Card className="shadow-lg mt-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
-              <CardDescription>
-                {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
-                ({displayableEvents.length} events found)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {displayableEvents.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Event Name</TableHead>
-                      {!selectedProject && <TableHead>Project</TableHead>}
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead>Deadline</TableHead>
-                      <TableHead>Discipline</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Assigned</TableHead>
-                      <TableHead>Shot Requests</TableHead>
-                      <TableHead>Deliverables</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {displayableEvents.map((event) => (
-                      <TableRow key={event.id}>
-                        <TableCell className="font-medium flex items-center gap-1.5">
-                           {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500" title="Quick Turnaround"/>}
-                           {getCoverageIcon(event.isCovered)}
-                          {event.name}
-                        </TableCell>
-                        {!selectedProject && <TableCell>{event.project}</TableCell>}
-                        <TableCell className="flex items-center">
-                          {format(parseISO(event.date), "PPP")} <span className="text-muted-foreground ml-1">({event.time})</span>
-                          {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {event.deadline ? formatDeadline(event.deadline) : "N/A"}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground flex items-center gap-1">
-                          {getDisciplineIcon(event.discipline)}
-                          {event.discipline || "N/A"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={
-                            event.priority === "Critical" ? "destructive" :
-                            event.priority === "High" ? "secondary" :
-                            event.priority === "Medium" ? "outline" : "default"
-                          }>{event.priority}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {event.assignedPersonnelIds?.length || 0}
-                        </TableCell>
-                         <TableCell>
-                           <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
-                            {event.shotRequests}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{event.deliverables}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
-                            <Link href={`/events/${event.id}/shots`}>
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">View/Manage Shots</span>
-                            </Link>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Edit Event</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(event.id)}>
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete Event</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                 <p className="text-muted-foreground text-center py-8">
-                  No events found {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+            <EventListTabContent
+                displayableEvents={displayableEvents}
+                selectedProject={selectedProject}
+                useDemoData={useDemoData}
+                openEditEventModal={openEditEventModal}
+                handleDeleteClick={handleDeleteClick}
+            />
         </TabsContent>
 
         <TabsContent value="block-schedule">
-          <Card className="shadow-lg mt-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
-              <CardDescription>
-                View events for a selected day laid out on an hourly timeline. Select a day tab below to view its schedule.
-                 {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
-                 ({displayableEvents.length} total events matching filters)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {groupedAndSortedEventsForDisplay.length > 0 && activeBlockScheduleDateKey ? (
-                <Tabs
-                  value={activeBlockScheduleDateKey}
-                  onValueChange={setActiveBlockScheduleDateKey}
-                  className="w-full"
-                >
-                  <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
-                    {groupedAndSortedEventsForDisplay.map(([dateKey, _]) => (
-                      <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
-                        {format(parseISO(dateKey), "EEE, MMM d")}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  {groupedAndSortedEventsForDisplay.map(([dateKey, dayEvents]) => (
-                    <TabsContent key={`content-${dateKey}`} value={dateKey}>
-                      <BlockScheduleView
-                        selectedDate={parseISO(dateKey)}
-                        eventsForDate={dayEvents}
-                        onEditEvent={openEditEventModal}
-                      />
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              ) : (
-                <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
-                  <CalendarIconLucide size={48} className="mb-4 text-muted" />
-                  <p className="text-lg font-medium">
-                    No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display in timeline based on current filters.
-                  </p>
-                  <p>
-                    {useDemoData ? 'Add some events for the selected project, adjust your project/event filters, or ensure demo data is loaded.' : 'Add events or adjust filters to see the timeline view.'}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            <BlockScheduleTabContent
+                groupedAndSortedEventsForDisplay={groupedAndSortedEventsForDisplay}
+                activeBlockScheduleDateKey={activeBlockScheduleDateKey}
+                setActiveBlockScheduleDateKey={setActiveBlockScheduleDateKey}
+                openEditEventModal={openEditEventModal}
+                selectedProject={selectedProject}
+                useDemoData={useDemoData}
+            />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
+
     
