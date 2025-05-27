@@ -8,7 +8,7 @@ import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
 import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
 import { z } from 'zod';
-import { format, addHours, subHours, setHours, setMinutes, startOfDay } from 'date-fns'; // Added date-fns functions
+import { format, addHours, subHours, setHours, setMinutes, startOfDay } from 'date-fns';
 
 // Define ShotRequest types and schema here
 const shotRequestSchemaInternal = z.object({
@@ -35,11 +35,11 @@ const initialShotRequestsMock: ShotRequest[] = [
   { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Wide shot of keynote speaker on Day 1 Morning", shotType: "Wide", priority: "High", status: "Planned" },
   { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening intently", shotType: "Medium", priority: "Medium", status: "Planned" },
   { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Planned" },
-  // Add some shots for the new dynamic today events
-  { id: "sr_today_001", eventId: "evt_today_early", description: "Early morning setup shots", shotType: "B-Roll", priority: "Medium", status: "Planned"},
-  { id: "sr_today_002", eventId: "evt_today_early", description: "First guest arrival", shotType: "Medium", priority: "High", status: "Planned"},
-  { id: "sr_today_003", eventId: "evt_today_late", description: "Main presentation wide shot", shotType: "Wide", priority: "Critical", status: "Planned"},
-  { id: "sr_today_004", eventId: "evt_today_late", description: "Speaker close-up", shotType: "Close-up", priority: "High", status: "Planned"},
+  // Add some shots for the dynamic today events
+  { id: "sr_today_comp_001", eventId: "evt_today_completed_test", description: "Wrap-up shots", shotType: "B-Roll", priority: "Medium", status: "Planned"},
+  { id: "sr_today_prog_001", eventId: "evt_today_inprogress_test", description: "Live action main shot", shotType: "Medium", priority: "High", status: "Planned"},
+  { id: "sr_today_prog_002", eventId: "evt_today_inprogress_test", description: "Behind the scenes", shotType: "B-Roll", priority: "Low", status: "Planned"},
+  { id: "sr_today_upc_001", eventId: "evt_today_upcoming_test", description: "Pre-event ambiance", shotType: "Wide", priority: "Medium", status: "Planned"},
 ];
 
 
@@ -76,13 +76,17 @@ const generateG9eSummitEvents = (): Event[] => {
       const afternoonDiscipline = disciplines[(dayIndex + photographerIndex + 1) % disciplines.length];
       const eveningDiscipline = disciplines[(dayIndex + photographerIndex + 2) % disciplines.length];
 
-      const morningShots = initialShotRequestsMock.filter(s => s.eventId === `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter}`).length;
-      const afternoonShots = initialShotRequestsMock.filter(s => s.eventId === `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter + 2}`).length; // Approx ID
-      const eveningShots = initialShotRequestsMock.filter(s => s.eventId === `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter + 3}`).length; // Approx ID
+      const morningEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter}`;
+      const afternoonEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter + 2}`; // Approx ID
+      const eveningEventId = `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter + 3}`; // Approx ID
+
+      const morningShots = initialShotRequestsMock.filter(s => s.eventId === morningEventId).length;
+      const afternoonShots = initialShotRequestsMock.filter(s => s.eventId === afternoonEventId).length;
+      const eveningShots = initialShotRequestsMock.filter(s => s.eventId === eveningEventId).length;
 
 
       summitEvents.push({
-        id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_morn_${eventIdCounter}`,
+        id: morningEventId,
         name: `${photographerName} - Summit Day ${dayIndex + 1} Morning Coverage`,
         projectId: g9eSummitProjectId,
         project: "G9e Corporate Summit 2024",
@@ -117,7 +121,7 @@ const generateG9eSummitEvents = (): Event[] => {
       });
 
       summitEvents.push({
-        id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_aft_${eventIdCounter++}`,
+        id: afternoonEventId,
         name: `${photographerName} - Summit Day ${dayIndex + 1} Afternoon Workshops`,
         projectId: g9eSummitProjectId,
         project: "G9e Corporate Summit 2024",
@@ -152,7 +156,7 @@ const generateG9eSummitEvents = (): Event[] => {
 
       if (photographerIndex % 2 === 0) {
         summitEvents.push({
-          id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_eve_${eventIdCounter++}`,
+          id: eveningEventId,
           name: `${photographerName} - Summit Day ${dayIndex + 1} Evening Reception`,
           projectId: g9eSummitProjectId,
           project: "G9e Corporate Summit 2024",
@@ -199,48 +203,68 @@ export function EventProvider({ children }: { children: ReactNode }) {
       const loadedShots: Record<string, ShotRequest[]> = {};
 
       if (useDemoData) {
-        // Dynamically add events for today
-        const today = new Date();
-        const todayStr = format(today, "yyyy-MM-dd");
+        const now = new Date();
+        const todayStr = format(now, "yyyy-MM-dd");
 
-        const earlyTodayStart = setMinutes(setHours(startOfDay(today), 8), 0); // 8:00 AM
-        const earlyTodayEnd = setMinutes(setHours(startOfDay(today), 11), 30); // 11:30 AM
-
-        const lateTodayStart = setMinutes(setHours(startOfDay(today), 13), 0); // 1:00 PM
-        const lateTodayEnd = setMinutes(setHours(startOfDay(today), 17), 0); // 5:00 PM
-
-
+        // Completed Event (for proj001)
+        const completedStart = subHours(now, 2);
+        const completedEnd = subHours(now, 1);
         loadedEvents.push({
-          id: "evt_today_early",
-          name: "Today's Early Shoot (Demo)",
-          projectId: "proj001", // Summer Music Festival
+          id: "evt_today_completed_test",
+          name: "Demo: Recently Completed",
+          projectId: "proj001", 
           project: "Summer Music Festival 2024",
           date: todayStr,
-          time: `${format(earlyTodayStart, "HH:mm")} - ${format(earlyTodayEnd, "HH:mm")}`,
-          priority: "High",
+          time: `${format(completedStart, "HH:mm")} - ${format(completedEnd, "HH:mm")}`,
+          priority: "Medium",
           deliverables: 1,
-          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_early").length,
-          assignedPersonnelIds: ["user001", "user004"],
-          isQuickTurnaround: true,
-          deadline: format(addHours(today, 24), "yyyy-MM-dd'T'HH:mm:ss"),
-          organizationId: "org_g9e",
+          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_completed_test").length,
+          assignedPersonnelIds: ["user001"],
+          isQuickTurnaround: false,
+          organizationId: "org_g9e", 
           discipline: "Video",
           isCovered: true,
         });
+
+        // In Progress Event (for proj001)
+        const inProgressStart = subHours(now, 0.5); // Started 30 mins ago
+        const inProgressEnd = addHours(now, 0.5);   // Ends in 30 mins
         loadedEvents.push({
-          id: "evt_today_late",
-          name: "Today's Late Session (Demo)",
-          projectId: g9eSummitProjectId, // G9e Corporate Summit
-          project: "G9e Corporate Summit 2024",
+          id: "evt_today_inprogress_test",
+          name: "Demo: Currently In Progress",
+          projectId: "proj001",
+          project: "Summer Music Festival 2024",
           date: todayStr,
-          time: `${format(lateTodayStart, "HH:mm")} - ${format(lateTodayEnd, "HH:mm")}`,
-          priority: "Critical",
+          time: `${format(inProgressStart, "HH:mm")} - ${format(inProgressEnd, "HH:mm")}`,
+          priority: "High",
           deliverables: 2,
-          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_late").length,
-          assignedPersonnelIds: ["user003", "user005", "user006"],
-          isQuickTurnaround: false,
+          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_inprogress_test").length,
+          assignedPersonnelIds: ["user002", "user003"],
+          isQuickTurnaround: true,
+          deadline: format(addHours(now, 4), "yyyy-MM-dd'T'HH:mm:ss"),
           organizationId: "org_g9e",
           discipline: "Both",
+          isCovered: true,
+        });
+
+        // Upcoming Event (for proj001)
+        const upcomingStart = addHours(now, 1);
+        const upcomingEnd = addHours(now, 2);
+        loadedEvents.push({
+          id: "evt_today_upcoming_test",
+          name: "Demo: Upcoming Today",
+          projectId: "proj001",
+          project: "Summer Music Festival 2024",
+          date: todayStr,
+          time: `${format(upcomingStart, "HH:mm")} - ${format(upcomingEnd, "HH:mm")}`,
+          priority: "Critical",
+          deliverables: 0,
+          shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_upcoming_test").length,
+          assignedPersonnelIds: ["user004", "user005"],
+          isQuickTurnaround: true,
+          deadline: format(addHours(now, 6), "yyyy-MM-dd'T'HH:mm:ss"),
+          organizationId: "org_g9e",
+          discipline: "Photography",
           isCovered: true,
         });
         
