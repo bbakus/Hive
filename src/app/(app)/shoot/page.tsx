@@ -53,7 +53,7 @@ export default function ShootPage() {
 
   const getEventStatus = (event: Event, now: Date): "in_progress" | "upcoming" | "past" => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return "upcoming"; // Default or error case
+    if (!times) return "upcoming"; 
 
     if (isWithinInterval(now, { start: times.start, end: times.end })) {
       return "in_progress";
@@ -78,7 +78,6 @@ export default function ShootPage() {
     return filtered;
   }, [todaysCoveredEvents, filterTimeStatus, filterQuickTurnaround, currentTime]);
 
-
   const getEventStatusBadgeInfo = (event: Event): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } => {
     if (!currentTime) return { label: "Pending", variant: "outline" };
     const status = getEventStatus(event, currentTime);
@@ -88,6 +87,13 @@ export default function ShootPage() {
       case "past": return { label: "Completed", variant: "default" };
       default: return { label: "Scheduled", variant: "outline" };
     }
+  };
+
+  const getShotProgress = (eventId: string): { captured: number; total: number } => {
+    const shots = getShotRequestsForEvent(eventId);
+    const total = shots.length;
+    const captured = shots.filter(shot => shot.status === "Captured" || shot.status === "Completed").length;
+    return { captured, total };
   };
 
   if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
@@ -146,7 +152,7 @@ export default function ShootPage() {
                         <SelectItem value="all">All Today's Events</SelectItem>
                         <SelectItem value="upcoming">Upcoming</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="past">Past (Completed)</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -214,10 +220,10 @@ export default function ShootPage() {
                 <AccordionContent className="p-4 border-t">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" disabled> {/* Placeholder */}
+                      <Button variant="outline" size="sm" disabled> 
                         <LogIn className="mr-2 h-4 w-4"/> Check In
                       </Button>
-                      <Button variant="outline" size="sm" disabled> {/* Placeholder */}
+                      <Button variant="outline" size="sm" disabled> 
                         <LogOut className="mr-2 h-4 w-4"/> Check Out
                       </Button>
                     </div>
@@ -233,7 +239,7 @@ export default function ShootPage() {
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {shotsForEvent.map(shot => (
                         <div key={shot.id} className="flex items-center gap-3 p-2 rounded-md border bg-background/50">
-                          <Checkbox id={`shot-check-${shot.id}`} disabled checked={shot.status === "Captured" || shot.status === "Completed"} aria-label={`Checkbox for shot ${shot.description}`}/> {/* Placeholder for now */}
+                          <Checkbox id={`shot-check-${shot.id}`} disabled checked={shot.status === "Captured" || shot.status === "Completed"} aria-label={`Checkbox for shot ${shot.description}`}/> 
                           <label htmlFor={`shot-check-${shot.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={shot.description}>
                             {shot.description}
                           </label>
