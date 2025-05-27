@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation'; // Added useRouter
 import { useMemo, useState, useEffect } from 'react';
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  // DialogTrigger, // Removed if not used directly
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -37,16 +37,8 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
-import type { Event } from '../page'; 
-
-const initialEventsForShotPageMock: Event[] = [
-    { id: "evt001", name: "Main Stage - Day 1", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "14:00 - 23:00", priority: "High", deliverables: 5, shotRequests: 20 },
-    { id: "evt002", name: "Keynote Speech", project: "Tech Conference X", projectId: "proj002", date: "2024-09-15", time: "09:00 - 10:00", priority: "Critical", deliverables: 2, shotRequests: 5 },
-    { id: "evt003", name: "VIP Reception", project: "Corporate Gala Dinner", projectId: "proj003", date: "2024-11-05", time: "18:00 - 19:00", priority: "Medium", deliverables: 1, shotRequests: 3 },
-    { id: "evt004", name: "Artist Meet & Greet", project: "Summer Music Festival 2024", projectId: "proj001", date: "2024-07-15", time: "17:00 - 18:00", priority: "Medium", deliverables: 1, shotRequests: 10 },
-    { id: "evt005", name: "Closing Ceremony", project: "Tech Conference X", projectId: "proj002", date: "2024-09-17", time: "16:00 - 17:00", priority: "High", deliverables: 3, shotRequests: 8 },
-];
+import { useSettingsContext } from "@/contexts/SettingsContext";
+import { useEventContext, type Event } from "@/contexts/EventContext"; // Import Event type from context
 
 const shotRequestSchema = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
@@ -63,22 +55,29 @@ export type ShotRequest = ShotRequestFormData & {
   eventId: string;
 };
 
+// This mock data is now for initial shot requests if demo data is on.
+// The parent event data comes from EventContext.
 const initialShotRequestsMock: ShotRequest[] = [
   { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd", shotType: "Wide", priority: "High", status: "Planned", notes: "Get this as gates open" },
   { id: "sr002", eventId: "evt001", description: "Close-up of lead singer - Song 3", shotType: "Close-up", priority: "Critical", status: "Planned" },
-  { id: "sr003", eventId: "evt002", description: "Speaker walking onto stage", shotType: "Medium", priority: "High", status: "Captured" },
-  { id: "sr004", eventId: "evt001", description: "Drone shot of entire festival area at sunset", shotType: "Drone", priority: "Medium", status: "Assigned", notes: "Requires licensed pilot" },
+  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various songs", shotType: "B-Roll", priority: "Medium", status: "Planned" },
+  { id: "sr004", eventId: "evt002", description: "Speaker walking onto stage", shotType: "Medium", priority: "High", status: "Captured" },
+  // Add a few mock shots for G9e Summit Events to test
+  { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Wide shot of keynote speaker on Day 1 Morning", shotType: "Wide", priority: "High", status: "Planned" },
+  { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening intently", shotType: "Medium", priority: "Medium", status: "Planned" },
+  { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Planned" },
 ];
 
 
 export default function ShotListPage() {
   const params = useParams();
   const eventId = params.eventId as string;
-  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   
-  const [event, setEvent] = useState<Event | null>(null);
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const { getEventById, isLoadingEvents: isLoadingContextEvents } = useEventContext();
+
+  const [event, setEvent] = useState<Event | null | undefined>(undefined); // undefined: loading, null: not found
   const [shotRequests, setShotRequests] = useState<ShotRequest[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   
   const [isShotModalOpen, setIsShotModalOpen] = useState(false);
   const [editingShotRequest, setEditingShotRequest] = useState<ShotRequest | null>(null);
@@ -86,6 +85,7 @@ export default function ShotListPage() {
   const [shotRequestToDeleteId, setShotRequestToDeleteId] = useState<string | null>(null);
 
   const { toast } = useToast();
+  const router = useRouter();
 
   const {
     register,
@@ -105,33 +105,47 @@ export default function ShotListPage() {
   });
 
   useEffect(() => {
-    if (isLoadingSettings) return;
+    if (isLoadingSettings || isLoadingContextEvents) {
+      setEvent(undefined); // Mark as loading if contexts are not ready
+      setShotRequests([]);
+      return;
+    }
 
-    if (eventId) {
-      const eventsToUse = useDemoData ? initialEventsForShotPageMock : [];
+    if (!eventId) {
+      setEvent(null); // No eventId means we can't find an event
+      setShotRequests([]);
+      return;
+    }
+    
+    // Contexts are loaded, and eventId exists. Attempt to get the event.
+    const foundEvent = getEventById(eventId);
+    setEvent(foundEvent || null); // If getEventById returns undefined, it means not found, so set to null.
+
+    if (foundEvent) {
+      // Load shot requests for this event (mocked for now)
       const shotsToUse = useDemoData ? initialShotRequestsMock : [];
-
-      const foundEvent = eventsToUse.find(e => e.id === eventId);
-      setEvent(foundEvent || null);
       const eventSpecificShots = shotsToUse.filter(sr => sr.eventId === eventId);
       setShotRequests(eventSpecificShots);
-      setIsLoadingData(false);
     } else {
-      setIsLoadingData(false);
+      setShotRequests([]); // No event found, so no shot requests
     }
-  }, [eventId, useDemoData, isLoadingSettings]);
+
+  }, [eventId, useDemoData, isLoadingSettings, isLoadingContextEvents, getEventById]);
+
 
   useEffect(() => {
-    if (editingShotRequest) {
-      reset(editingShotRequest);
-    } else {
-      reset({
-        description: "",
-        shotType: "Medium",
-        priority: "Medium",
-        status: "Planned",
-        notes: "",
-      });
+    if (isShotModalOpen) { // Only reset form when modal opens
+        if (editingShotRequest) {
+        reset(editingShotRequest);
+        } else {
+        reset({
+            description: "",
+            shotType: "Medium",
+            priority: "Medium",
+            status: "Planned",
+            notes: "",
+        });
+        }
     }
   }, [editingShotRequest, reset, isShotModalOpen]);
 
@@ -176,7 +190,7 @@ export default function ShotListPage() {
 
   const closeShotModal = () => {
     setIsShotModalOpen(false);
-    setEditingShotRequest(null);
+    // No need to reset editingShotRequest here, useEffect handles it based on isShotModalOpen
   };
   
   const handleDeleteShotClick = (shotId: string) => {
@@ -198,16 +212,15 @@ export default function ShotListPage() {
     setIsShotDeleteDialogOpen(false);
   };
 
-
-  if (isLoadingSettings || isLoadingData) {
+  if (isLoadingSettings || isLoadingContextEvents || event === undefined) {
     return <div className="flex items-center justify-center h-screen">Loading event shot list...</div>;
   }
 
-  if (!event) {
+  if (event === null) { // Changed from !event to event === null to distinguish "not found" from "loading"
     return (
         <div className="flex flex-col items-center justify-center h-screen gap-4">
             <p className="text-xl text-muted-foreground">Event not found.</p>
-             <p className="text-sm text-muted-foreground">{!useDemoData && "Demo data is turned off. Event details might not be available unless added."}</p>
+             <p className="text-sm text-muted-foreground">{!useDemoData && "Demo data is turned off or this event does not exist in the current context."}</p>
             <Button asChild variant="outline">
                 <Link href="/events">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back to Events
@@ -418,3 +431,5 @@ export default function ShotListPage() {
     </div>
   );
 }
+
+    
