@@ -95,6 +95,7 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const { activePhase, setActivePhase, PHASES: availablePhasesFromContext } = usePhaseContext();
   const [mounted, setMounted] = useState(false);
 
+  // Fallback to directly imported PHASES if context one is undefined during initial renders
   const availablePhases = availablePhasesFromContext || AppPhasesArray;
 
 
@@ -108,16 +109,12 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
 
     if (currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')) {
       determinedPhase = 'Dashboard';
+    } else if (currentPath.includes('/shots')) { // Prioritize shot lists for "Shoot" phase
+      determinedPhase = 'Shoot';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-      // If already in "Shoot" phase and navigating within /events (e.g. to a shot list), keep "Shoot"
-      // Otherwise, /events primarily belongs to "Plan"
-      if (activePhase === 'Shoot' && (currentPath.includes('/shots'))) {
-         determinedPhase = 'Shoot';
-      } else {
-        determinedPhase = 'Plan';
-      }
+      determinedPhase = 'Plan'; // Default for general event pages
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/scheduler' || currentPath.startsWith('/scheduler/')) {
@@ -129,11 +126,13 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
     } else if (currentPath === '/settings' || currentPath.startsWith('/support/')) {
-      determinedPhase = activePhase || 'Dashboard'; // Keep current main phase or default
+      // For settings/support, keep the current main phase or default to Dashboard
+      // This prevents these utility pages from changing the primary phase context unnecessarily
+      determinedPhase = activePhase || 'Dashboard'; 
     }
 
 
-    if (determinedPhase && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
+    if (determinedPhase && availablePhases && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
       setActivePhase(determinedPhase);
     }
   }, [pathname, activePhase, setActivePhase, availablePhases]);
