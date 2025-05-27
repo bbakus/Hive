@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon } from "lucide-react";
+import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon, UserCheck } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
@@ -28,6 +28,7 @@ import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page
 
 // MOCK_CURRENT_USER_ID simulates the logged-in photographer/user for actions on this page
 const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
+const MOCK_CURRENT_USER_NAME = "Field Photographer"; // Added for toast messages
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -35,7 +36,7 @@ export default function ShootPage() {
     eventsForSelectedProjectAndOrg, 
     isLoadingEvents, 
     getShotRequestsForEvent,
-    updateShotRequest, // Make sure this is used correctly
+    updateShotRequest,
     checkInUserToEvent,
     checkOutUserFromEvent
   } = useEventContext();
@@ -52,15 +53,18 @@ export default function ShootPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const getPersonnelNameById = (id: string): string => {
+  const getPersonnelNameById = (id?: string): string => {
+    if (!id) return "Unknown";
     const person = initialPersonnelMock.find(p => p.id === id);
-    return person ? person.name : "Unknown User";
+    return person ? person.name : "Unknown";
   };
 
   const todaysCoveredEvents = useMemo(() => {
     if (!currentTime || !eventsForSelectedProjectAndOrg) return [];
     return eventsForSelectedProjectAndOrg.filter(event => {
-      const eventStartDate = parseEventTimes(event.date, event.time)?.start;
+      const eventTimes = parseEventTimes(event.date, event.time);
+      if (!eventTimes) return false; // Skip events with invalid time strings
+      const eventStartDate = eventTimes.start;
       return eventStartDate && isToday(eventStartDate) && event.isCovered;
     }).sort((a, b) => {
         const timeA = parseEventTimes(a.date, a.time)?.start.getTime() || 0;
@@ -127,10 +131,14 @@ export default function ShootPage() {
         updatePayload.status = "Assigned"; // Revert to "Assigned"
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
+        // Retain initialCapturerId
+        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
       } else {
         updatePayload.status = "Captured";
         if (!shotToUpdate.initialCapturerId) {
           updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
+        } else {
+          updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain if already set
         }
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
@@ -151,7 +159,7 @@ export default function ShootPage() {
         });
       } else {
         const reason = window.prompt("Please provide a reason for blocking this shot:");
-        if (reason !== null) { // User provided a reason (even if empty string)
+        if (reason !== null) { 
           updatePayload.status = "Blocked";
           updatePayload.blockedReason = reason;
           updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
@@ -161,13 +169,12 @@ export default function ShootPage() {
             description: `Shot "${shotToUpdate.description.substring(0,30)}..." marked as Blocked. Reason: ${reason}`
           });
         } else {
-          // User cancelled the prompt, do nothing
           toast({
             title: "Block Action Cancelled",
             variant: "default",
             description: "Shot status remains unchanged."
           });
-          return; // Prevent further processing
+          return; 
         }
       }
     }
@@ -176,7 +183,6 @@ export default function ShootPage() {
       updateShotRequest(eventId, shotId, updatePayload);
     }
   };
-
 
   const handleCheckIn = (eventId: string, personnelId: string) => {
     checkInUserToEvent(eventId, personnelId);
@@ -197,7 +203,6 @@ export default function ShootPage() {
       description: `${personName} successfully checked out from ${eventName}.`,
     });
   };
-
 
   if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
     return (
@@ -255,7 +260,7 @@ export default function ShootPage() {
                         <SelectItem value="all">All Today&apos;s Events</SelectItem>
                         <SelectItem value="upcoming">Upcoming</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="past">Past (Completed)</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -393,21 +398,21 @@ export default function ShootPage() {
                       {shotsForEvent.map(shot => (
                         <div key={shot.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
                           <div className="flex-1 space-y-1">
-                            <label htmlFor={`shot-item-${event.id}-${shot.id}`} className="text-sm text-foreground" title={shot.description}>
+                            <p className="text-sm text-foreground" title={shot.description}>
                               {shot.description}
-                            </label>
+                            </p>
                             {shot.status === "Blocked" && shot.blockedReason && (
                                 <p className="text-xs text-destructive flex items-center gap-1">
                                     <AlertTriangleIcon className="h-3.5 w-3.5" /> Reason: {shot.blockedReason}
                                 </p>
                             )}
                           </div>
-                          <div className="flex flex-col xs:flex-row gap-1.5 items-stretch xs:items-center self-stretch xs:self-auto w-full xs:w-auto mt-1.5 sm:mt-0 flex-shrink-0">
+                          <div className="flex flex-row gap-1.5 items-center self-stretch xs:self-auto w-full xs:w-auto mt-1.5 sm:mt-0 flex-shrink-0">
                             <Button 
                               variant={(shot.status === "Captured" || shot.status === "Completed") ? "secondary" : "outline"} 
                               size="sm"
                               onClick={() => handleShotAction(event.id, shot.id, 'toggleCapture')}
-                              className="text-xs px-2 py-1 h-auto flex-grow xs:flex-grow-0"
+                              className="text-xs px-2 py-1 h-auto flex-grow-0"
                             >
                               {shot.status === "Captured" || shot.status === "Completed" ? "Uncapture" : "Capture"}
                             </Button>
@@ -415,7 +420,7 @@ export default function ShootPage() {
                               variant={shot.status === "Blocked" ? "destructive" : "outline"} 
                               size="sm"
                               onClick={() => handleShotAction(event.id, shot.id, 'toggleBlock')}
-                              className="text-xs px-2 py-1 h-auto flex-grow xs:flex-grow-0"
+                              className="text-xs px-2 py-1 h-auto flex-grow-0"
                             >
                               {shot.status === "Blocked" ? "Unblock" : "Block"}
                             </Button>
