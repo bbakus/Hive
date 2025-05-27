@@ -10,7 +10,7 @@ import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page"; // Assuming these are exported correctly
+import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page"; 
 import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -25,10 +25,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
-// ScrollArea removed as per request for this specific list
 
-// MOCK_CURRENT_USER_ID simulates the logged-in photographer/user for actions on this page
-const MOCK_CURRENT_USER_ID = "user_photog_field_sim";
+
+// MOCK_CURRENT_USER_ID simulates the logged-in photographer for actions on this page
+const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
 const MOCK_CURRENT_USER_NAME = "Field Photographer";
 
 
@@ -50,8 +50,8 @@ export default function ShootPage() {
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
 
   useEffect(() => {
-    setCurrentTime(new Date()); // Set initial time
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute
+    setCurrentTime(new Date()); 
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -77,7 +77,7 @@ export default function ShootPage() {
 
   const getEventStatus = (event: Event, now: Date): "in_progress" | "upcoming" | "past" => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return "upcoming";
+    if (!times) return "upcoming"; 
 
     if (isWithinInterval(now, { start: times.start, end: times.end })) {
       return "in_progress";
@@ -146,7 +146,7 @@ export default function ShootPage() {
       });
     } else if (action === "toggleBlock") {
       if (shotToUpdate.status === "Blocked") {
-        updatePayload.status = "Assigned";
+        updatePayload.status = "Assigned"; 
         updatePayload.blockedReason = "";
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
@@ -156,7 +156,7 @@ export default function ShootPage() {
         });
       } else {
         const reason = window.prompt("Please provide a reason for blocking this shot:");
-        if (reason !== null) {
+        if (reason !== null) { 
           updatePayload.status = "Blocked";
           updatePayload.blockedReason = reason;
           updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
@@ -171,7 +171,7 @@ export default function ShootPage() {
             variant: "default",
             description: "Shot status remains unchanged."
           });
-          return;
+          return; 
         }
       }
     }
@@ -258,7 +258,7 @@ export default function ShootPage() {
                         <SelectItem value="all">All Today&apos;s Events</SelectItem>
                         <SelectItem value="upcoming">Upcoming</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="past">Completed</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -392,17 +392,9 @@ export default function ShootPage() {
                     </Button>
                   </div>
                   {shotsForEvent.length > 0 ? (
-                    <div className="space-y-2"> {/* Removed ScrollArea */}
+                    <div className="space-y-1"> {/* No ScrollArea, vertical stack */}
                       {shotsForEvent.map(shot => (
-                        <div key={shot.id} className="flex items-center gap-2 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
-                          <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
-                            {shot.description}
-                          </p>
-                          {shot.status === "Blocked" && shot.blockedReason && (
-                            <p className="text-xs text-destructive flex items-center gap-1 ml-2 flex-shrink-0" title={shot.blockedReason}>
-                                <AlertTriangleIcon className="h-3.5 w-3.5" /> Blocked
-                            </p>
-                          )}
+                        <div key={shot.id} className="flex items-center gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
                            <Badge
                              variant={
                                 shot.status === "Captured" ? "default" :
@@ -417,6 +409,9 @@ export default function ShootPage() {
                           >
                             {shot.status}
                           </Badge>
+                          <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
+                            {shot.description}
+                          </p>
                           <div className="flex flex-row gap-1.5 items-center flex-shrink-0">
                             <Button
                               variant={(shot.status === "Captured" || shot.status === "Completed") ? "secondary" : "outline"}
@@ -450,6 +445,3 @@ export default function ShootPage() {
     </div>
   );
 }
-
-
-      
