@@ -78,7 +78,7 @@ export default function ShotListPage() {
       description: "",
       shotType: "Medium",
       priority: "Medium",
-      status: "Planned",
+      status: "Unassigned", // Default new shots to "Unassigned"
       notes: "",
       blockedReason: "",
     },
@@ -128,7 +128,7 @@ export default function ShotListPage() {
             description: "",
             shotType: "Medium",
             priority: "Medium",
-            status: "Planned", // Default for new shots
+            status: "Unassigned", // Default for new shots
             notes: "",
             blockedReason: "",
           });
@@ -176,7 +176,7 @@ export default function ShotListPage() {
       description: "",
       shotType: "Medium",
       priority: "Medium",
-      status: "Planned",
+      status: "Unassigned",
       notes: "",
       blockedReason: "",
     });
@@ -265,7 +265,7 @@ export default function ShotListPage() {
     );
   }
 
-  const shotStatuses: ShotRequestFormData['status'][] = ["Planned", "Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
+  const shotStatuses: ShotRequestFormData['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
 
 
   return (
@@ -467,13 +467,11 @@ export default function ShotListPage() {
                             className="w-full justify-center"
                             variant={
                                 shot.status === "Captured" ? "default" :
-                                shot.status === "Reviewed" ? "default" : // Keep for now, workflow can refine this
-                                shot.status === "Planned" ? "outline" :
+                                shot.status === "Completed" ? "default" : 
                                 shot.status === "Unassigned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
-                                shot.status === "Request More" ? "destructive" : // Or a specific "warning" yellow if available
-                                shot.status === "Completed" ? "default" : 
+                                shot.status === "Request More" ? "destructive" : 
                                 "outline"
                             }
                             >
@@ -487,13 +485,11 @@ export default function ShotListPage() {
                                 className="w-full justify-center"
                                 variant={
                                 s === "Captured" ? "default" :
-                                s === "Reviewed" ? "default" :
-                                s === "Planned" ? "outline" :
+                                s === "Completed" ? "default" :
                                 s === "Unassigned" ? "outline" :
                                 s === "Assigned" ? "secondary" :
                                 s === "Blocked" ? "destructive" :
                                 s === "Request More" ? "destructive" :
-                                s === "Completed" ? "default" : 
                                 "outline"
                                 }
                               >

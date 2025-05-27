@@ -15,7 +15,7 @@ export const shotRequestSchemaInternal = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   shotType: z.enum(["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"]),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
-  status: z.enum(["Planned", "Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"]),
+  status: z.enum(["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"]),
   notes: z.string().optional(),
   blockedReason: z.string().optional(),
 });
@@ -31,17 +31,17 @@ export type Event = EventTypeDefinition;
 
 // Initial Mock Data for Shot Requests
 const initialShotRequestsMock: ShotRequest[] = [
-  { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd", shotType: "Wide", priority: "High", status: "Planned", notes: "Get this as gates open" },
+  { id: "sr001", eventId: "evt001", description: "Opening wide shot of the crowd", shotType: "Wide", priority: "High", status: "Unassigned", notes: "Get this as gates open" },
   { id: "sr002", eventId: "evt001", description: "Close-up of lead singer - Song 3", shotType: "Close-up", priority: "Critical", status: "Assigned" },
-  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various songs", shotType: "B-Roll", priority: "Medium", status: "Planned" },
+  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various songs", shotType: "B-Roll", priority: "Medium", status: "Unassigned" },
   { id: "sr004", eventId: "evt002", description: "Speaker walking onto stage", shotType: "Medium", priority: "High", status: "Captured" },
-  { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Wide shot of keynote speaker on Day 1 Morning", shotType: "Wide", priority: "High", status: "Planned" },
+  { id: "sr_summit_001", eventId: "evt_summit_d1_p1_morn_100", description: "Wide shot of keynote speaker on Day 1 Morning", shotType: "Wide", priority: "High", status: "Unassigned" },
   { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening intently", shotType: "Medium", priority: "Medium", status: "Assigned" },
-  { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Planned" },
+  { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Unassigned" },
   { id: "sr_today_comp_001", eventId: "evt_today_completed_test", description: "Wrap-up shots", shotType: "B-Roll", priority: "Medium", status: "Completed"},
   { id: "sr_today_prog_001", eventId: "evt_today_inprogress_test", description: "Live action main shot", shotType: "Medium", priority: "High", status: "Captured"},
-  { id: "sr_today_prog_002", eventId: "evt_today_inprogress_test", description: "Behind the scenes", shotType: "B-Roll", priority: "Low", status: "Planned"},
-  { id: "sr_today_upc_001", eventId: "evt_today_upcoming_test", description: "Pre-event ambiance", shotType: "Wide", priority: "Medium", status: "Planned"},
+  { id: "sr_today_prog_002", eventId: "evt_today_inprogress_test", description: "Behind the scenes", shotType: "B-Roll", priority: "Low", status: "Unassigned"},
+  { id: "sr_today_upc_001", eventId: "evt_today_upcoming_test", description: "Pre-event ambiance", shotType: "Wide", priority: "Medium", status: "Unassigned"},
   { id: "sr_blocked_test_001", eventId: "evt001", description: "Drone shot over main stage", shotType: "Drone", priority: "High", status: "Blocked", blockedReason: "High winds, FAA restriction."}
 ];
 
@@ -210,7 +210,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
       if (useDemoData) {
         const now = new Date();
         const todayStr = format(now, "yyyy-MM-dd");
-
+        
         const completedStart = subHours(now, 2);
         const completedEnd = subHours(now, 1);
         const inProgressStart = subHours(now, 0.5); 
@@ -219,7 +219,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
         const upcomingEnd = addHours(now, 2);
 
         const dynamicEventsToAdd: Event[] = [
-            {
+             {
               id: "evt_today_completed_test", name: "Demo: Recently Completed", projectId: "proj001", project: "Summer Music Festival 2024",
               date: todayStr, time: `${format(completedStart, "HH:mm")} - ${format(completedEnd, "HH:mm")}`, priority: "Medium", deliverables: 1,
               shotRequests: initialShotRequestsMock.filter(s => s.eventId === "evt_today_completed_test").length, assignedPersonnelIds: ["user001"],
@@ -327,9 +327,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
       let newEventShots = eventShots.map(shot =>
         shot.id === shotId ? { ...shot, ...updatedData } : shot
       );
-
+      
       // If status is changed to something other than "Blocked", clear blockedReason
-      if (updatedData.status && updatedData.status !== "Blocked") {
+      if (updatedData.status && updatedData.status !== "Blocked" && newEventShots.find(s => s.id === shotId)?.blockedReason) {
         newEventShots = newEventShots.map(shot => 
           shot.id === shotId ? { ...shot, blockedReason: "" } : shot
         );
