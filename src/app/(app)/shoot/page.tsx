@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Users, Clock, AlertTriangle, Info, Zap, CheckCircle, LogIn, LogOut, Filter, CheckSquare, Camera as CameraIcon } from "lucide-react";
+import { RadioTower, ListChecks, Clock, AlertTriangle, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
@@ -24,7 +24,9 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page"; // Import personnel mock
+import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
+
+const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; // Simulate a photographer for shot capture
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -94,7 +96,7 @@ export default function ShootPage() {
     switch (status) {
       case "in_progress": return { label: "In Progress", variant: "secondary" };
       case "upcoming": return { label: "Upcoming", variant: "outline" };
-      case "past": return { label: "Completed", variant: "default" };
+      case "past": return { label: "Completed", variant: "default" }; // This refers to event timing, not necessarily task completion
       default: return { label: "Scheduled", variant: "outline" };
     }
   };
@@ -111,38 +113,42 @@ export default function ShootPage() {
     return person ? person.name : "Unknown User";
   };
 
-  const handleShotCheckChange = (shotId: string, eventId: string, newCheckedState: boolean) => {
+  const handleShotCheckChange = (shotId: string, eventId: string, currentShotStatus: ShotRequest['status'], newCheckedState: boolean) => {
     const shotsForEvent = getShotRequestsForEvent(eventId);
     const shotToUpdate = shotsForEvent.find(s => s.id === shotId);
 
     if (!shotToUpdate) return;
 
-    const MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE = "user_photog_field_sim"; // Simulate who is checking it off
-
     let newStatus: ShotRequest['status'] | undefined = undefined;
     let updatePayload: Partial<ShotRequestFormData> = {};
 
     if (newCheckedState) {
-      if (shotToUpdate.status !== "Captured" && shotToUpdate.status !== "Completed") {
+      if (currentShotStatus !== "Captured" && currentShotStatus !== "Completed") {
         newStatus = "Captured";
-        updatePayload.status = newStatus;
-        if (!shotToUpdate.initialCapturerId) {
-          updatePayload.initialCapturerId = MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE;
-        }
-        updatePayload.lastStatusModifierId = MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE;
-        updatePayload.lastStatusModifiedAt = new Date().toISOString();
       }
-    } else {
-      if (shotToUpdate.status === "Captured") { 
-        newStatus = "Assigned"; 
-        updatePayload.status = newStatus;
-        // Keep initialCapturerId, just update modifier
-        updatePayload.lastStatusModifierId = MOCK_PHOTOGRAPHER_ID_FOR_CAPTURE; 
-        updatePayload.lastStatusModifiedAt = new Date().toISOString();
+    } else { // Unchecking
+      if (currentShotStatus === "Captured") { 
+        newStatus = "Assigned"; // Revert to "Assigned" if it was "Captured"
       }
+      // If it was "Completed" or other statuses, unchecking does nothing from this quick view
     }
 
     if (newStatus) {
+      updatePayload.status = newStatus;
+      const nowISO = new Date().toISOString();
+
+      if (newStatus === "Captured") {
+        if (!shotToUpdate.initialCapturerId) {
+          updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
+        }
+        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+        updatePayload.lastStatusModifiedAt = nowISO;
+      } else if (newStatus === "Assigned" && currentShotStatus === "Captured") { // Reverting from Captured
+        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID; // Person unchecking
+        updatePayload.lastStatusModifiedAt = nowISO;
+        // Keep initialCapturerId
+      }
+      
       updateShotRequest(eventId, shotId, updatePayload);
       toast({
         title: "Shot Status Updated",
@@ -154,18 +160,20 @@ export default function ShootPage() {
   const handleCheckIn = (eventId: string, personnelId: string) => {
     checkInUserToEvent(eventId, personnelId);
     const personName = getPersonnelNameById(personnelId);
+    const eventName = eventsForSelectedProjectAndOrg.find(e => e.id === eventId)?.name || "the event";
     toast({
       title: "Checked In",
-      description: `${personName} successfully checked in to the event.`,
+      description: `${personName} successfully checked in to ${eventName}.`,
     });
   };
 
   const handleCheckOut = (eventId: string, personnelId: string) => {
     checkOutUserFromEvent(eventId, personnelId);
     const personName = getPersonnelNameById(personnelId);
+    const eventName = eventsForSelectedProjectAndOrg.find(e => e.id === eventId)?.name || "the event";
      toast({
       title: "Checked Out",
-      description: `${personName} successfully checked out from the event.`,
+      description: `${personName} successfully checked out from ${eventName}.`,
     });
   };
 
@@ -298,17 +306,18 @@ export default function ShootPage() {
 
                       return (
                         <div key={personnelId} className="mb-4 p-3 border rounded-md bg-muted/30">
-                          <div className="flex justify-between items-center mb-2">
-                            <div>
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
+                            <div className="mb-2 sm:mb-0">
                                 <p className="font-semibold text-sm">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></p>
                                 {person.cameraSerial && <p className="text-xs text-muted-foreground flex items-center gap-1"><CameraIcon className="h-3 w-3" /> S/N: {person.cameraSerial}</p>}
                             </div>
-                            <div className="flex gap-2 items-center">
+                            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                               <Button 
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => handleCheckIn(event.id, personnelId)}
                                 disabled={isCheckedIn || wasCheckedOut}
+                                className="w-full sm:w-auto"
                               > 
                                 <LogIn className="mr-2 h-4 w-4"/> Check In
                               </Button>
@@ -317,6 +326,7 @@ export default function ShootPage() {
                                 size="sm" 
                                 onClick={() => handleCheckOut(event.id, personnelId)}
                                 disabled={!isCheckedIn || wasCheckedOut}
+                                className="w-full sm:w-auto"
                               > 
                                 <LogOut className="mr-2 h-4 w-4"/> Check Out
                               </Button>
@@ -360,27 +370,27 @@ export default function ShootPage() {
                   {shotsForEvent.length > 0 ? (
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                       {shotsForEvent.map(shot => (
-                        <div key={shot.id} className="flex items-center gap-3 p-2 rounded-md border bg-background/50">
+                        <div key={shot.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2 rounded-md border bg-background/50">
                           <Checkbox 
                             id={`shot-check-${event.id}-${shot.id}`} 
                             checked={shot.status === "Captured" || shot.status === "Completed"}
-                            onCheckedChange={(checked) => handleShotCheckChange(shot.id, event.id, !!checked)}
+                            onCheckedChange={(checked) => handleShotCheckChange(shot.id, event.id, shot.status, !!checked)}
                             aria-label={`Checkbox for shot ${shot.description}`}
+                            className="mt-1 sm:mt-0 flex-shrink-0"
                           /> 
-                          <label htmlFor={`shot-check-${event.id}-${shot.id}`} className="flex-1 text-sm text-muted-foreground truncate" title={shot.description}>
+                          <label htmlFor={`shot-check-${event.id}-${shot.id}`} className="flex-1 text-sm text-muted-foreground" title={shot.description}>
                             {shot.description}
                           </label>
                           <Badge 
                              variant={
-                                shot.status === "Captured" ? "default" :
-                                shot.status === "Completed" ? "default" :
+                                shot.status === "Captured" || shot.status === "Completed" ? "default" :
                                 shot.status === "Unassigned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
                                 shot.status === "Request More" ? "destructive" : 
                                 "outline"
                             }
-                            className="text-xs whitespace-nowrap"
+                            className="text-xs whitespace-nowrap self-start sm:self-center"
                           >
                             {shot.status}
                           </Badge>
@@ -399,3 +409,4 @@ export default function ShootPage() {
     </div>
   );
 }
+
