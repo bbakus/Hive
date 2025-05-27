@@ -41,6 +41,7 @@ import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page
 import { format, parseISO } from "date-fns";
 import { usePhaseContext } from '@/contexts/PhaseContext';
 
+const DEFAULT_SHOT_ASSIGNMENT_VALUE = "--NONE--";
 
 export default function ShotListPage() {
   const params = useParams();
@@ -167,15 +168,17 @@ export default function ShotListPage() {
     
     if (editingShotRequest) {
       dataToSubmit.initialCapturerId = editingShotRequest.initialCapturerId;
-      dataToSubmit.lastStatusModifierId = editingShotRequest.lastStatusModifierId;
-      dataToSubmit.lastStatusModifiedAt = editingShotRequest.lastStatusModifiedAt;
+      // lastStatusModifierId and lastStatusModifiedAt are updated by the context/status change logic
       
-      if (editingShotRequest.status !== data.status) {
+      if (editingShotRequest.status !== data.status) { // If status changed via dialog
           dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
           dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
           if ((data.status === "Captured" || data.status === "Completed") && !editingShotRequest.initialCapturerId) {
               dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
           }
+      } else { // If status didn't change, preserve old modifier info
+        dataToSubmit.lastStatusModifierId = editingShotRequest.lastStatusModifierId;
+        dataToSubmit.lastStatusModifiedAt = editingShotRequest.lastStatusModifiedAt;
       }
 
       updateShotRequest(eventId, editingShotRequest.id, dataToSubmit);
@@ -183,9 +186,12 @@ export default function ShotListPage() {
         title: "Shot Request Updated",
         description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
-    } else {
+    } else { // Adding new shot
       dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
       dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
+      if ((data.status === "Captured" || data.status === "Completed")) {
+            dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
+      }
       
       addShotRequest(eventId, dataToSubmit as ShotRequestFormData);
       toast({
@@ -243,12 +249,13 @@ export default function ShotListPage() {
       const oldStatus = shotToUpdate.status;
 
       if (newStatus === "Captured" || newStatus === "Completed") {
-        if (!shotToUpdate.initialCapturerId) {
+        if (!shotToUpdate.initialCapturerId) { // First time captured/completed
             updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
-        } else { 
-            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
+        } else { // Re-capturing or marking complete after other statuses
+            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain original capturer
         }
       } else if ((oldStatus === "Captured" || oldStatus === "Completed") && shotToUpdate.initialCapturerId) {
+        // If moving away from captured/completed, ensure initialCapturerId is retained
         updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
       }
       
@@ -416,12 +423,15 @@ export default function ShotListPage() {
                     name="assignedPersonnelId"
                     control={control}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
+                      <Select
+                        onValueChange={(value) => field.onChange(value === DEFAULT_SHOT_ASSIGNMENT_VALUE ? "" : value)}
+                        value={field.value || DEFAULT_SHOT_ASSIGNMENT_VALUE}
+                      >
                         <SelectTrigger className={errors.assignedPersonnelId ? "border-destructive" : ""}>
                           <SelectValue placeholder="-- Event's Assigned Personnel --" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- Event's Assigned Personnel --</SelectItem>
+                          <SelectItem value={DEFAULT_SHOT_ASSIGNMENT_VALUE}>-- Event's Assigned Personnel --</SelectItem>
                           {personnelAssignedToEvent.map(person => (
                             <SelectItem key={person.id} value={person.id}>{person.name} ({person.role})</SelectItem>
                           ))}
@@ -613,6 +623,5 @@ export default function ShotListPage() {
     </div>
   );
 }
-
 
     
