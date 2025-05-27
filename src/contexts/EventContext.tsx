@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { useProjectContext, type Project } from './ProjectContext';
+import { useProjectContext } from './ProjectContext';
 import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
 import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
@@ -11,14 +11,17 @@ import { z } from 'zod';
 import { format, addHours, subHours, setHours, setMinutes, startOfDay } from 'date-fns';
 
 // Define ShotRequest types and schema here
-export const shotRequestSchema = z.object({
+export const shotRequestSchemaInternal = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   shotType: z.enum(["Wide", "Medium", "Close-up", "Drone", "Gimbal", "Interview", "B-Roll", "Other"]),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
-  status: z.enum(["Planned", "Assigned", "Captured", "Reviewed", "Blocked"]),
+  status: z.enum(["Planned", "Assigned", "Captured", "Reviewed", "Blocked", "Completed"]), // Added "Completed"
   notes: z.string().optional(),
+  blockedReason: z.string().optional(), // Added for blocked status
 });
-export type ShotRequestFormData = z.infer<typeof shotRequestSchema>;
+
+export type ShotRequestFormData = z.infer<typeof shotRequestSchemaInternal>;
+
 export type ShotRequest = ShotRequestFormData & {
   id: string;
   eventId: string;
@@ -36,10 +39,11 @@ const initialShotRequestsMock: ShotRequest[] = [
   { id: "sr_summit_002", eventId: "evt_summit_d1_p1_morn_100", description: "Audience listening intently", shotType: "Medium", priority: "Medium", status: "Planned" },
   { id: "sr_summit_003", eventId: "evt_summit_d1_p2_aft_107", description: "Workshop interaction - Photographer B", shotType: "B-Roll", priority: "Medium", status: "Planned" },
   // Add some shots for the dynamic today events
-  { id: "sr_today_comp_001", eventId: "evt_today_completed_test", description: "Wrap-up shots", shotType: "B-Roll", priority: "Medium", status: "Planned"},
-  { id: "sr_today_prog_001", eventId: "evt_today_inprogress_test", description: "Live action main shot", shotType: "Medium", priority: "High", status: "Planned"},
+  { id: "sr_today_comp_001", eventId: "evt_today_completed_test", description: "Wrap-up shots", shotType: "B-Roll", priority: "Medium", status: "Completed"},
+  { id: "sr_today_prog_001", eventId: "evt_today_inprogress_test", description: "Live action main shot", shotType: "Medium", priority: "High", status: "Captured"},
   { id: "sr_today_prog_002", eventId: "evt_today_inprogress_test", description: "Behind the scenes", shotType: "B-Roll", priority: "Low", status: "Planned"},
   { id: "sr_today_upc_001", eventId: "evt_today_upcoming_test", description: "Pre-event ambiance", shotType: "Wide", priority: "Medium", status: "Planned"},
+  { id: "sr_blocked_test_001", eventId: "evt001", description: "Drone shot over main stage", shotType: "Drone", priority: "High", status: "Blocked", blockedReason: "High winds, FAA restriction."}
 ];
 
 
@@ -51,6 +55,7 @@ type EventContextType = {
   deleteEvent: (eventId: string) => void;
   isLoadingEvents: boolean;
   getEventById: (eventId: string) => Event | undefined;
+  shotRequestsByEventId: Record<string, ShotRequest[]>;
   getShotRequestsForEvent: (eventId: string) => ShotRequest[];
   addShotRequest: (eventId: string, shotData: ShotRequestFormData) => void;
   updateShotRequest: (eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => void;
@@ -320,11 +325,12 @@ export function EventProvider({ children }: { children: ReactNode }) {
   const updateShotRequest = useCallback((eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => {
     setShotRequestsByEventId(prev => {
       const eventShots = prev[eventId] || [];
+      const newEventShots = eventShots.map(shot =>
+        shot.id === shotId ? { ...shot, ...updatedData } : shot
+      );
       return {
         ...prev,
-        [eventId]: eventShots.map(shot =>
-          shot.id === shotId ? { ...shot, ...shotData, ...updatedData } : shot // Ensure all fields are there
-        ),
+        [eventId]: newEventShots,
       };
     });
   }, []);
@@ -372,13 +378,14 @@ export function EventProvider({ children }: { children: ReactNode }) {
     deleteEvent,
     isLoadingEvents,
     getEventById,
+    shotRequestsByEventId, // Make sure this is exposed
     getShotRequestsForEvent,
     addShotRequest,
     updateShotRequest,
     deleteShotRequest,
   }), [
       allEventsState, eventsForSelectedProjectAndOrg, addEvent, updateEvent, deleteEvent, isLoadingEvents, getEventById,
-      getShotRequestsForEvent, addShotRequest, updateShotRequest, deleteShotRequest
+      shotRequestsByEventId, getShotRequestsForEvent, addShotRequest, updateShotRequest, deleteShotRequest
     ]);
 
   return (
@@ -395,5 +402,4 @@ export function useEventContext() {
   }
   return context;
 }
-
     

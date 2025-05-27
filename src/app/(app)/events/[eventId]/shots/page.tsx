@@ -2,13 +2,13 @@
 "use client";
 
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Camera, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,10 +34,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import type { z } from "zod"; // Only import z
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchema } from "@/contexts/EventContext"; // Import schema from context
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal as shotRequestSchema } from "@/contexts/EventContext"; // Import schema from context
+
 
 export default function ShotListPage() {
   const params = useParams();
@@ -69,17 +70,29 @@ export default function ShotListPage() {
     handleSubmit,
     reset,
     control,
+    watch, // Import watch
+    setValue, // Import setValue
     formState: { errors },
   } = useForm<ShotRequestFormData>({
-    resolver: zodResolver(shotRequestSchema), // Use imported schema
+    resolver: zodResolver(shotRequestSchema), 
     defaultValues: {
       description: "",
       shotType: "Medium",
       priority: "Medium",
       status: "Planned",
       notes: "",
+      blockedReason: "",
     },
   });
+
+  const watchedStatus = watch("status");
+
+  const refreshShotRequests = useCallback(() => {
+    if (eventId && !isEventContextLoading) {
+        setCurrentShotRequests(getShotRequestsForEvent(eventId));
+    }
+  }, [eventId, isEventContextLoading, getShotRequestsForEvent]);
+
 
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
@@ -92,12 +105,12 @@ export default function ShotListPage() {
     setEvent(foundEvent || null);
 
     if (foundEvent) {
-      setCurrentShotRequests(getShotRequestsForEvent(eventId));
+      refreshShotRequests();
     } else {
       setCurrentShotRequests([]);
     }
 
-  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById, getShotRequestsForEvent]);
+  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById, refreshShotRequests]);
 
 
   useEffect(() => {
@@ -109,6 +122,7 @@ export default function ShotListPage() {
             priority: editingShotRequest.priority,
             status: editingShotRequest.status,
             notes: editingShotRequest.notes || "",
+            blockedReason: editingShotRequest.blockedReason || "",
           });
         } else {
           reset({
@@ -117,39 +131,69 @@ export default function ShotListPage() {
             priority: "Medium",
             status: "Planned",
             notes: "",
+            blockedReason: "",
           });
         }
     }
   }, [editingShotRequest, reset, isShotModalOpen]);
 
+  // Effect to clear blockedReason if status is not "Blocked"
+  useEffect(() => {
+    if (watchedStatus !== "Blocked") {
+      setValue("blockedReason", "");
+    }
+  }, [watchedStatus, setValue]);
+
 
   const handleShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
     if (!eventId) return;
 
+    let dataToSubmit = { ...data };
+    if (data.status !== "Blocked") {
+      dataToSubmit.blockedReason = ""; // Clear reason if not blocked
+    }
+
+
     if (editingShotRequest) {
-      updateShotRequest(eventId, editingShotRequest.id, data);
+      updateShotRequest(eventId, editingShotRequest.id, dataToSubmit);
       toast({
         title: "Shot Request Updated",
-        description: `"${data.description.substring(0,30)}..." has been updated.`,
+        description: `"${dataToSubmit.description.substring(0,30)}..." has been updated.`,
       });
     } else {
-      addShotRequest(eventId, data);
+      addShotRequest(eventId, dataToSubmit);
       toast({
         title: "Shot Request Added",
-        description: `"${data.description.substring(0,30)}..." has been added.`,
+        description: `"${dataToSubmit.description.substring(0,30)}..." has been added.`,
       });
     }
-    setCurrentShotRequests(getShotRequestsForEvent(eventId));
+    refreshShotRequests(); // Refresh list from context
     closeShotModal();
   };
   
   const openAddShotModal = () => {
     setEditingShotRequest(null);
+    reset({ // Explicitly reset form for "add" mode
+      description: "",
+      shotType: "Medium",
+      priority: "Medium",
+      status: "Planned",
+      notes: "",
+      blockedReason: "",
+    });
     setIsShotModalOpen(true);
   };
 
   const openEditShotModal = (shot: ShotRequest) => {
     setEditingShotRequest(shot);
+     reset({ // Pre-fill form for "edit" mode
+      description: shot.description,
+      shotType: shot.shotType,
+      priority: shot.priority,
+      status: shot.status,
+      notes: shot.notes || "",
+      blockedReason: shot.blockedReason || "",
+    });
     setIsShotModalOpen(true);
   };
 
@@ -167,7 +211,7 @@ export default function ShotListPage() {
     if (shotRequestToDeleteId && eventId) {
       const shot = currentShotRequests.find(sr => sr.id === shotRequestToDeleteId);
       deleteShotRequest(eventId, shotRequestToDeleteId);
-      setCurrentShotRequests(getShotRequestsForEvent(eventId));
+      refreshShotRequests(); // Refresh list from context
       toast({
         title: "Shot Request Deleted",
         description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
@@ -182,8 +226,14 @@ export default function ShotListPage() {
     if (!eventId) return;
     const shotToUpdate = currentShotRequests.find(sr => sr.id === shotId);
     if (shotToUpdate) {
-      updateShotRequest(eventId, shotId, { ...shotToUpdate, status: newStatus });
-      setCurrentShotRequests(getShotRequestsForEvent(eventId)); // Refresh list from context
+      const updatePayload: Partial<ShotRequestFormData> = { status: newStatus };
+      if (newStatus !== "Blocked") {
+        updatePayload.blockedReason = ""; // Clear reason if not blocked
+      }
+      // If changing TO "Blocked", we don't prompt for reason here, it's done in edit modal.
+      // For inline status change, we assume reason will be added via edit if needed.
+      updateShotRequest(eventId, shotId, updatePayload);
+      refreshShotRequests(); 
       toast({
         title: "Status Updated",
         description: `Shot status changed to "${newStatus}".`,
@@ -209,7 +259,7 @@ export default function ShotListPage() {
     );
   }
 
-  const shotStatuses: ShotRequestFormData['status'][] = ["Planned", "Assigned", "Captured", "Reviewed", "Blocked"];
+  const shotStatuses: ShotRequestFormData['status'][] = ["Planned", "Assigned", "Captured", "Reviewed", "Blocked", "Completed"];
 
 
   return (
@@ -325,6 +375,22 @@ export default function ShotListPage() {
                   {errors.status && <p className="text-xs text-destructive mt-1">{errors.status.message}</p>}
                 </div>
               </div>
+
+              {watchedStatus === "Blocked" && (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="blockedReason" className="text-right pt-2">Blocked Reason</Label>
+                  <div className="col-span-3">
+                    <Textarea 
+                      id="blockedReason" 
+                      {...register("blockedReason")} 
+                      placeholder="Reason why this shot is blocked..." 
+                      className={errors.blockedReason ? "border-destructive" : ""}
+                    />
+                    {errors.blockedReason && <p className="text-xs text-destructive mt-1">{errors.blockedReason.message}</p>}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="notes" className="text-right pt-2">Notes</Label>
                 <div className="col-span-3">
@@ -367,7 +433,15 @@ export default function ShotListPage() {
               <TableBody>
                 {currentShotRequests.map((shot) => (
                   <TableRow key={shot.id}>
-                    <TableCell className="font-medium max-w-xs truncate" title={shot.description}>{shot.description}</TableCell>
+                    <TableCell className="font-medium max-w-xs">
+                        <p className="truncate" title={shot.description}>{shot.description}</p>
+                        {shot.status === "Blocked" && shot.blockedReason && (
+                            <p className="text-xs text-destructive mt-1" title={shot.blockedReason}>
+                            <AlertTriangle className="inline-block h-3.5 w-3.5 mr-1 align-text-bottom" />
+                            Blocked: {shot.blockedReason.substring(0, 50)}{shot.blockedReason.length > 50 ? "..." : ""}
+                            </p>
+                        )}
+                    </TableCell>
                     <TableCell>{shot.shotType}</TableCell>
                     <TableCell>
                        <Badge variant={
@@ -391,6 +465,7 @@ export default function ShotListPage() {
                                 shot.status === "Planned" ? "outline" :
                                 shot.status === "Assigned" ? "secondary" :
                                 shot.status === "Blocked" ? "destructive" :
+                                shot.status === "Completed" ? "default" : // Adjusted for Completed
                                 "outline"
                             }
                             >
@@ -408,6 +483,7 @@ export default function ShotListPage() {
                                 s === "Planned" ? "outline" :
                                 s === "Assigned" ? "secondary" :
                                 s === "Blocked" ? "destructive" :
+                                s === "Completed" ? "default" : // Adjusted for Completed
                                 "outline"
                                 }
                               >
@@ -444,5 +520,4 @@ export default function ShotListPage() {
     </div>
   );
 }
-
     
