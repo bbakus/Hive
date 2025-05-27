@@ -49,8 +49,8 @@ export default function ShotListPage() {
   const {
     getEventById,
     isLoadingEvents: isEventContextLoading,
-    shotRequestsByEventId, // Consume this for reactivity
-    getShotRequestsForEvent, // Still useful for initial load or direct fetch
+    shotRequestsByEventId, 
+    getShotRequestsForEvent,
     addShotRequest,
     updateShotRequest,
     deleteShotRequest
@@ -105,14 +105,13 @@ export default function ShotListPage() {
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
       setEvent(undefined); 
-      // setCurrentShotRequests([]); // Let the other useEffect handle this based on shotRequestsByEventId
       return;
     }
 
     const foundEvent = getEventById(eventId);
     setEvent(foundEvent || null); 
 
-    // Initial load of shot requests if not already handled by the reactive useEffect
+    // relies on the other useEffect to set currentShotRequests from shotRequestsByEventId
     if (foundEvent && (!shotRequestsByEventId[eventId] || currentShotRequests.length === 0)) {
        setCurrentShotRequests(getShotRequestsForEvent(eventId));
     } else if (!foundEvent) {
@@ -182,13 +181,12 @@ export default function ShotListPage() {
         description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
     } else {
-      addShotRequest(eventId, data as ShotRequestFormData); // Cast because addShotRequest expects full form data for a new shot
+      addShotRequest(eventId, data as ShotRequestFormData);
       toast({
         title: "Shot Request Added",
         description: `"${data.description.substring(0,30)}..." has been added.`,
       });
     }
-    // No need to call refreshShotRequests, useEffect handles it
     closeShotModal();
   };
 
@@ -238,7 +236,6 @@ export default function ShotListPage() {
     if (shotRequestToDeleteId && eventId) {
       const shot = currentShotRequests.find(sr => sr.id === shotRequestToDeleteId);
       deleteShotRequest(eventId, shotRequestToDeleteId);
-      // No need to call refreshShotRequests
       toast({
         title: "Shot Request Deleted",
         description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
@@ -256,43 +253,24 @@ export default function ShotListPage() {
       let updatePayload: Partial<ShotRequestFormData> = { 
         status: newStatus,
         lastStatusModifiedAt: new Date().toISOString(),
-        // lastStatusModifierId will be set based on prompt logic or default
       };
 
       const oldStatus = shotToUpdate.status;
 
       if (newStatus === "Captured" || newStatus === "Completed") {
-        if (oldStatus !== "Captured" && oldStatus !== "Completed") { // First time capture/complete
-            const capturer = window.prompt(`Who captured shot: "${shotToUpdate.description.substring(0,50)}..."?`, shotToUpdate.assignedPersonnelId || shotToUpdate.initialCapturerId || event?.assignedPersonnelIds?.[0] || MOCK_CURRENT_USER_ID);
-            if (capturer !== null) {
-                updatePayload.initialCapturerId = capturer || undefined;
-                updatePayload.lastStatusModifierId = capturer || undefined;
-            } else {
-                toast({ title: "Status Change Cancelled", description: "No capturer provided for initial capture.", variant: "destructive" });
-                return; // User cancelled prompt
-            }
-        } else { // Re-capturing or re-completing (e.g. after "Request More")
-            const capturer = window.prompt(`Who captured this (latest attempt) for shot: "${shotToUpdate.description.substring(0,50)}..."?`, shotToUpdate.assignedPersonnelId || MOCK_CURRENT_USER_ID);
-            if (capturer !== null) {
-                updatePayload.lastStatusModifierId = capturer || undefined;
-                // Retain initialCapturerId if it exists
-                updatePayload.initialCapturerId = shotToUpdate.initialCapturerId || capturer || undefined;
-            } else {
-                toast({ title: "Status Change Cancelled", description: "No capturer provided for re-capture.", variant: "destructive" });
-                return; // User cancelled prompt
-            }
+        if (!shotToUpdate.initialCapturerId) { // First time capture/complete
+            updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
+            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
+        } else { // Re-capturing or re-completing
+            // Retain initialCapturerId, only update last modifier
+            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
+            updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         }
       } else if (oldStatus === "Captured" || oldStatus === "Completed") { // Moving away from captured/completed
         updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain initial capturer
-        const modifier = window.prompt(`Status changed to ${newStatus}. Confirm modifier (e.g., editor, PM for "${shotToUpdate.description.substring(0,50)}...") :`, MOCK_CURRENT_USER_ID);
-         if (modifier !== null) {
-            updatePayload.lastStatusModifierId = modifier || undefined;
-        } else {
-            toast({ title: "Status Change Cancelled", description: "No modifier provided.", variant: "destructive" });
-            return; // User cancelled prompt
-        }
-      } else { // For other transitions (e.g. Unassigned -> Assigned, or Assigned -> Blocked)
-        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID; // Default to current user if not a capture/post-capture change
+        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID; // Current user made this change
+      } else { // For other transitions
+        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
       }
       
       // Clear blockedReason if status is not Blocked
@@ -301,10 +279,9 @@ export default function ShotListPage() {
       }
       
       updateShotRequest(eventId, shotId, updatePayload);
-      // No need to call refreshShotRequests
       toast({
         title: "Status Updated",
-        description: `Shot status changed to "${newStatus}".`,
+        description: `Shot status for "${shotToUpdate.description.substring(0,30)}..." changed to "${newStatus}".`,
       });
 
       if (newStatus === "Request More") {
@@ -312,12 +289,13 @@ export default function ShotListPage() {
           ? getPersonnelNameById(shotToUpdate.assignedPersonnelId)
           : (event?.assignedPersonnelIds && event.assignedPersonnelIds.length > 0
               ? getPersonnelNameById(event.assignedPersonnelIds[0]) 
-              : "team");
+              : "the assigned team");
+        
         const modifierName = getPersonnelNameById(updatePayload.lastStatusModifierId) || MOCK_CURRENT_USER_NAME;
 
         toast({
           title: "Notification Simulated",
-          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." (modified by ${modifierName}) would be sent to ${assignedPersonName || "the assigned user/team"}.`,
+          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." (modified by ${modifierName}) would be sent to ${assignedPersonName}.`,
           variant: "default",
           duration: 7000,
         });
@@ -645,4 +623,3 @@ export default function ShotListPage() {
     </div>
   );
 }
-

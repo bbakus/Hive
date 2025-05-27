@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore } from 'date-fns';
 
 // --- Shot Request Definitions ---
+// Define the Zod schema for shot request form data
 export const shotRequestSchemaInternal = z.object({
   description: z.string().min(5, { message: "Description must be at least 5 characters." }),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
@@ -24,6 +25,7 @@ export const shotRequestSchemaInternal = z.object({
 });
 
 export type ShotRequestFormData = z.infer<typeof shotRequestSchemaInternal>;
+
 export type ShotRequest = ShotRequestFormData & {
   id: string;
   eventId: string;
@@ -31,35 +33,6 @@ export type ShotRequest = ShotRequestFormData & {
 // --- End Shot Request Definitions ---
 
 export type Event = EventTypeDefinition;
-
-
-export const initialShotRequestsMock: ShotRequest[] = [
-  // evt001 shots
-  { id: "sr001", eventId: "evt001", description: "Opening wide shot of festival grounds, as gates open", priority: "High", status: "Assigned", assignedPersonnelId: "user001", notes: "Get this as gates open", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  { id: "sr002", eventId: "evt001", description: "Close-up of headline act performance, key moments", priority: "Critical", status: "Captured", assignedPersonnelId: "user001", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date(Date.now() - 3600000).toISOString() },
-  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various angles, B-Roll style", priority: "Medium", status: "Unassigned", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  // evt002 shots
-  { id: "sr004", eventId: "evt002", description: "Speaker on stage - wide and medium compositions", priority: "High", status: "Completed", initialCapturerId: "user003", lastStatusModifierId: "user002", lastStatusModifiedAt: new Date(Date.now() - 7200000).toISOString() },
-  { id: "sr006", eventId: "evt002", description: "Audience listening during keynote - medium shots", priority: "Medium", status: "Assigned", assignedPersonnelId: "user007", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  // evt004 shots
-  { id: "sr007", eventId: "evt004", description: "Workshop interaction shots - candid B-Roll", priority: "Medium", status: "Unassigned", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  { id: "sr008", eventId: "evt004", description: "Group photo after session, well-lit portrait style", priority: "Medium", status: "Completed", initialCapturerId: "user004", lastStatusModifierId: "user004", lastStatusModifiedAt: new Date().toISOString() },
-  // evt005 shots
-  { id: "sr009", eventId: "evt005", description: "Action shot of product demo, focus on product features", priority: "High", status: "Captured", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
-  // evt006 shots
-  { id: "sr011", eventId: "evt006", description: "Venue ambiance shots before event, wide establishing shots", priority: "Medium", status: "Unassigned", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops"},
-  { id: "sr012", eventId: "evt006", description: "Specific requested portrait of VIP", priority: "High", status: "Blocked", blockedReason: "Talent was not available at scheduled time.", lastStatusModifierId: "user003", lastStatusModifiedAt: new Date().toISOString()},
-  
-  // Shots for dynamically created "today" events
-  { id: "sr_today_completed_1_new", eventId: "evt_today_completed_dynamic_new", description: "Morning ambiance coverage", priority: "Medium", status: "Completed", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
-  { id: "sr_today_completed_2_new", eventId: "evt_today_completed_dynamic_new", description: "Details of the setup", priority: "Low", status: "Completed", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
-  { id: "sr_today_inprogress_1_new", eventId: "evt_today_inprogress_dynamic_new", description: "Speaker A presentation main angle", priority: "High", status: "Captured", assignedPersonnelId: "user002", initialCapturerId: "user002", lastStatusModifierId: "user002", lastStatusModifiedAt: new Date().toISOString()},
-  { id: "sr_today_inprogress_2_new", eventId: "evt_today_inprogress_dynamic_new", description: "Live audience reactions", priority: "Medium", status: "Assigned", assignedPersonnelId: "user002", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  { id: "sr_today_inprogress_3_new", eventId: "evt_today_inprogress_dynamic_new", description: "Wide shot of Q&A session", priority: "Medium", status: "Unassigned", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  { id: "sr_today_upcoming_1_new", eventId: "evt_today_upcoming_dynamic_new", description: "Key product reveal shot", priority: "Critical", status: "Assigned", assignedPersonnelId: "user004", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-  { id: "sr_today_upcoming_2_new", eventId: "evt_today_upcoming_dynamic_new", description: "CEO handshake with partner", priority: "High", status: "Unassigned", lastStatusModifiedAt: new Date().toISOString(), lastStatusModifierId: "user_admin_ops" },
-];
-
 
 const g9eSummitPhotographers = ["user001", "user002", "user003", "user004", "user005", "user006"];
 const g9eSummitDays = ["2024-08-01", "2024-08-02", "2024-08-03", "2024-08-04"];
@@ -92,7 +65,7 @@ const generateG9eSummitEvents = (): Event[] => {
         priority: "High",
         assignedPersonnelIds: [photographerId],
         deliverables: 1,
-        shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === morningEventId).length,
+        shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === morningEventId).length, // Calculate dynamically
         organizationId: g9eOrgId,
         discipline: morningDiscipline,
         isQuickTurnaround: (dayIndex + photographerIndex) % 3 === 0,
@@ -127,7 +100,7 @@ const generateG9eSummitEvents = (): Event[] => {
         priority: "High",
         assignedPersonnelIds: [photographerId],
         deliverables: 1,
-        shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === afternoonEventId).length,
+        shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === afternoonEventId).length, // Calculate dynamically
         organizationId: g9eOrgId,
         discipline: afternoonDiscipline,
         isCovered: true,
@@ -154,7 +127,7 @@ const generateG9eSummitEvents = (): Event[] => {
       if (photographerIndex % 2 === 0) {
         summitEvents.push({
           id: eveningEventId,
-          name: `${photographerName} - Summit Day ${dayIndex + 1} Networking Dinner`,
+          name: `${photographerName} - Summit Day ${dayIndex + 1} Evening Networking`,
           projectId: g9eSummitProjectId,
           project: "G9e Corporate Summit 2024",
           date: day,
@@ -162,7 +135,7 @@ const generateG9eSummitEvents = (): Event[] => {
           priority: "Medium",
           assignedPersonnelIds: [photographerId],
           deliverables: 0,
-          shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === eveningEventId).length,
+          shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === eveningEventId).length, // Calculate dynamically
           organizationId: g9eOrgId,
           discipline: eveningDiscipline,
           isQuickTurnaround: (dayIndex + photographerIndex) % 4 === 0,
@@ -184,6 +157,33 @@ const initialBaseEvents: Event[] = [
     { id: "evt006", name: "Festival Workshop Photography", projectId: "proj001", project: "Summer Music Festival 2024", date: "2024-07-16", time: "10:00 - 12:00", priority: "Medium", deliverables: 2, shotRequests: 2, assignedPersonnelIds: ["user001", "user005"], organizationId: "org_g9e", discipline: "Photography", isCovered: true},
 ];
 
+export const initialShotRequestsMock: ShotRequest[] = [
+  // evt001 shots
+  { id: "sr001", eventId: "evt001", description: "Opening wide shot of festival grounds", priority: "High", status: "Assigned", assignedPersonnelId: "user001", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date(Date.now() - 7200000).toISOString() },
+  { id: "sr002", eventId: "evt001", description: "Close-up of headline act performance", priority: "Critical", status: "Captured", assignedPersonnelId: "user001", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date(Date.now() - 3600000).toISOString() },
+  { id: "sr003", eventId: "evt001", description: "Audience reaction shots - various angles", priority: "Medium", status: "Unassigned", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+  // evt002 shots
+  { id: "sr004", eventId: "evt002", description: "Speaker on stage - wide and medium", priority: "High", status: "Completed", initialCapturerId: "user003", lastStatusModifierId: "user002", lastStatusModifiedAt: new Date(Date.now() - 7200000).toISOString() },
+  { id: "sr006", eventId: "evt002", description: "Audience listening during keynote", priority: "Medium", status: "Assigned", assignedPersonnelId: "user007", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+  // evt004 shots
+  { id: "sr007", eventId: "evt004", description: "Workshop interaction shots", priority: "Medium", status: "Unassigned", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+  { id: "sr008", eventId: "evt004", description: "Group photo after session", priority: "Medium", status: "Completed", initialCapturerId: "user004", lastStatusModifierId: "user004", lastStatusModifiedAt: new Date().toISOString() },
+  // evt005 shots (proj002)
+  { id: "sr009", eventId: "evt005", description: "Action shot of product demo", priority: "High", status: "Captured", assignedPersonnelId: "user001", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
+  // evt006 shots (proj001)
+  { id: "sr011", eventId: "evt006", description: "Venue ambiance shots before event", priority: "Medium", status: "Unassigned", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr012", eventId: "evt006", description: "Specific requested portrait of VIP", priority: "High", status: "Blocked", blockedReason: "Talent was not available at scheduled time.", initialCapturerId: undefined, lastStatusModifierId: "user003", lastStatusModifiedAt: new Date().toISOString()},
+  
+  // Shots for dynamically created "today" events for proj001
+  { id: "sr_today_completed_1_new", eventId: "evt_today_completed_dynamic_new", description: "Morning ambiance coverage", priority: "Medium", status: "Completed", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr_today_completed_2_new", eventId: "evt_today_completed_dynamic_new", description: "Details of the setup", priority: "Low", status: "Completed", initialCapturerId: "user001", lastStatusModifierId: "user001", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr_today_inprogress_1_new", eventId: "evt_today_inprogress_dynamic_new", description: "Speaker A presentation main angle", priority: "High", status: "Captured", assignedPersonnelId: "user002", initialCapturerId: "user002", lastStatusModifierId: "user002", lastStatusModifiedAt: new Date().toISOString()},
+  { id: "sr_today_inprogress_2_new", eventId: "evt_today_inprogress_dynamic_new", description: "Live audience reactions", priority: "Medium", status: "Assigned", assignedPersonnelId: "user002", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+  { id: "sr_today_inprogress_3_new", eventId: "evt_today_inprogress_dynamic_new", description: "Wide shot of Q&A session", priority: "Medium", status: "Unassigned", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+  { id: "sr_today_upcoming_1_new", eventId: "evt_today_upcoming_dynamic_new", description: "Key product reveal shot", priority: "Critical", status: "Assigned", assignedPersonnelId: "user004", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+  { id: "sr_today_upcoming_2_new", eventId: "evt_today_upcoming_dynamic_new", description: "CEO handshake with partner", priority: "High", status: "Unassigned", initialCapturerId: undefined, lastStatusModifierId: "user_admin_ops", lastStatusModifiedAt: new Date().toISOString() },
+];
+
 const getInitialEventsWithDynamicToday = (useDemo: boolean): Event[] => {
   if (!useDemo) return [];
   
@@ -194,29 +194,30 @@ const getInitialEventsWithDynamicToday = (useDemo: boolean): Event[] => {
 
   const dynamicTodayEvents: Event[] = [
     {
-      id: "evt_today_completed_dynamic_new", name: "Completed Demo Shoot (Today)", projectId: "proj001", project: "Summer Music Festival 2024",
+      id: "evt_today_completed_dynamic_new", name: "Completed Photography (Today)", projectId: "proj001", project: "Summer Music Festival 2024",
       date: todayStr, time: `${format(setMinutes(setHours(startOfDay(now), 8), 0), "HH:mm")} - ${format(setMinutes(setHours(startOfDay(now), 9), 30), "HH:mm")}`, priority: "Medium", deliverables: 1,
       shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_completed_dynamic_new").length, 
-      assignedPersonnelIds: ["user001"],
+      assignedPersonnelIds: ["user001"], // Alice
       isQuickTurnaround: false, organizationId: "org_g9e", discipline: "Photography", isCovered: true,
     },
     {
-      id: "evt_today_inprogress_dynamic_new", name: "Live Demo Shoot (Today)", projectId: "proj001", project: "Summer Music Festival 2024",
+      id: "evt_today_inprogress_dynamic_new", name: "Live Photo Shoot (Today)", projectId: "proj001", project: "Summer Music Festival 2024",
       date: todayStr, time: `${format(subHours(now, 0.5), "HH:mm")} - ${format(addHours(now, 0.5), "HH:mm")}`, priority: "High", deliverables: 2,
       shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_inprogress_dynamic_new").length, 
-      assignedPersonnelIds: ["user002", "user003"],
+      assignedPersonnelIds: ["user002"], // Bob
       isQuickTurnaround: true, deadline: format(addHours(now, 4), "yyyy-MM-dd'T'HH:mm:ssX"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
     },
     {
-      id: "evt_today_upcoming_dynamic_new", name: "Upcoming Demo Session (Today)", projectId: "proj001", project: "Summer Music Festival 2024",
+      id: "evt_today_upcoming_dynamic_new", name: "Upcoming Headshots (Today)", projectId: "proj001", project: "Summer Music Festival 2024",
       date: todayStr, time: `${format(addHours(now, 1), "HH:mm")} - ${format(addHours(now, 2), "HH:mm")}`, priority: "Critical", deliverables: 0,
       shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === "evt_today_upcoming_dynamic_new").length, 
-      assignedPersonnelIds: ["user004", "user005"],
+      assignedPersonnelIds: ["user004"], // Diana
       isQuickTurnaround: true, deadline: format(addHours(now, 6), "yyyy-MM-dd'T'HH:mm:ssX"), organizationId: "org_g9e", discipline: "Photography", isCovered: true,
     }
   ];
 
   let combinedEvents = [...baseEvents, ...dynamicTodayEvents];
+  // Ensure shotRequests count is accurate for ALL events based on the mock shot list
   combinedEvents = combinedEvents.map(event => ({
     ...event,
     shotRequests: initialShotRequestsMock.filter(sr => sr.eventId === event.id).length,
@@ -234,7 +235,7 @@ type EventContextType = {
   isLoadingEvents: boolean;
   getEventById: (eventId: string) => Event | undefined;
   // Shot Request Management
-  shotRequestsByEventId: Record<string, ShotRequest[]>; // Exposed for reactive updates
+  shotRequestsByEventId: Record<string, ShotRequest[]>;
   getShotRequestsForEvent: (eventId: string) => ShotRequest[];
   addShotRequest: (eventId: string, shotData: ShotRequestFormData) => void;
   updateShotRequest: (eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => void;
@@ -254,17 +255,21 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoadingSettings) {
+      setIsLoadingEvents(true); // Set loading true before processing
       let loadedEvents = getInitialEventsWithDynamicToday(useDemoData);
       const loadedShotsByEvent: Record<string, ShotRequest[]> = {};
       
-      initialShotRequestsMock.forEach(shot => {
-        const cleanShot = { ...shot };
-        if (!loadedShotsByEvent[shot.eventId]) {
-          loadedShotsByEvent[shot.eventId] = [];
-        }
-        loadedShotsByEvent[shot.eventId].push(cleanShot);
-      });
+      if (useDemoData) {
+        initialShotRequestsMock.forEach(shot => {
+          const cleanShot = { ...shot };
+          if (!loadedShotsByEvent[shot.eventId]) {
+            loadedShotsByEvent[shot.eventId] = [];
+          }
+          loadedShotsByEvent[shot.eventId].push(cleanShot);
+        });
+      }
       
+      // Ensure shotRequests count is accurate for ALL events based on the (potentially empty) mock shot list
       loadedEvents = loadedEvents.map(event => ({
         ...event,
         shotRequests: loadedShotsByEvent[event.id]?.length || 0,
@@ -273,6 +278,11 @@ export function EventProvider({ children }: { children: ReactNode }) {
       setAllEventsState(loadedEvents);
       setShotRequestsByEventId(loadedShotsByEvent);
       setIsLoadingEvents(false);
+    } else {
+      // If settings are still loading, ensure we clear out data if demo data might be turned off
+      setAllEventsState([]);
+      setShotRequestsByEventId({});
+      setIsLoadingEvents(true);
     }
   }, [useDemoData, isLoadingSettings]);
 
@@ -355,13 +365,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
         if (shot.id === shotId) {
           const newShotData = { ...shot, ...updatedData };
           
-          // lastStatusModifiedAt is set by handleStatusChange in shots/page.tsx
-          // newShotData.lastStatusModifiedAt = new Date().toISOString(); 
-
           if (newShotData.status !== "Blocked" && newShotData.blockedReason) {
-            newShotData.blockedReason = "";
+            newShotData.blockedReason = ""; // Clear reason if not blocked
           }
-          if (newShotData.assignedPersonnelId === "") {
+          if (newShotData.assignedPersonnelId === "") { // Handle empty string from select as undefined
             newShotData.assignedPersonnelId = undefined;
           }
           return newShotData;
@@ -417,7 +424,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
     deleteEvent,
     isLoadingEvents,
     getEventById,
-    shotRequestsByEventId, // Expose this
+    shotRequestsByEventId,
     getShotRequestsForEvent,
     addShotRequest,
     updateShotRequest,
@@ -441,4 +448,3 @@ export function useEventContext() {
   }
   return context;
 }
-
