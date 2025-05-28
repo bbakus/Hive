@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
+import { useOrganizationContext, type Organization } from "@/contexts/OrganizationContext"; // Added import
 import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -148,6 +149,7 @@ function EventFilters({
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+            className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
           />
           <Label htmlFor="filter-quick-turnaround" className="font-normal whitespace-nowrap">Quick Turnaround Only</Label>
         </div>
@@ -292,7 +294,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                           <CardTitle className="text-lg flex items-center gap-1.5">
                             {getCoverageIcon(event.isCovered)}
                             <span className="truncate" title={event.name}>{event.name}</span>
-                            {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 ml-1.5" title="Quick Turnaround"/>}
+                             {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 ml-1.5" title="Quick Turnaround"/>}
                           </CardTitle>
                           <div className="text-xs text-muted-foreground space-y-0.5">
                             <p className="flex items-center gap-1">
@@ -467,7 +469,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
 
 type BlockScheduleTabContentProps = {
   displayableEvents: Event[];
-  selectedEventDates: string[]; // Now used to determine the date for the block schedule
+  selectedEventDates: string[];
   openEditEventModal: (event: Event) => void;
   selectedProject: Project | null;
   useDemoData: boolean;
@@ -485,7 +487,6 @@ function BlockScheduleTabContent({
   
   const activeBlockScheduleDate = useMemo(() => {
     if (selectedEventDates.length > 0) {
-      // Sort to ensure consistency if multiple dates are somehow selected, take the earliest
       const sortedSelectedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
       const dateObj = parseISO(sortedSelectedDates[0]);
       return isValid(dateObj) ? dateObj : null;
@@ -616,8 +617,6 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
           filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
-      } else if (filterDiscipline === "Video") {
-          filtered = filtered.filter(event => event.discipline === "Video" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
@@ -709,8 +708,6 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
           sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography" || event.discipline === "Both");
-      } else if (filterDiscipline === "Video") {
-           sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Video" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
           sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "");
       }
@@ -720,7 +717,7 @@ export default function EventsPage() {
   }, [eventsForSelectedProjectAndOrg, filterCoverageStatus, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline]);
 
 
-  const handleEventSubmit: SubmitHandler<EventFormDialogData> = (data) => {
+  const handleEventSubmit = (data: EventFormDialogData) => {
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
     if (!selectedProjInfo) {
       toast({ title: "Error", description: "Selected project not found.", variant: "destructive" });
@@ -822,8 +819,7 @@ export default function EventsPage() {
         </Button>
       </div>
 
-      <div className="p-4 border rounded-md bg-card/50 shadow-sm">
-        <EventFilters
+       <EventFilters
             filterQuickTurnaround={filterQuickTurnaround}
             setFilterQuickTurnaround={setFilterQuickTurnaround}
             filterTimeStatus={filterTimeStatus}
@@ -839,7 +835,6 @@ export default function EventsPage() {
             setSelectedEventDates={setSelectedEventDates}
             uniqueEventDatesForFilter={uniqueEventDatesForFilter}
         />
-      </div>
 
       <EventFormDialog
         isOpen={isEventModalOpen}
@@ -907,5 +902,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-    
