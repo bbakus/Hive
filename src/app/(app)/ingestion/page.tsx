@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine, RefreshCw } from 'lucide-react';
+import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine, RefreshCw, HelpCircle } from 'lucide-react'; // Added HelpCircle
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -97,7 +97,8 @@ export default function IngestionUtilityPage() {
         clearInterval(pollingIntervalId);
       }
     };
-  }, [verifyAgentConnection, pollingIntervalId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // verifyAgentConnection is stable, pollingIntervalId is for cleanup only
 
 
   const handleStartIngestion = async () => {
@@ -285,8 +286,7 @@ export default function IngestionUtilityPage() {
       setPollingIntervalId(null);
     }
     setIngestionSummary(null); 
-    // No need to clear ingestionLog here, it's per-action
-  }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath]);
+  }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath, pollingIntervalId]);
 
 
   if (isLoadingSettings || isLoadingEvents) {
