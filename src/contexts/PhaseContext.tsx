@@ -13,12 +13,9 @@ import {
   LifeBuoy,
   Film,
   ClipboardList,
-  Video as VideoIcon,
-  Camera,
-  ListChecks,
   PackageCheck,
   RadioTower,
-  UploadCloud, // Added for Ingestion
+  UploadCloud,
 } from "lucide-react";
 
 export type NavItem = {
@@ -33,7 +30,7 @@ export type Phase = "Dashboard" | "Plan" | "Shoot" | "Edit" | "Deliver";
 export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"];
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [],
+  "Dashboard": [], // Dashboard link is now handled by its own top-level phase button
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -48,7 +45,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
   ],
   "Deliver": [
-    { href: "/deliverables", label: "Deliverables", icon: ClipboardList, matchStartsWith: true },
+    { href: "/deliverables", label: "Deliverables", icon: PackageCheck, matchStartsWith: true }, // Changed icon
   ],
 };
 
@@ -71,6 +68,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
   const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
+    if (phase === "Dashboard") return []; // No sidebar items when Dashboard phase is active
     return phaseNavConfigs[phase] || [];
   };
 
