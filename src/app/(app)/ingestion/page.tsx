@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine } from 'lucide-react';
+import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine, RefreshCw } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -16,6 +16,9 @@ import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from '@/app/(
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { localUtility, type IngestJobStatus } from '@/services/localUtility';
+import { cn } from '@/lib/utils';
+
+type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
 
 export default function IngestionUtilityPage() {
   const { selectedProject } = useProjectContext();
@@ -29,7 +32,7 @@ export default function IngestionUtilityPage() {
   const [isIngesting, setIsIngesting] = useState(false);
 
   const [sourcePath, setSourcePath] = useState("");
-  const [sourcePath2, setSourcePath2] = useState(""); // New state for second source path
+  const [sourcePath2, setSourcePath2] = useState("");
   const [workingPath, setWorkingPath] = useState("");
   const [backupPath, setBackupPath] = useState("");
 
@@ -46,28 +49,64 @@ export default function IngestionUtilityPage() {
   } | null>(null);
   
   const [availablePaths, setAvailablePaths] = useState<string[]>([]);
+  const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
 
-  const availablePhotographers = initialPersonnelMock.filter(
-    p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
-  );
+  const availablePhotographers = useMemo(() => {
+    return initialPersonnelMock.filter(
+      p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
+    );
+  }, []);
   
-  const selectedPhotographerDetails = initialPersonnelMock.find(p => p.id === selectedPhotographerId);
+  const selectedPhotographerDetails = useMemo(() => {
+    return initialPersonnelMock.find(p => p.id === selectedPhotographerId);
+  }, [selectedPhotographerId]);
+
+  const relevantEvents = useMemo(() => {
+    if (!selectedProject) return [];
+    return eventsForSelectedProjectAndOrg.filter(event => event.isCovered);
+  }, [selectedProject, eventsForSelectedProjectAndOrg]);
 
   const logMessage = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
     const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : '';
     setIngestionLog(prev => [`${new Date().toLocaleTimeString()}: ${prefix}${message}`, ...prev].slice(0, 100));
   }, []);
 
+  const verifyAgentConnection = useCallback(async () => {
+    setAgentConnectionStatus('checking');
+    logMessage("Verifying connection to local agent...");
+    try {
+      await localUtility.getAvailableDrives(); // Using this as a ping
+      setAgentConnectionStatus('connected');
+      logMessage("Successfully connected to local agent.", 'success');
+      toast({ title: "Agent Connected", description: "Successfully connected to the local ingestion agent." });
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setAgentConnectionStatus('disconnected');
+      logMessage(`Failed to connect to local agent: ${errorMessage}`, 'error');
+      toast({ title: "Agent Connection Failed", description: `Could not connect to local agent. ${errorMessage}`, variant: "destructive" });
+      return false;
+    }
+  }, [logMessage, toast]);
+
   useEffect(() => {
+    verifyAgentConnection();
+    // Cleanup polling interval on unmount
     return () => {
       if (pollingIntervalId) {
         clearInterval(pollingIntervalId);
       }
     };
-  }, [pollingIntervalId]);
+  }, [verifyAgentConnection, pollingIntervalId]);
 
 
   const handleStartIngestion = async () => {
+    const isConnected = await verifyAgentConnection();
+    if (!isConnected) {
+      toast({ title: 'Agent Not Connected', description: 'Cannot start ingestion. Please ensure the local agent is running and accessible.', variant: 'destructive'});
+      return;
+    }
+
     if (!selectedPhotographerId || !selectedEventId ) {
       toast({
         title: 'Missing Information',
@@ -144,7 +183,7 @@ export default function IngestionUtilityPage() {
               clearInterval(interval);
               setPollingIntervalId(null);
               setIsIngesting(false);
-              setCurrentJobId(null);
+              setCurrentJobId(null); // Clear job ID after completion/failure
               logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
               
               setIngestionSummary({
@@ -193,12 +232,12 @@ export default function IngestionUtilityPage() {
               }
             }
           } catch (statusError: any) {
-            logMessage(`Error polling job status: ${statusError.message || String(statusError)}`, 'error');
+            logMessage(`Error polling job status for ${currentJobToPoll}: ${statusError.message || String(statusError)}`, 'error');
             clearInterval(interval);
             setPollingIntervalId(null);
             setIsIngesting(false);
             setCurrentJobId(null); 
-            toast({ title: 'Polling Error', description: `Could not get status for job. ${statusError.message || String(statusError)}`, variant: 'destructive' });
+            toast({ title: 'Polling Error', description: `Could not get status for job ${currentJobToPoll}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
           }
         }, 3000); 
         setPollingIntervalId(interval);
@@ -214,6 +253,9 @@ export default function IngestionUtilityPage() {
   };
   
   const handleFetchAvailableDrives = async () => {
+    const isConnected = await verifyAgentConnection();
+    if (!isConnected) return;
+
     logMessage("Attempting to fetch available drives from local agent...");
     try {
       const drives = await localUtility.getAvailableDrives();
@@ -236,12 +278,14 @@ export default function IngestionUtilityPage() {
   const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
+    // Clear job related states when key inputs change, encouraging a new job submission
     setCurrentJobId(null);
     if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
     }
     setIngestionSummary(null); 
+    // No need to clear ingestionLog here, it's per-action
   }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath]);
 
 
@@ -271,16 +315,64 @@ export default function IngestionUtilityPage() {
     );
   }
 
+  const AgentStatusIndicator = () => {
+    let IconComponent = HelpCircle;
+    let textColor = "text-muted-foreground";
+    let bgColor = "bg-gray-400";
+    let statusText = "Unknown";
+
+    switch (agentConnectionStatus) {
+      case 'connected':
+        IconComponent = CheckCircle;
+        textColor = "text-green-600 dark:text-green-400";
+        bgColor = "bg-green-500";
+        statusText = "Connected";
+        break;
+      case 'disconnected':
+        IconComponent = XCircle;
+        textColor = "text-red-600 dark:text-red-400";
+        bgColor = "bg-red-500";
+        statusText = "Disconnected";
+        break;
+      case 'checking':
+        IconComponent = Loader2;
+        textColor = "text-yellow-600 dark:text-yellow-400";
+        bgColor = "bg-yellow-500";
+        statusText = "Checking...";
+        break;
+    }
+
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <span
+          className={cn(
+            "h-3 w-3 rounded-full",
+            bgColor,
+            agentConnectionStatus === 'checking' && "animate-pulse"
+          )}
+          aria-hidden="true"
+        />
+        <span className={textColor}>{statusText}</span>
+        <Button variant="ghost" size="sm" onClick={verifyAgentConnection} className="h-7 px-2 py-1 text-xs" title="Refresh Connection Status">
+           <RefreshCw className={cn("h-3.5 w-3.5", agentConnectionStatus === 'checking' && "animate-spin")} />
+        </Button>
+      </div>
+    );
+  };
+
+
   return (
     <div className="flex flex-col gap-8">
-      <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <UploadCloud className="h-8 w-8 text-accent" /> Swift Ingestion Utility (Conceptual)
         </h1>
-        <p className="text-muted-foreground">
-          Interface to trigger a local agent for media ingestion, organization, and shot status updates.
-        </p>
+        <AgentStatusIndicator />
       </div>
+       <p className="text-muted-foreground -mt-6">
+          Interface to trigger a local agent for media ingestion, organization, and shot status updates.
+      </p>
+
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -310,25 +402,26 @@ export default function IngestionUtilityPage() {
                   HIVE Camera S/N: {selectedPhotographerDetails.cameraSerial || "Not specified"}
                 </p>
               )}
+              <p className="text-xs text-muted-foreground mt-1">The local agent would ideally verify image EXIF camera serials against this.</p>
             </div>
             <div>
               <Label htmlFor="event-select">Target Event</Label>
-              <Select value={selectedEventId} onValueChange={setSelectedEventId} disabled={isIngesting || !selectedProject}>
+              <Select value={selectedEventId} onValueChange={setSelectedEventId} disabled={isIngesting || !selectedProject || relevantEvents.length === 0}>
                 <SelectTrigger id="event-select">
-                  <SelectValue placeholder={selectedProject ? "Select event..." : "Select a project first"} />
+                  <SelectValue placeholder={selectedProject ? (relevantEvents.length > 0 ? "Select event..." : "No covered events for project") : "Select a project first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {eventsForSelectedProjectAndOrg.filter(e => e.isCovered).map(event => (
+                  {relevantEvents.map(event => (
                     <SelectItem key={event.id} value={event.id}>
                       {event.name} ({event.date})
                     </SelectItem>
                   ))}
-                  {selectedProject && eventsForSelectedProjectAndOrg.filter(e => e.isCovered).length === 0 && (
+                  {selectedProject && relevantEvents.length === 0 && (
                     <p className="p-2 text-xs text-muted-foreground">No covered events for this project.</p>
                   )}
                 </SelectContent>
               </Select>
-               <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches.</p>
+               <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches. Unmatched files could be placed in an 'Unspecified' folder by the agent.</p>
             </div>
           </div>
           <div className="space-y-4">
@@ -382,10 +475,13 @@ export default function IngestionUtilityPage() {
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleStartIngestion} disabled={!isReadyToIngest || isIngesting}>
+          <Button onClick={handleStartIngestion} disabled={!isReadyToIngest || isIngesting || agentConnectionStatus !== 'connected'}>
             {isIngesting && currentJobId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
             {isIngesting && currentJobId ? `Ingesting (Job: ${currentJobId.substring(0,8)}...)` : "Send Job to Local Agent"}
           </Button>
+           {agentConnectionStatus !== 'connected' && (
+            <p className="ml-4 text-sm text-destructive">Local agent not connected.</p>
+          )}
         </CardFooter>
       </Card>
 
@@ -461,6 +557,3 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
-
-
-    
