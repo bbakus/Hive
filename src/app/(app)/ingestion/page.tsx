@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine, RefreshCw, HelpCircle } from 'lucide-react';
+import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, HelpCircle, FolderOpen, FileKey } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -17,14 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { localUtility, type IngestJobStatus } from '@/services/localUtility';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
-
-interface DriveInfo {
-  path: string;
-  // Allow any other properties that might come from the agent
-  [key: string]: any;
-}
 
 export default function IngestionUtilityPage() {
   const { selectedProject } = useProjectContext();
@@ -35,14 +30,10 @@ export default function IngestionUtilityPage() {
   const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>('');
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [ingestionLog, setIngestionLog] = useState<string[]>([]);
-  const [isIngesting, setIsIngesting] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
 
-  const [sourcePath, setSourcePath] = useState("");
-  const [sourcePath2, setSourcePath2] = useState("");
-  const [workingPath, setWorkingPath] = useState("");
-  const [backupPath, setBackupPath] = useState("");
-
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [jobIdToMonitor, setJobIdToMonitor] = useState<string>("");
+  const [currentMonitoringJobId, setCurrentMonitoringJobId] = useState<string | null>(null);
   const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
 
   const [ingestionSummary, setIngestionSummary] = useState<{
@@ -54,7 +45,6 @@ export default function IngestionUtilityPage() {
     errors?: string[];
   } | null>(null);
 
-  const [availablePaths, setAvailablePaths] = useState<DriveInfo[]>([]);
   const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
 
   const availablePhotographers = useMemo(() => {
@@ -66,6 +56,10 @@ export default function IngestionUtilityPage() {
   const selectedPhotographerDetails = useMemo(() => {
     return initialPersonnelMock.find(p => p.id === selectedPhotographerId);
   }, [selectedPhotographerId]);
+
+  const selectedEventDetails = useMemo(() => {
+    return eventsForSelectedProjectAndOrg.find(e => e.id === selectedEventId);
+  }, [selectedEventId, eventsForSelectedProjectAndOrg]);
 
   const relevantEvents = useMemo(() => {
     if (!selectedProject) return [];
@@ -81,7 +75,8 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying connection to local agent...");
     try {
-      await localUtility.getAvailableDrives();
+      // Using getAvailableDrives for a lightweight connection check
+      await localUtility.getAvailableDrives(); 
       setAgentConnectionStatus('connected');
       logMessage("Successfully connected to local agent.", 'success');
       toast({ title: "Agent Connected", description: "Successfully connected to the local ingestion agent." });
@@ -105,187 +100,121 @@ export default function IngestionUtilityPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-  const handleStartIngestion = async () => {
+  const handleInitiateIngestion = async () => {
     const isConnected = await verifyAgentConnection();
     if (!isConnected) {
-      toast({ title: 'Agent Not Connected', description: 'Cannot start ingestion. Please ensure the local agent is running and accessible.', variant: 'destructive'});
+      toast({ title: 'Agent Not Connected', description: 'Cannot initiate. Please ensure the local agent is running and accessible.', variant: 'destructive'});
       return;
     }
 
-    if (!selectedPhotographerId || !selectedEventId ) {
+    if (!selectedPhotographerId || !selectedEventId) {
       toast({
         title: 'Missing Information',
-        description: 'Please select photographer and event for HIVE context.',
+        description: 'Please select photographer and event context for HIVE.',
         variant: 'destructive',
       });
       return;
     }
-    if (!sourcePath.trim() || !workingPath.trim() || !backupPath.trim()) {
-      toast({
-        title: 'Missing Paths',
-        description: 'Please specify at least one source path, working, and backup paths for the local agent.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    
+    logMessage(`Signaling local agent for Photographer: ${selectedPhotographerDetails?.name}, Event: ${selectedEventDetails?.name}.`);
+    logMessage("Please use your local HIVE Ingestion Utility to select paths and start the ingestion process.");
+    logMessage("Once the local utility provides a Job ID, enter it below and click 'Start Monitoring Job'.");
+    toast({
+      title: "Local Agent Signaled (Conceptual)",
+      description: "Use your local utility for path selection. Enter the Job ID it provides here to monitor.",
+      duration: 7000,
+    });
+    // No API call here, user now interacts with local agent
+  };
 
-    setIsIngesting(true);
+  const handleStartMonitoring = () => {
+    if (!jobIdToMonitor.trim()) {
+      toast({ title: "Job ID Required", description: "Please enter the Job ID provided by your local agent.", variant: "destructive" });
+      return;
+    }
+    if (currentMonitoringJobId && pollingIntervalId) { // Clear previous job if any
+        clearInterval(pollingIntervalId);
+    }
+    setIsMonitoring(true);
     setIngestionLog([]);
     setIngestionSummary(null);
-    if (currentJobId && pollingIntervalId) { // Clear previous job if any
-        clearInterval(pollingIntervalId);
-        setPollingIntervalId(null);
-    }
-    setCurrentJobId(null);
-
-
-    logMessage('Preparing ingestion job...');
-
-    const photographer = initialPersonnelMock.find(p => p.id === selectedPhotographerId);
-    const event = eventsForSelectedProjectAndOrg.find(e => e.id === selectedEventId);
-
-    if (!photographer || !event) {
-      logMessage('Error: Selected photographer or event not found in HIVE.', 'error');
-      toast({ title: 'HIVE Error', description: 'Photographer or event details missing.', variant: 'destructive' });
-      setIsIngesting(false);
-      return;
-    }
-
-    const sourcePathsArray = [sourcePath.trim()];
-    if (sourcePath2.trim()) {
-      sourcePathsArray.push(sourcePath2.trim());
-    }
-
-    const jobData = {
-      photographerId: selectedPhotographerId,
-      eventId: selectedEventId,
-      sourcePaths: sourcePathsArray,
-      workingPath: workingPath.trim(),
-      backupPath: backupPath.trim(),
-      photographerCameraSerial: photographer.cameraSerial || undefined,
-    };
-
-    try {
-      logMessage(`Sending job request to local agent for Event: "${event.name}", Photographer: "${photographer.name}"...`);
-      logMessage(`Job details: Sources: ${jobData.sourcePaths.join(', ')}, Working: ${jobData.workingPath}, Backup: ${jobData.backupPath}, Camera S/N: ${jobData.photographerCameraSerial || 'N/A'}`);
-
-      const result = await localUtility.startIngest(jobData);
-
-      if (result.jobId) {
-        setCurrentJobId(result.jobId);
-        logMessage(`Job submitted to local agent. Job ID: ${result.jobId}. ${result.message || ''}`, 'success');
-        toast({ title: 'Job Submitted', description: `Job ID: ${result.jobId}. Polling for status...` });
-
-        const interval = setInterval(async () => {
-          const currentJobToPoll = result.jobId;
-          if (!currentJobToPoll) {
+    setCurrentMonitoringJobId(jobIdToMonitor.trim());
+    logMessage(`Starting to monitor Job ID: ${jobIdToMonitor.trim()}`);
+    
+    const interval = setInterval(async () => {
+      const currentJobToPoll = jobIdToMonitor.trim(); // Use fresh value from state in closure
+       if (!currentJobToPoll) {
              clearInterval(interval);
              setPollingIntervalId(null);
              return;
           }
+      try {
+        const statusResult: IngestJobStatus = await localUtility.getJobStatus(currentJobToPoll);
+        logMessage(`Agent reported status (${currentJobToPoll}): ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress || 0}%)`);
 
-          try {
-            const statusResult: IngestJobStatus = await localUtility.getJobStatus(currentJobToPoll);
-            logMessage(`Agent reported status (${currentJobToPoll}): ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress || 0}%)`);
+        if (statusResult.status === 'completed' || statusResult.status === 'failed' || statusResult.status === 'cancelled') {
+          clearInterval(interval);
+          setPollingIntervalId(null);
+          setIsMonitoring(false);
+          logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
 
-            if (statusResult.status === 'completed' || statusResult.status === 'failed') {
-              clearInterval(interval);
-              setPollingIntervalId(null);
-              setIsIngesting(false);
-              // setCurrentJobId(null); // Keep currentJobId to display it in the summary, clear on new job submission
-              logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
+          setIngestionSummary({
+            filesProcessed: statusResult.filesProcessed || 0,
+            totalSizeMB: statusResult.totalSizeMB || 0,
+            shotsUpdated: 0, // Will be updated after HIVE processing
+            checksumStatus: statusResult.checksumResult || "N/A",
+            finalMessage: statusResult.message,
+            errors: statusResult.errors
+          });
 
-              setIngestionSummary({
-                filesProcessed: statusResult.filesProcessed || 0,
-                totalSizeMB: statusResult.totalSizeMB || 0,
-                shotsUpdated: 0,
-                checksumStatus: statusResult.checksumResult || "N/A",
-                finalMessage: statusResult.message,
-                errors: statusResult.errors
-              });
+          if (statusResult.status === 'completed' && selectedEventId && selectedPhotographerId) {
+            toast({ title: 'Ingestion Complete (Agent)', description: statusResult.message || 'Files processed by local agent. Updating HIVE...' });
 
-              if (statusResult.status === 'completed') {
-                toast({ title: 'Ingestion Complete', description: statusResult.message || 'Files processed by local agent.' });
+            let shotsUpdatedCount = 0;
+            const shotsForEvent = getShotRequestsForEvent(selectedEventId);
+            const updatableShots = shotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
+            const filesToConsiderForShotUpdate = statusResult.filesProcessed || 0;
+            const shotsToUpdateCount = Math.min(updatableShots.length, filesToConsiderForShotUpdate);
 
-                let shotsUpdatedCount = 0;
-                const shotsForEvent = getShotRequestsForEvent(selectedEventId);
-                const updatableShots = shotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
-
-                const filesToConsiderForShotUpdate = statusResult.filesProcessed || 0;
-                const shotsToUpdateCount = Math.min(updatableShots.length, filesToConsiderForShotUpdate);
-
-                if (shotsToUpdateCount > 0) {
-                  logMessage(`Updating ${shotsToUpdateCount} shot requests in HIVE for event "${event.name}"...`);
-                  for (let i = 0; i < shotsToUpdateCount; i++) {
-                    const shot = updatableShots[i];
-                    const updatePayload: Partial<ShotRequestFormData> = {
-                      status: 'Captured',
-                      initialCapturerId: selectedPhotographerId,
-                      lastStatusModifierId: selectedPhotographerId,
-                      lastStatusModifiedAt: new Date().toISOString(),
-                    };
-                    try {
-                      updateShotRequest(selectedEventId, shot.id, updatePayload);
-                      logMessage(`HIVE status updated for shot: "${shot.description.substring(0,30)}..." to Captured.`);
-                      shotsUpdatedCount++;
-                    } catch (hiveError: any) {
-                      logMessage(`HIVE Error updating shot "${shot.description.substring(0,30)}...": ${hiveError.message || String(hiveError)}`, 'error');
-                    }
-                  }
-                   setIngestionSummary(prev => prev ? {...prev, shotsUpdated: shotsUpdatedCount} : null);
-                } else {
-                  logMessage(`No updatable shots found in HIVE for event "${event.name}" or no files reported processed by agent.`);
+            if (shotsToUpdateCount > 0) {
+              logMessage(`Updating ${shotsToUpdateCount} shot requests in HIVE for event "${selectedEventDetails?.name}"...`);
+              for (let i = 0; i < shotsToUpdateCount; i++) {
+                const shot = updatableShots[i];
+                const updatePayload: Partial<ShotRequestFormData> = {
+                  status: 'Captured',
+                  initialCapturerId: selectedPhotographerId,
+                  lastStatusModifierId: selectedPhotographerId,
+                  lastStatusModifiedAt: new Date().toISOString(),
+                };
+                try {
+                  updateShotRequest(selectedEventId, shot.id, updatePayload);
+                  logMessage(`HIVE status updated for shot: "${shot.description.substring(0,30)}..." to Captured.`);
+                  shotsUpdatedCount++;
+                } catch (hiveError: any) {
+                  logMessage(`HIVE Error updating shot "${shot.description.substring(0,30)}...": ${hiveError.message || String(hiveError)}`, 'error');
                 }
-              } else {
-                toast({ title: 'Ingestion Failed', description: statusResult.message || 'Local agent reported an error.', variant: 'destructive' });
               }
+               setIngestionSummary(prev => prev ? {...prev, shotsUpdated: shotsUpdatedCount} : null);
+               if (shotsUpdatedCount > 0) {
+                toast({ title: "HIVE Updated", description: `${shotsUpdatedCount} shot requests marked as 'Captured'.`});
+               }
+            } else {
+              logMessage(`No updatable shots found in HIVE for event "${selectedEventDetails?.name}" or no files reported processed by agent.`);
             }
-          } catch (statusError: any) {
-            logMessage(`Error polling job status for ${currentJobToPoll}: ${statusError.message || String(statusError)}`, 'error');
-            if(pollingIntervalId) clearInterval(pollingIntervalId);
-            setPollingIntervalId(null);
-            setIsIngesting(false);
-            // setCurrentJobId(null); // Clear only if polling definitively fails for this job
-            toast({ title: 'Polling Error', description: `Could not get status for job ${currentJobToPoll}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
+          } else if (statusResult.status === 'failed' || statusResult.status === 'cancelled') {
+            toast({ title: `Ingestion ${statusResult.status}`, description: statusResult.message || `Local agent reported ${statusResult.status}.`, variant: 'destructive' });
           }
-        }, 3000);
-        setPollingIntervalId(interval);
-      } else {
-        throw new Error(result.message || "Local agent did not return a Job ID.");
+        }
+      } catch (statusError: any) {
+        logMessage(`Error polling job status for ${currentJobToPoll}: ${statusError.message || String(statusError)}`, 'error');
+        if(pollingIntervalId) clearInterval(pollingIntervalId); // Clear interval from outer scope
+        setPollingIntervalId(null);
+        setIsMonitoring(false);
+        toast({ title: 'Polling Error', description: `Could not get status for job ${currentJobToPoll}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logMessage(`Failed to start ingestion job: ${errorMessage}`, 'error');
-      toast({ title: 'Ingestion Error', description: errorMessage, variant: 'destructive' });
-      setIsIngesting(false);
-    }
+    }, 3000);
+    setPollingIntervalId(interval);
   };
-
-  const handleFetchAvailableDrives = async () => {
-    const isConnected = await verifyAgentConnection();
-    if (!isConnected) return;
-
-    logMessage("Fetching available drives from local agent...");
-    try {
-      const drives = await localUtility.getAvailableDrives();
-      if (drives && drives.locations) {
-        setAvailablePaths(drives.locations as DriveInfo[]);
-        logMessage(`Agent reported drives: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`, 'success');
-        toast({ title: "Drives Fetched", description: `Agent reported: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`});
-      } else {
-        logMessage("No drive locations reported by agent.", 'info');
-        setAvailablePaths([]);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logMessage(`Error fetching drives: ${errorMessage}`, 'error');
-      toast({ title: 'Drive Fetch Error', description: errorMessage, variant: 'destructive' });
-      setAvailablePaths([]);
-    }
-  };
-
-  const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
     // Clear previous job tracking when key selections change
@@ -293,9 +222,10 @@ export default function IngestionUtilityPage() {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
     }
-    setCurrentJobId(null);
+    setCurrentMonitoringJobId(null);
     setIngestionSummary(null);
-    // setIngestionLog([]); // Optionally clear log on selection change
+    setIsMonitoring(false);
+    setJobIdToMonitor(""); // Clear entered job ID
   }, [selectedPhotographerId, selectedEventId]);
 
 
@@ -369,6 +299,14 @@ export default function IngestionUtilityPage() {
       </div>
     );
   };
+  
+  const expectedFolderPath = useMemo(() => {
+    if (!selectedEventDetails || !selectedPhotographerDetails) return "[Select Event & Photographer]";
+    const eventDate = selectedEventDetails.date ? format(new Date(selectedEventDetails.date.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
+    const eventName = selectedEventDetails.name.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
+    const photographerInitials = selectedPhotographerDetails.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'PHOTOG';
+    return `[Your_Working_Path]/${eventDate}_${eventName}/${photographerInitials}/`;
+  }, [selectedEventDetails, selectedPhotographerDetails]);
 
 
   return (
@@ -380,20 +318,22 @@ export default function IngestionUtilityPage() {
         <AgentStatusIndicator />
       </div>
        <p className="text-muted-foreground -mt-6">
-          Interface to trigger a local agent for media ingestion, organization, and shot status updates.
+          Select context in HIVE, then use your local agent for file operations. Monitor progress here.
       </p>
-
 
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Ingestion Job Setup</CardTitle>
-          <CardDescription>Select photographer, event, and specify paths for the local agent.</CardDescription>
+          <CardTitle>Ingestion Context & Monitoring</CardTitle>
+          <CardDescription>
+            Set the Photographer and Event context for the ingestion. Your local agent will handle path selection and file operations.
+            Then, enter the Job ID from your local agent to monitor its progress in HIVE.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-x-8 gap-y-6">
           <div className="space-y-4">
             <div>
               <Label htmlFor="photographer-select">Active Photographer</Label>
-              <Select value={selectedPhotographerId} onValueChange={setSelectedPhotographerId} disabled={isIngesting}>
+              <Select value={selectedPhotographerId} onValueChange={setSelectedPhotographerId} disabled={isMonitoring}>
                 <SelectTrigger id="photographer-select">
                   <SelectValue placeholder="Select photographer..." />
                 </SelectTrigger>
@@ -412,11 +352,10 @@ export default function IngestionUtilityPage() {
                   HIVE Camera S/N: {selectedPhotographerDetails.cameraSerial || "Not specified"}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground mt-1">The local agent would ideally verify image EXIF camera serials against this.</p>
             </div>
             <div>
               <Label htmlFor="event-select">Target Event</Label>
-              <Select value={selectedEventId} onValueChange={setSelectedEventId} disabled={isIngesting || !selectedProject || relevantEvents.length === 0}>
+              <Select value={selectedEventId} onValueChange={setSelectedEventId} disabled={isMonitoring || !selectedProject || relevantEvents.length === 0}>
                 <SelectTrigger id="event-select">
                   <SelectValue placeholder={selectedProject ? (relevantEvents.length > 0 ? "Select event..." : "No covered events for project") : "Select a project first"} />
                 </SelectTrigger>
@@ -431,77 +370,58 @@ export default function IngestionUtilityPage() {
                   )}
                 </SelectContent>
               </Select>
-               <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches. Unmatched files could be placed in an 'Unspecified' folder by the agent.</p>
             </div>
+             <Button onClick={handleInitiateIngestion} disabled={!selectedPhotographerId || !selectedEventId || isMonitoring || agentConnectionStatus !== 'connected'}>
+                <FolderOpen className="mr-2 h-4 w-4" />
+                Signal Local Agent to Start Ingestion
+            </Button>
           </div>
+
           <div className="space-y-4">
             <div>
-              <Label htmlFor="source-path">Source Path (for Local Agent)</Label>
-              <div className="flex items-center gap-2">
-                <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <Input id="source-path" value={sourcePath} onChange={(e) => setSourcePath(e.target.value)} placeholder="e.g., /Users/editor/Desktop/Card_01" disabled={isIngesting} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Path the local agent will read from. Enter path manually.</p>
-            </div>
-            <div>
-              <Label htmlFor="source-path-2">Source Path 2 (Optional - for Local Agent)</Label>
-              <div className="flex items-center gap-2">
-                <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <Input id="source-path-2" value={sourcePath2} onChange={(e) => setSourcePath2(e.target.value)} placeholder="e.g., /Volumes/SD_Card_02" disabled={isIngesting} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Additional source path if ingesting from multiple locations.</p>
-            </div>
-            <div>
-              <Label htmlFor="working-path">Working Destination Path (for Local Agent)</Label>
-              <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <Input id="working-path" value={workingPath} onChange={(e) => setWorkingPath(e.target.value)} placeholder="e.g., /Volumes/ProductionDrive/ProjectX_Working" disabled={isIngesting}/>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Path for primary ingested files by agent. Enter path manually.</p>
-            </div>
-            <div>
-              <Label htmlFor="backup-path">Backup Destination Path (for Local Agent)</Label>
-               <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <Input id="backup-path" value={backupPath} onChange={(e) => setBackupPath(e.target.value)} placeholder="e.g., //NAS_SERVER/ProjectX_Backup" disabled={isIngesting}/>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent. Enter path manually.</p>
-            </div>
-            <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting || agentConnectionStatus !== 'connected'}>
-                <Info className="mr-2 h-4 w-4" /> Fetch Drive Info
-            </Button>
-            {availablePaths.length > 0 && (
-                <div className="text-xs text-muted-foreground mt-2">
-                    <p className="font-medium">Agent reported drives:</p>
-                    <ul className="list-disc list-inside pl-2">
-                        {availablePaths.map((drive, index) => <li key={`${drive.path}-${index}`}>{drive.path}</li>)}
-                    </ul>
+                <Label htmlFor="jobIdToMonitor">Job ID from Local Agent</Label>
+                <div className="flex items-center gap-2">
+                    <FileKey className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <Input 
+                        id="jobIdToMonitor" 
+                        value={jobIdToMonitor} 
+                        onChange={(e) => setJobIdToMonitor(e.target.value)} 
+                        placeholder="Enter Job ID provided by local agent" 
+                        disabled={isMonitoring}
+                    />
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                    After initiating with your local utility, enter the Job ID it gives you here.
+                </p>
+            </div>
+            <Button onClick={handleStartMonitoring} disabled={!jobIdToMonitor.trim() || isMonitoring || agentConnectionStatus !== 'connected'}>
+                {isMonitoring && currentMonitoringJobId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                {isMonitoring && currentMonitoringJobId ? `Monitoring (Job: ${currentMonitoringJobId.substring(0,8)}...)` : "Start Monitoring Job"}
+            </Button>
+            {agentConnectionStatus !== 'connected' && (
+              <p className="text-sm text-destructive">Local agent not connected. Cannot signal or monitor.</p>
             )}
+            <div className="mt-4 text-sm p-3 border rounded-md bg-muted/30">
+              <p className="font-medium text-foreground mb-1">Expected Folder Structure (Reference):</p>
+              <p className="text-xs text-muted-foreground font-mono">{expectedFolderPath}</p>
+              <p className="text-xs text-muted-foreground mt-1">Your local agent should create a similar structure based on its configuration.</p>
+            </div>
           </div>
         </CardContent>
-        <CardFooter>
-          <Button onClick={handleStartIngestion} disabled={!isReadyToIngest || isIngesting || agentConnectionStatus !== 'connected'}>
-            {isIngesting && currentJobId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-            {isIngesting && currentJobId ? `Ingesting (Job: ${currentJobId.substring(0,8)}...)` : "Send Job to Local Agent"}
-          </Button>
-           {agentConnectionStatus !== 'connected' && (
-            <p className="ml-4 text-sm text-destructive">Local agent not connected.</p>
-          )}
-        </CardFooter>
       </Card>
 
-      {ingestionLog.length > 0 && (
+      {(ingestionLog.length > 0 || isMonitoring) && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Local Agent Communication Log</CardTitle>
+            {currentMonitoringJobId && <CardDescription>Monitoring Job ID: {currentMonitoringJobId}</CardDescription>}
           </CardHeader>
           <CardContent>
             <Textarea
               readOnly
               value={ingestionLog.join('\n')}
               className="h-48 font-mono text-xs bg-muted/30"
-              placeholder="Ingestion log will appear here..."
+              placeholder="Agent communication log will appear here..."
             />
           </CardContent>
         </Card>
@@ -511,7 +431,7 @@ export default function IngestionUtilityPage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Ingestion Summary Report</CardTitle>
-             {currentJobId && <CardDescription>Job ID: {currentJobId}</CardDescription>}
+             {currentMonitoringJobId && <CardDescription>Job ID: {currentMonitoringJobId}</CardDescription>}
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p className="flex items-center gap-2">
@@ -553,14 +473,12 @@ export default function IngestionUtilityPage() {
       )}
        <Alert variant="destructive">
         <Info className="h-4 w-4" />
-        <AlertTitle>Local Agent Interaction Notice</AlertTitle>
+        <AlertTitle>Local Agent Required for File Operations</AlertTitle>
         <AlertDescription>
-          This utility attempts to communicate with a local agent expected to be running at <strong>http://localhost:8765</strong>.
-          Ensure the local agent is running and configured for CORS if you encounter connection issues.
-          The browser itself CANNOT directly access local/networked file paths or perform file system operations for writing.
-          Path inputs are passed to the local agent.
+          This HIVE utility sets the context (Photographer, Event) for an ingestion job. The actual selection of file paths, file copying, and checksums must be handled by a separate **local HIVE desktop agent application** running on your computer. After initiating the job with your local agent, enter the Job ID it provides above to monitor progress and update HIVE shot statuses.
         </AlertDescription>
       </Alert>
     </div>
   );
 }
+
