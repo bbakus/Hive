@@ -22,9 +22,6 @@ type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnecte
 
 interface DriveInfo {
   path: string;
-  available?: boolean;
-  freeSpace?: string;
-  totalSpace?: string;
   // Allow any other properties that might come from the agent
   [key: string]: any; 
 }
@@ -84,7 +81,6 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying connection to local agent...");
     try {
-      // Using /available-drives as a simple ping endpoint
       await localUtility.getAvailableDrives(); 
       setAgentConnectionStatus('connected');
       logMessage("Successfully connected to local agent.", 'success');
@@ -107,7 +103,7 @@ export default function IngestionUtilityPage() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, []); 
 
 
   const handleStartIngestion = async () => {
@@ -178,8 +174,8 @@ export default function IngestionUtilityPage() {
         toast({ title: 'Job Submitted', description: `Job ID: ${result.jobId}. Polling for status...` });
 
         const interval = setInterval(async () => {
-          const currentJobToPoll = result.jobId; // Capture jobId at the time interval is set up
-          if (!currentJobToPoll) { // Check if we still have a job to poll (it might have been cleared)
+          const currentJobToPoll = result.jobId; 
+          if (!currentJobToPoll) { 
              clearInterval(interval);
              setPollingIntervalId(null);
              return;
@@ -237,13 +233,13 @@ export default function IngestionUtilityPage() {
                 } else {
                   logMessage(`No updatable shots found in HIVE for event "${event.name}" or no files reported processed by agent.`);
                 }
-              } else { // status is 'failed'
+              } else { 
                 toast({ title: 'Ingestion Failed', description: statusResult.message || 'Local agent reported an error.', variant: 'destructive' });
               }
             }
           } catch (statusError: any) {
             logMessage(`Error polling job status for ${currentJobToPoll}: ${statusError.message || String(statusError)}`, 'error');
-            if(pollingIntervalId) clearInterval(pollingIntervalId); // Clear on polling error too
+            if(pollingIntervalId) clearInterval(pollingIntervalId); 
             setPollingIntervalId(null);
             setIsIngesting(false);
             setCurrentJobId(null); 
@@ -270,11 +266,8 @@ export default function IngestionUtilityPage() {
     try {
       const drives = await localUtility.getAvailableDrives();
       if (drives && drives.locations) {
-        // Assuming drives.locations is now Array<DriveInfo> or Array<string>
-        // If it's Array<string>, no change needed in setAvailablePaths if type is string[]
-        // If it's Array<DriveInfo>, the type of availablePaths state should be DriveInfo[]
-        setAvailablePaths(drives.locations as DriveInfo[]); // Cast for now, ensure agent returns compatible structure or update DriveInfo
-        logMessage(`Available drive locations (conceptual): ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`, 'success');
+        setAvailablePaths(drives.locations as DriveInfo[]); 
+        logMessage(`Agent reported drives (conceptual): ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`, 'success');
         toast({ title: "Drives Fetched (Conceptual)", description: `Agent reported: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`});
       } else {
         logMessage("No drive locations reported by agent.", 'info');
@@ -290,7 +283,6 @@ export default function IngestionUtilityPage() {
   
   const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
-  // Clear job ID and polling when inputs change
   useEffect(() => {
     setCurrentJobId(null);
     if (pollingIntervalId) {
@@ -443,16 +435,14 @@ export default function IngestionUtilityPage() {
               <div className="flex items-center gap-2">
                 <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="source-path" value={sourcePath} onChange={(e) => setSourcePath(e.target.value)} placeholder="e.g., /Users/editor/Desktop/Card_01" disabled={isIngesting} />
-                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Path the local agent will read from. "Browse" is conceptual for web UI.</p>
+              <p className="text-xs text-muted-foreground mt-1">Path the local agent will read from. Enter path manually.</p>
             </div>
             <div>
               <Label htmlFor="source-path-2">Source Path 2 (Optional - for Local Agent)</Label>
               <div className="flex items-center gap-2">
                 <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="source-path-2" value={sourcePath2} onChange={(e) => setSourcePath2(e.target.value)} placeholder="e.g., /Volumes/SD_Card_02" disabled={isIngesting} />
-                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Additional source path if ingesting from multiple locations.</p>
             </div>
@@ -461,18 +451,16 @@ export default function IngestionUtilityPage() {
               <div className="flex items-center gap-2">
                 <HardDrive className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="working-path" value={workingPath} onChange={(e) => setWorkingPath(e.target.value)} placeholder="e.g., /Volumes/ProductionDrive/ProjectX_Working" disabled={isIngesting}/>
-                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Path for primary ingested files by agent. "Browse" is conceptual.</p>
+              <p className="text-xs text-muted-foreground mt-1">Path for primary ingested files by agent. Enter path manually.</p>
             </div>
             <div>
               <Label htmlFor="backup-path">Backup Destination Path (for Local Agent)</Label>
                <div className="flex items-center gap-2">
                 <HardDrive className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="backup-path" value={backupPath} onChange={(e) => setBackupPath(e.target.value)} placeholder="e.g., //NAS_SERVER/ProjectX_Backup" disabled={isIngesting}/>
-                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent. "Browse" is conceptual.</p>
+              <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent. Enter path manually.</p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting || agentConnectionStatus !== 'connected'}>
                 <Info className="mr-2 h-4 w-4" /> Fetch Drive Info (Conceptual)
@@ -571,3 +559,4 @@ export default function IngestionUtilityPage() {
   );
 }
 
+    
