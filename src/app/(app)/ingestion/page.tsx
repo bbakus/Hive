@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine, RefreshCw, HelpCircle } from 'lucide-react'; // Added HelpCircle
+import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine, RefreshCw, HelpCircle } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -75,7 +75,7 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying connection to local agent...");
     try {
-      await localUtility.getAvailableDrives(); // Using this as a ping
+      await localUtility.getAvailableDrives(); 
       setAgentConnectionStatus('connected');
       logMessage("Successfully connected to local agent.", 'success');
       toast({ title: "Agent Connected", description: "Successfully connected to the local ingestion agent." });
@@ -91,14 +91,13 @@ export default function IngestionUtilityPage() {
 
   useEffect(() => {
     verifyAgentConnection();
-    // Cleanup polling interval on unmount
     return () => {
       if (pollingIntervalId) {
         clearInterval(pollingIntervalId);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // verifyAgentConnection is stable, pollingIntervalId is for cleanup only
+  }, []); 
 
 
   const handleStartIngestion = async () => {
@@ -184,7 +183,7 @@ export default function IngestionUtilityPage() {
               clearInterval(interval);
               setPollingIntervalId(null);
               setIsIngesting(false);
-              setCurrentJobId(null); // Clear job ID after completion/failure
+              setCurrentJobId(null); 
               logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
               
               setIngestionSummary({
@@ -234,7 +233,7 @@ export default function IngestionUtilityPage() {
             }
           } catch (statusError: any) {
             logMessage(`Error polling job status for ${currentJobToPoll}: ${statusError.message || String(statusError)}`, 'error');
-            clearInterval(interval);
+            if(pollingIntervalId) clearInterval(pollingIntervalId); // Clear on polling error too
             setPollingIntervalId(null);
             setIsIngesting(false);
             setCurrentJobId(null); 
@@ -279,14 +278,13 @@ export default function IngestionUtilityPage() {
   const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
-    // Clear job related states when key inputs change, encouraging a new job submission
     setCurrentJobId(null);
     if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
     }
     setIngestionSummary(null); 
-  }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath, pollingIntervalId]);
+  }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath]);
 
 
   if (isLoadingSettings || isLoadingEvents) {
@@ -426,7 +424,7 @@ export default function IngestionUtilityPage() {
           </div>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="source-path">Source Path 1 (for Local Agent)</Label>
+              <Label htmlFor="source-path">Source Path (for Local Agent)</Label>
               <div className="flex items-center gap-2">
                 <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="source-path" value={sourcePath} onChange={(e) => setSourcePath(e.target.value)} placeholder="e.g., /Users/editor/Desktop/Card_01" disabled={isIngesting} />
@@ -468,7 +466,7 @@ export default function IngestionUtilityPage() {
                 <div className="text-xs text-muted-foreground mt-2">
                     <p className="font-medium">Agent reported drives (conceptual):</p>
                     <ul className="list-disc list-inside pl-2">
-                        {availablePaths.map(p => <li key={p}>{p}</li>)}
+                        {availablePaths.map((p, index) => <li key={`${p}-${index}`}>{p}</li>)}
                     </ul>
                 </div>
             )}
@@ -557,3 +555,4 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
+
