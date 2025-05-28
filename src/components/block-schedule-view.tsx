@@ -2,16 +2,16 @@
 "use client";
 
 import type { Event } from "@/app/(app)/events/page";
-import { parseEventTimes } from "@/app/(app)/events/page"; // Keep this import
+import { parseEventTimes } from "@/app/(app)/events/page";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Users, Settings, Zap, Eye, Camera as CameraIcon, AlertTriangle } from "lucide-react";
-import type { Personnel } from "@/app/(app)/personnel/page"; // Keep this import
+import type { Personnel } from "@/app/(app)/personnel/page";
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
   eventsForDate: Event[];
-  personnelForDay: Personnel[]; // Use full Personnel type if available, or a subset { id, name }
+  personnelForDay: Personnel[];
   onEditEvent?: (event: Event) => void;
   allPersonnel: Personnel[];
 }
@@ -70,7 +70,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
       height: `${height}px`,
       left: '2%',
       width: '96%',
-      zIndex: 10 + Math.floor(eventStartOffsetMinutes / 60), // Basic stacking based on start hour
+      zIndex: 10 + Math.floor(eventStartOffsetMinutes / 60),
       overflow: 'hidden',
     };
   };
@@ -86,7 +86,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
 
 
   return (
-    <div className="flex flex-col min-h-[600px] bg-background rounded-lg shadow">
+    <div className="flex flex-col min-h-[calc(var(--vh,1vh)_*_100_-_12rem)] bg-background rounded-lg shadow"> {/* Adjusted min-height */}
       <div className="p-4 border-b">
         <h3 className="text-lg font-semibold">
           Schedule for: {format(selectedDate, "EEEE, MMMM do, yyyy")}
@@ -96,8 +96,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
         )}
       </div>
       <div className="flex flex-grow overflow-x-auto">
-        {/* Time Gutter */}
-        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r sticky left-0 bg-background z-30">
+        {/* Time Gutter - No longer sticky */}
+        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r bg-background"> {/* Added bg-background to prevent transparency issues */}
           {hours.map((hour) => (
             <div
               key={`time-${hour}`}
@@ -107,7 +107,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
               {`${String(hour).padStart(2, '0')}:00`}
             </div>
           ))}
-           <div className="h-1 border-b"></div>
+           <div className="h-1 border-b"></div> {/* Extra line to make bottom border visible */}
         </div>
 
         {/* Schedule Area */}
@@ -116,23 +116,21 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
             personnelForDay.map((person) => (
               <div
                 key={person.id}
-                className="flex-1 min-w-[200px] sm:min-w-[250px] border-r last:border-r-0 relative"
-                style={{ flexBasis: `${100 / Math.max(1,personnelForDay.length)}%` }}
+                className="flex-1 min-w-[200px] sm:min-w-[250px] border-r last:border-r-0"
               >
-                {/* Column Header - Made Sticky */}
-                <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-0 z-20">
+                {/* Column Header - Sticky, positioned below main app header */}
+                <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-16 z-10"> {/* Changed top-0 to top-16, adjusted z-index */}
                   <p className="font-medium text-sm truncate" title={person.name}>{person.name}</p>
                 </div>
-                {/* Hour lines for this column */}
+                {/* Column Timeline - Events are positioned absolutely within this */}
                 <div className="relative">
                     {hours.map((hour) => (
                         <div key={`grid-${person.id}-${hour}`} className="border-b" style={{ height: `${HOUR_ROW_HEIGHT_REM}rem` }}>
                             <div className="border-b border-dashed border-border/30" style={{height: `${HOUR_ROW_HEIGHT_REM / 2}rem`}}></div>
                         </div>
                     ))}
-                     <div className="h-1 border-b"></div>
+                     <div className="h-1 border-b"></div> {/* Extra line for bottom border consistency */}
 
-                    {/* Events for this person */}
                     {eventsForDate
                       .filter(event => event.assignedPersonnelIds?.includes(person.id))
                       .map((event) => {
@@ -194,9 +192,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
               </div>
             ))
           ) : (
-            // Fallback for events with no specific personnel assigned to them (or if personnelForDay is empty)
-            <div className="flex-1 min-w-[250px] border-r last:border-r-0 relative">
-                <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-0 z-20">
+            <div className="flex-1 min-w-[250px] border-r last:border-r-0">
+                <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-16 z-10">
                   <p className="font-medium text-sm truncate">General / Unassigned</p>
                 </div>
                 <div className="relative">
@@ -251,7 +248,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
     </div>
   );
 }
-// To avoid undefined error for CalendarIcon when no events.
+
 const CalendarIcon = ({ className, ...props }: React.ComponentProps<typeof Users>) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("lucide lucide-calendar-days", className)} {...props}>
     <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
@@ -266,3 +263,4 @@ const CalendarIcon = ({ className, ...props }: React.ComponentProps<typeof Users
     <path d="M16 18h.01"/>
   </svg>
 );
+
