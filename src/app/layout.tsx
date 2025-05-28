@@ -1,8 +1,10 @@
+
 import type {Metadata} from 'next';
 import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
+import { ThemeProvider } from '@/contexts/ThemeContext'; // Added import
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -25,14 +27,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning> {/* Removed className="dark", added suppressHydrationWarning */}
       <body className={cn(
         geistSans.variable,
         geistMono.variable,
         "antialiased font-sans"
         )}>
-        {children}
-        <Toaster />
+        <ThemeProvider
+          defaultTheme="dark"
+          storageKey="hive-theme"
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
         {/*
           In a real application, you would include the Google Maps API script here.
           Replace YOUR_API_KEY with your actual Google Maps API key.

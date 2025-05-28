@@ -5,13 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { Settings as SettingsIcon, Info } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext"; // Added import
+import { Settings as SettingsIcon, Info, Sun, Moon } from "lucide-react"; // Added Sun, Moon
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SettingsPage() {
-  const { useDemoData, setUseDemoData, isLoading } = useSettingsContext();
+  const { useDemoData, setUseDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const { theme, setTheme, toggleTheme } = useTheme(); // Added useTheme
 
-  if (isLoading) {
+  if (isLoadingSettings) { // isLoading from ThemeContext might also be relevant if it had one
     return (
       <div className="flex flex-col gap-8">
         <div>
@@ -65,25 +67,32 @@ export default function SettingsPage() {
           </div>
            <Alert>
             <Info className="h-4 w-4" />
-            <AlertTitle>Refresh Required</AlertTitle>
+            <AlertTitle>Refresh May Be Required</AlertTitle>
             <AlertDescription>
-              Changes to the "Load Demo Data" setting will take full effect after refreshing the application (e.g., by navigating to a different page or reloading your browser tab). New projects, events, etc., added while demo data is off will persist.
+              Changes to "Load Demo Data" or "Theme" may require a page refresh or navigation to fully apply across all components.
             </AlertDescription>
           </Alert>
-          {/* Future settings can be added here */}
-          {/* Example:
+          
           <div className="flex items-center space-x-4 rounded-md border p-4">
             <div className="flex-1 space-y-1">
-              <Label htmlFor="theme-selector" className="text-base font-medium">
-                Theme
+              <Label htmlFor="theme-toggle" className="text-base font-medium">
+                Appearance
               </Label>
               <p className="text-sm text-muted-foreground">
-                Select your preferred application theme (Light/Dark).
+                Switch between light and dark themes for the application.
               </p>
             </div>
-            <p className="text-muted-foreground">(Theme selection coming soon)</p>
+            <div className="flex items-center gap-2">
+              <Sun className={theme === 'light' ? 'text-accent' : 'text-muted-foreground'} />
+              <Switch
+                id="theme-toggle"
+                checked={theme === 'dark'}
+                onCheckedChange={toggleTheme}
+                aria-label="Toggle dark mode"
+              />
+              <Moon className={theme === 'dark' ? 'text-accent' : 'text-muted-foreground'} />
+            </div>
           </div>
-          */}
         </CardContent>
       </Card>
     </div>
