@@ -24,7 +24,7 @@ const getPriorityColor = (priority: Event['priority']): string => {
     case "Critical":
       return "bg-destructive/80 border-destructive text-destructive-foreground";
     case "High":
-      return "bg-secondary border-foreground/30 text-secondary-foreground";
+      return "bg-secondary border-foreground/30 text-secondary-foreground"; // Keep distinct from accent for now
     case "Medium":
       return "bg-primary/70 border-primary text-primary-foreground";
     case "Low":
@@ -40,14 +40,14 @@ const getCoverageIcon = (isCovered?: boolean) => {
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <CameraIcon className="h-3 w-3 opacity-80" />;
+  if (discipline === "Photography") return <CameraIcon className="h-3 w-3 opacity-80 flex-shrink-0" />;
   return null;
 };
 
 
 export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay, onEditEvent, allPersonnel }: BlockScheduleViewProps) {
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i);
-  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; // Assuming 1rem = 16px
+  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; 
   const pixelsPerMinute = hourRowHeightPx / 60;
 
   const getEventBlockStyle = (event: Event): React.CSSProperties | null => {
@@ -59,10 +59,10 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
 
     const eventStartOffsetMinutes = (times.start.getTime() - startOfDayDate.getTime()) / (1000 * 60);
     let durationInMinutes = ((times.end.getTime() - times.start.getTime()) / (1000 * 60));
-    if (durationInMinutes <= 0) durationInMinutes = 15; // Minimum 15 min display
+    if (durationInMinutes <= 0) durationInMinutes = 15; 
 
     const top = eventStartOffsetMinutes * pixelsPerMinute;
-    const height = Math.max(durationInMinutes * pixelsPerMinute, 30); // Min height 30px
+    const height = Math.max(durationInMinutes * pixelsPerMinute, 30);
 
     return {
       position: 'absolute',
@@ -84,9 +84,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
     );
   }
 
-
   return (
-    <div className="flex flex-col min-h-[calc(var(--vh,1vh)_*_100_-_12rem)] bg-background rounded-lg shadow"> {/* Adjusted min-height */}
+    <div className="flex flex-col bg-background rounded-lg shadow">
       <div className="p-4 border-b">
         <h3 className="text-lg font-semibold">
           Schedule for: {format(selectedDate, "EEEE, MMMM do, yyyy")}
@@ -96,8 +95,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
         )}
       </div>
       <div className="flex flex-grow overflow-x-auto">
-        {/* Time Gutter - No longer sticky */}
-        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r bg-background"> {/* Added bg-background to prevent transparency issues */}
+        {/* Time Gutter */}
+        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r bg-background z-20"> {/* Added z-20 to keep it above grid lines potentially */}
           {hours.map((hour) => (
             <div
               key={`time-${hour}`}
@@ -107,7 +106,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
               {`${String(hour).padStart(2, '0')}:00`}
             </div>
           ))}
-           <div className="h-1 border-b"></div> {/* Extra line to make bottom border visible */}
+           <div className="h-1 border-b"></div> 
         </div>
 
         {/* Schedule Area */}
@@ -118,8 +117,8 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                 key={person.id}
                 className="flex-1 min-w-[200px] sm:min-w-[250px] border-r last:border-r-0"
               >
-                {/* Column Header - Sticky, positioned below main app header */}
-                <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-16 z-10"> {/* Changed top-0 to top-16, adjusted z-index */}
+                {/* Column Header - Sticky */}
+                <div className="h-10 flex items-center justify-center p-2 border-b bg-background sticky top-16 z-20 shadow-sm"> {/* Changed to bg-background, increased z-index slightly */}
                   <p className="font-medium text-sm truncate" title={person.name}>{person.name}</p>
                 </div>
                 {/* Column Timeline - Events are positioned absolutely within this */}
@@ -129,7 +128,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                             <div className="border-b border-dashed border-border/30" style={{height: `${HOUR_ROW_HEIGHT_REM / 2}rem`}}></div>
                         </div>
                     ))}
-                     <div className="h-1 border-b"></div> {/* Extra line for bottom border consistency */}
+                     <div className="h-1 border-b"></div>
 
                     {eventsForDate
                       .filter(event => event.assignedPersonnelIds?.includes(person.id))
@@ -191,9 +190,9 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                 </div>
               </div>
             ))
-          ) : (
+          ) : ( // Fallback for no personnel assigned to any event on this day
             <div className="flex-1 min-w-[250px] border-r last:border-r-0">
-                <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-16 z-10">
+                <div className="h-10 flex items-center justify-center p-2 border-b bg-background sticky top-16 z-20 shadow-sm">
                   <p className="font-medium text-sm truncate">General / Unassigned</p>
                 </div>
                 <div className="relative">
@@ -249,6 +248,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
   );
 }
 
+// Simple Calendar Icon for fallback, not imported from lucide if not needed elsewhere to keep component self-contained if possible
 const CalendarIcon = ({ className, ...props }: React.ComponentProps<typeof Users>) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("lucide lucide-calendar-days", className)} {...props}>
     <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
@@ -263,4 +263,4 @@ const CalendarIcon = ({ className, ...props }: React.ComponentProps<typeof Users
     <path d="M16 18h.01"/>
   </svg>
 );
-
+    
