@@ -187,25 +187,21 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <Card className="shadow-md mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filter Events</CardTitle>
-        <CardDescription>Refine the events shown across all views below.</CardDescription>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="mb-6 p-4 border rounded-md shadow-sm bg-card"> {/* Simplified wrapper */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="flex items-center space-x-2">
           <Checkbox
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
           />
-          <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround Only</Label>
+          <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround</Label>
         </div>
         <div>
-          <Label htmlFor="filter-time-status">Time Status</Label>
+          <Label htmlFor="filter-time-status" className="text-xs">Time Status</Label>
           <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
-            <SelectTrigger id="filter-time-status">
-              <SelectValue placeholder="Filter by time status" />
+            <SelectTrigger id="filter-time-status" className="h-9">
+              <SelectValue placeholder="Filter by time" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Time Statuses</SelectItem>
@@ -216,24 +212,24 @@ function EventFilters({
           </Select>
         </div>
         <div>
-          <Label htmlFor="filter-assigned-member">Assigned Team Member</Label>
+          <Label htmlFor="filter-assigned-member" className="text-xs">Assigned Member</Label>
           <Select value={filterAssignedMemberId} onValueChange={setFilterAssignedMemberId} disabled={assignedPersonnelForFilter.length === 0}>
-            <SelectTrigger id="filter-assigned-member">
-              <SelectValue placeholder="Filter by team member" />
+            <SelectTrigger id="filter-assigned-member" className="h-9">
+              <SelectValue placeholder="Filter by member" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Team Members</SelectItem>
+              <SelectItem value="all">All Members</SelectItem>
               {assignedPersonnelForFilter.map(person => (
                 <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
               ))}
-              {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel assigned in current project/org.</p>}
+              {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel in project.</p>}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label htmlFor="filter-discipline">Discipline</Label>
+          <Label htmlFor="filter-discipline" className="text-xs">Discipline</Label>
           <Select value={filterDiscipline} onValueChange={setFilterDiscipline}>
-            <SelectTrigger id="filter-discipline">
+            <SelectTrigger id="filter-discipline" className="h-9">
               <SelectValue placeholder="Filter by discipline" />
             </SelectTrigger>
             <SelectContent>
@@ -244,26 +240,26 @@ function EventFilters({
           </Select>
         </div>
         <div>
-          <Label htmlFor="filter-coverage-status">Coverage Status</Label>
+          <Label htmlFor="filter-coverage-status" className="text-xs">Coverage</Label>
           <Select value={filterCoverageStatus} onValueChange={(value) => setFilterCoverageStatus(value as any)}>
-            <SelectTrigger id="filter-coverage-status">
-              <SelectValue placeholder="Filter by coverage status" />
+            <SelectTrigger id="filter-coverage-status" className="h-9">
+              <SelectValue placeholder="Filter by coverage" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Events</SelectItem>
-              <SelectItem value="covered">Covered Events Only</SelectItem>
-              <SelectItem value="not_covered">Non-Covered Events Only</SelectItem>
+              <SelectItem value="covered">Covered Only</SelectItem>
+              <SelectItem value="not_covered">Non-Covered Only</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="lg:col-span-1">
-          <Label htmlFor="filter-specific-dates">Filter by Specific Dates</Label>
+          <Label htmlFor="filter-specific-dates" className="text-xs">Specific Dates</Label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" id="filter-specific-dates" className={cn("w-full justify-start text-left font-normal", selectedEventDates.length === 0 && "text-muted-foreground")}>
+              <Button variant="outline" id="filter-specific-dates" className={cn("w-full justify-start text-left font-normal h-9", selectedEventDates.length === 0 && "text-muted-foreground")}>
                 <CalendarIconLucide className="mr-2 h-4 w-4" />
                 {selectedEventDates.length === 0
-                  ? "All Event Dates"
+                  ? "All Dates"
                   : selectedEventDates.length === 1
                   ? format(parseISO(selectedEventDates[0]), "PPP")
                   : `${selectedEventDates.length} dates selected`}
@@ -305,8 +301,8 @@ function EventFilters({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -336,12 +332,12 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               </h3>
               <div className="space-y-4">
                 {dayEvents.map((event) => (
-                  <Card key={event.id} className="shadow-md hover:shadow-lg transition-shadow">
+                   <Card key={event.id} className="shadow-md hover:shadow-lg transition-shadow">
                     <div className="p-4 flex justify-between items-start gap-4">
                       {/* Main Info Section - Left */}
                       <div className="flex-grow space-y-1">
                         <CardTitle className="text-lg flex items-center gap-1.5">
-                          {getCoverageIcon(event.isCovered)}
+                           {getCoverageIcon(event.isCovered)}
                           <span className="truncate" title={event.name}>{event.name}</span>
                           {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
                         </CardTitle>
@@ -731,7 +727,7 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography");
+          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
@@ -1252,3 +1248,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
+    
