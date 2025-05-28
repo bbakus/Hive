@@ -149,8 +149,8 @@ export function formatDeadline(deadlineString?: string): string | null {
 }
 
 const getCoverageIcon = (isCovered?: boolean) => {
-  if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
-  return <Eye className="h-3.5 w-3.5 text-muted-foreground/50 opacity-70" title="Not Covered" />;
+  if (isCovered === true) return <Eye className="h-5 w-5 text-accent opacity-90" title="Covered Event" />;
+  return <Eye className="h-5 w-5 text-muted-foreground/50 opacity-70" title="Not Covered" />;
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
@@ -239,7 +239,7 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
-              <SelectItem value="">N/A or Other</SelectItem>
+              <SelectItem value="na_or_other">N/A or Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -732,7 +732,7 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
           filtered = filtered.filter(event => event.discipline === "Photography");
-      } else if (filterDiscipline === "") { // For "N/A or Other"
+      } else if (filterDiscipline === "na_or_other") { 
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
     }
@@ -1252,5 +1252,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-    
