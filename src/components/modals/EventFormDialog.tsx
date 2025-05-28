@@ -41,9 +41,9 @@ export const eventFormSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", ""]).optional(),
+  discipline: z.enum(["Photography", ""]).optional(), // Corrected: Removed "Video", "Both"
   isCovered: z.boolean().optional(),
-  personnelActivity: z.record(z.object({ // Ensure this matches the Event type
+  personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
     checkOutTime: z.string().optional(),
   })).optional(),
@@ -57,8 +57,8 @@ interface EventFormDialogProps {
   editingEvent: Event | null;
   onSubmit: (data: EventFormDialogData) => void;
   allProjects: Project[];
-  allPersonnel: Personnel[]; // Using the main Personnel type from personnel/page
-  activeBlockScheduleDate?: string | null; // For defaulting date
+  allPersonnel: Personnel[];
+  activeBlockScheduleDate?: string | null;
 }
 
 export function EventFormDialog({
@@ -110,7 +110,7 @@ export function EventFormDialog({
         isQuickTurnaround: editingEvent.isQuickTurnaround || false,
         deadline: editingEvent.deadline || "",
         organizationId: editingEvent.organizationId || projectForEvent?.organizationId || "",
-        discipline: editingEvent.discipline || "",
+        discipline: editingEvent.discipline === "Photography" ? "Photography" : "", // Ensure only valid values
         isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
         personnelActivity: editingEvent.personnelActivity || {},
       });
