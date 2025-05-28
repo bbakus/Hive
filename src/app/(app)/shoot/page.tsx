@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon, UserCheck, User } from "lucide-react";
+import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon } from "lucide-react";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
@@ -15,11 +15,7 @@ import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 import { cn } from "@/lib/utils";
 import { BlockedReasonDialog } from "@/components/modals/BlockedReasonDialog";
+import { EventShootAccordionItem } from "@/components/shoot/EventShootAccordionItem";
 
 const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
 
@@ -116,6 +113,7 @@ export default function ShootPage() {
 
   const getShotProgress = useCallback((eventId: string) => {
     const shots = getShotRequestsForEvent(eventId);
+    if (!shots) return { captured: 0, total: 0 };
     const capturedOrCompleted = shots.filter(s => s.status === "Captured" || s.status === "Completed").length;
     return {
       captured: capturedOrCompleted,
@@ -171,7 +169,7 @@ export default function ShootPage() {
     
     const updatePayload: Partial<ShotRequestFormData> = {
       status: "Blocked",
-      blockedReason: reason.trim() || "Blocked - (No specific reason provided)",
+      blockedReason: reason.trim() || "Blocked - (Reason not specified via quick action)",
       lastStatusModifierId: MOCK_CURRENT_USER_ID,
       lastStatusModifiedAt: new Date().toISOString(),
     };
@@ -256,7 +254,7 @@ export default function ShootPage() {
         </p>
       </div>
 
-       <div className="p-4 border rounded-md bg-card/50 shadow-sm">
+       <Card className="p-3 px-4 shadow-sm border bg-card/50">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
             <div>
                 <Label htmlFor="filter-time-status" className="text-xs text-muted-foreground">Status</Label>
@@ -268,7 +266,7 @@ export default function ShootPage() {
                         <SelectItem value="all">All Today&apos;s Events</SelectItem>
                         <SelectItem value="upcoming">Upcoming</SelectItem>
                         <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="past">Past (Completed)</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -277,11 +275,12 @@ export default function ShootPage() {
                     id="filter-quick-turnaround"
                     checked={filterQuickTurnaround}
                     onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+                    className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
                 />
                 <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
             </div>
         </div>
-      </div>
+      </Card>
 
       {filteredTodaysEvents.length === 0 && (
         <Alert>
@@ -296,141 +295,26 @@ export default function ShootPage() {
 
       {filteredTodaysEvents.length > 0 && (
         <Accordion type="multiple" className="w-full space-y-3">
-          {filteredTodaysEvents.map(event => {
-            const shotProgress = getShotProgress(event.id);
-            const eventStatusBadge = getEventStatusBadgeInfo(event);
-            const shotsForEvent = getShotRequestsForEvent(event.id);
-
-            return (
-              <AccordionItem value={event.id} key={event.id} className="bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow border">
-                <AccordionTrigger className="p-4 hover:no-underline">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full gap-2 sm:gap-4">
-                    <div className="flex-1 text-left">
-                      <h3 className="text-lg font-semibold flex items-center gap-1.5">
-                        {event.name}
-                        {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 ml-1.5" title="Quick Turnaround"/>}
-                      </h3>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> {event.time}
-                        {event.deadline && <span className="ml-2 text-amber-600 dark:text-amber-400">Deadline: {formatDeadline(event.deadline)}</span>}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-start sm:items-end sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 sm:mt-0">
-                       <Badge variant={event.priority === "Critical" ? "destructive" : event.priority === "High" ? "secondary" : "outline"} className="text-xs">
-                        {event.priority}
-                      </Badge>
-                      <Badge variant={eventStatusBadge.variant} className="text-xs">
-                        {eventStatusBadge.label}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground whitespace-nowrap">
-                        Shots: {shotProgress.captured} / {shotProgress.total}
-                      </p>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="p-4 border-t">
-                    {(event.assignedPersonnelIds || []).map(personnelId => {
-                        const person = initialPersonnelMock.find(p => p.id === personnelId);
-                        if(!person) return null;
-                        const activity = event.personnelActivity?.[personnelId];
-                        const isCheckedIn = !!activity?.checkInTime && !activity?.checkOutTime;
-                        const hasCheckedOut = !!activity?.checkInTime && !!activity?.checkOutTime;
-
-                        return (
-                            <div key={personnelId} className="mb-4 p-3 border rounded-md bg-muted/30">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
-                                    <div className="mb-2 sm:mb-0">
-                                        <p className="font-semibold text-sm">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></p>
-                                        {person.cameraSerial && <p className="text-xs text-muted-foreground flex items-center gap-1"><CameraIcon className="h-3 w-3" /> S/N: {person.cameraSerial}</p>}
-                                    </div>
-                                    <div className="flex flex-col xs:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
-                                        <Button
-                                            variant="outline" size="sm"
-                                            onClick={() => handleCheckIn(event.id, personnelId)}
-                                            disabled={isCheckedIn || hasCheckedOut}
-                                            className="w-full xs:w-auto"
-                                        > <LogIn className="mr-2 h-4 w-4"/> Check In</Button>
-                                        <Button
-                                            variant="outline" size="sm"
-                                            onClick={() => handleCheckOut(event.id, personnelId)}
-                                            disabled={!isCheckedIn || hasCheckedOut}
-                                            className="w-full xs:w-auto"
-                                        > <LogOut className="mr-2 h-4 w-4"/> Check Out</Button>
-                                    </div>
-                                </div>
-                                {isCheckedIn && <Badge variant="secondary" className="text-xs mb-1"><CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500"/>Checked In at {format(parseISO(activity!.checkInTime!), "p")}</Badge>}
-                                {hasCheckedOut && <Badge variant="outline" className="text-xs mb-1">Checked Out at {format(parseISO(activity!.checkOutTime!), "p")}</Badge>}
-                                {hasCheckedOut && activity?.checkInTime && (
-                                    <p className="text-xs text-muted-foreground">Activity: {format(parseISO(activity.checkInTime), "p")} - {format(parseISO(activity.checkOutTime!), "p")}</p>
-                                )}
-                                {!isCheckedIn && !hasCheckedOut && <p className="text-xs text-muted-foreground">Not yet checked in.</p>}
-                            </div>
-                        );
-                    })}
-                    {(!event.assignedPersonnelIds || event.assignedPersonnelIds.length === 0) && (
-                        <p className="text-sm text-muted-foreground mb-3">No personnel assigned to this event for individual check-in/out.</p>
-                    )}
-
-                  <Separator className="my-3" />
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium">Shot Checklist:</h4>
-                    <Button variant="default" size="sm" asChild>
-                      <Link href={`/events/${event.id}/shots`}>
-                        <ListChecks className="mr-2 h-4 w-4" /> Full Shot List & Edit
-                      </Link>
-                    </Button>
-                  </div>
-                  {shotsForEvent.length > 0 ? (
-                    <div className="space-y-1">
-                      {shotsForEvent.map(shot => (
-                        <div key={shot.id} className="flex items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
-                            <Badge
-                                variant={
-                                    shot.status === "Captured" ? "default" :
-                                    shot.status === "Completed" ? "default" :
-                                    shot.status === "Unassigned" ? "outline" :
-                                    shot.status === "Assigned" ? "secondary" :
-                                    shot.status === "Blocked" ? "destructive" :
-                                    shot.status === "Request More" ? "destructive" :
-                                    "outline"
-                                }
-                                className="text-xs whitespace-nowrap px-2 py-0.5 w-[120px] justify-center self-start sm:self-center flex-shrink-0"
-                            >
-                                {shot.status}
-                            </Badge>
-                            <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
-                                {shot.description}
-                            </p>
-                            <div className="flex flex-row gap-1.5 items-center flex-shrink-0 self-start sm:self-center mt-1 sm:mt-0">
-                                <Button
-                                variant={cn("h-auto text-xs px-2 py-1", (shot.status === "Captured" || shot.status === "Completed") ? "bg-green-600 hover:bg-green-700 text-white" : "outline")}
-                                size="sm"
-                                onClick={() => handleShotAction(event.id, shot.id, 'toggleCapture')}
-                                >
-                                {(shot.status === "Captured" || shot.status === "Completed") ? "Uncapture" : "Capture"}
-                                </Button>
-                                <Button
-                                variant={cn("h-auto text-xs px-2 py-1", shot.status === "Blocked" ? "destructive" : "outline")}
-                                size="sm"
-                                onClick={() => handleShotAction(event.id, shot.id, 'toggleBlock')}
-                                >
-                                {shot.status === "Blocked" ? "Unblock" : "Block"}
-                                </Button>
-                            </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No shot requests defined for this event.</p>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
+          {filteredTodaysEvents.map(event => (
+            <EventShootAccordionItem
+              key={event.id}
+              event={event}
+              personnelList={initialPersonnelMock}
+              shotRequests={getShotRequestsForEvent(event.id)}
+              getPersonnelNameById={getPersonnelNameById}
+              onCheckIn={handleCheckIn}
+              onCheckOut={handleCheckOut}
+              onShotAction={handleShotAction}
+              getEventStatusBadgeInfo={getEventStatusBadgeInfo}
+              getShotProgress={getShotProgress}
+            />
+          ))}
         </Accordion>
       )}
     </div>
   );
 }
+
+    
 
     
