@@ -25,11 +25,11 @@ export default function IngestionUtilityPage() {
 
   const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>('');
   const [selectedEventId, setSelectedEventId] = useState<string>('');
-  // Removed selectedFiles state
   const [ingestionLog, setIngestionLog] = useState<string[]>([]);
   const [isIngesting, setIsIngesting] = useState(false);
 
   const [sourcePath, setSourcePath] = useState("");
+  const [sourcePath2, setSourcePath2] = useState(""); // New state for second source path
   const [workingPath, setWorkingPath] = useState("");
   const [backupPath, setBackupPath] = useState("");
 
@@ -66,7 +66,6 @@ export default function IngestionUtilityPage() {
     };
   }, [pollingIntervalId]);
 
-  // Removed handleFileChange function
 
   const handleStartIngestion = async () => {
     if (!selectedPhotographerId || !selectedEventId ) {
@@ -80,7 +79,7 @@ export default function IngestionUtilityPage() {
     if (!sourcePath.trim() || !workingPath.trim() || !backupPath.trim()) {
       toast({
         title: 'Missing Paths',
-        description: 'Please specify source, working, and backup paths for the local agent.',
+        description: 'Please specify at least one source path, working, and backup paths for the local agent.',
         variant: 'destructive',
       });
       return;
@@ -104,18 +103,23 @@ export default function IngestionUtilityPage() {
       return;
     }
 
+    const sourcePathsArray = [sourcePath.trim()];
+    if (sourcePath2.trim()) {
+      sourcePathsArray.push(sourcePath2.trim());
+    }
+
     const jobData = {
       photographerId: selectedPhotographerId,
       eventId: selectedEventId,
-      sourcePaths: [sourcePath], 
-      workingPath: workingPath,
-      backupPath: backupPath,
+      sourcePaths: sourcePathsArray, 
+      workingPath: workingPath.trim(),
+      backupPath: backupPath.trim(),
       photographerCameraSerial: photographer.cameraSerial || undefined,
     };
 
     try {
       logMessage(`Sending job to local agent for Event: "${event.name}", Photographer: "${photographer.name}"...`);
-      logMessage(`Job details: Source: ${sourcePath}, Working: ${workingPath}, Backup: ${backupPath}, Camera S/N: ${photographer.cameraSerial || 'N/A'}`);
+      logMessage(`Job details: Sources: ${jobData.sourcePaths.join(', ')}, Working: ${jobData.workingPath}, Backup: ${jobData.backupPath}, Camera S/N: ${jobData.photographerCameraSerial || 'N/A'}`);
       
       const result = await localUtility.startIngest(jobData);
       
@@ -238,7 +242,7 @@ export default function IngestionUtilityPage() {
       setPollingIntervalId(null);
     }
     setIngestionSummary(null); 
-  }, [selectedPhotographerId, selectedEventId, sourcePath, workingPath, backupPath]);
+  }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath]);
 
 
   if (isLoadingSettings || isLoadingEvents) {
@@ -271,7 +275,7 @@ export default function IngestionUtilityPage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <UploadCloud className="h-8 w-8 text-accent" /> Swift Ingestion Utility
+          <UploadCloud className="h-8 w-8 text-accent" /> Swift Ingestion Utility (Conceptual)
         </h1>
         <p className="text-muted-foreground">
           Interface to trigger a local agent for media ingestion, organization, and shot status updates.
@@ -326,17 +330,25 @@ export default function IngestionUtilityPage() {
               </Select>
                <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches.</p>
             </div>
-            {/* Removed Source Image Files input field */}
           </div>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="source-path">Source Path (for Local Agent)</Label>
+              <Label htmlFor="source-path">Source Path 1 (for Local Agent)</Label>
               <div className="flex items-center gap-2">
                 <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="source-path" value={sourcePath} onChange={(e) => setSourcePath(e.target.value)} placeholder="e.g., /Users/editor/Desktop/Card_01" disabled={isIngesting} />
                 <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Path the local agent will read from. "Browse" is conceptual for web UI.</p>
+            </div>
+            <div>
+              <Label htmlFor="source-path-2">Source Path 2 (Optional - for Local Agent)</Label>
+              <div className="flex items-center gap-2">
+                <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <Input id="source-path-2" value={sourcePath2} onChange={(e) => setSourcePath2(e.target.value)} placeholder="e.g., /Volumes/SD_Card_02" disabled={isIngesting} />
+                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Additional source path if ingesting from multiple locations.</p>
             </div>
             <div>
               <Label htmlFor="working-path">Working Destination Path (for Local Agent)</Label>
@@ -380,7 +392,7 @@ export default function IngestionUtilityPage() {
       {ingestionLog.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Local Agent Communication Log</CardTitle>
+            <CardTitle>Local Agent Communication Log (Simulated)</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -449,3 +461,6 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
+
+
+    
