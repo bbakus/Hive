@@ -8,75 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine } from 'lucide-react'; // Added ScanLine
+import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
 import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from '@/app/(app)/personnel/page';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
-// --- API Client Functions ---
-const LOCAL_AGENT_BASE_URL = 'http://localhost:8765';
-
-async function startIngestJob(data: {
-  photographerId: string;
-  eventId: string;
-  sourcePaths: string[];
-  workingPath: string; 
-  backupPath: string;
-  photographerCameraSerial?: string; // Added for conceptual passing
-}) {
-  try {
-    const response = await fetch(`${LOCAL_AGENT_BASE_URL}/ingest`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Failed to start ingestion job. Server returned an error.' }));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result; // Expecting { jobId: string, message?: string }
-  } catch (error) {
-    console.error('Error starting ingestion:', error);
-    throw error;
-  }
-}
-
-async function checkJobStatus(jobId: string) {
-  try {
-    const response = await fetch(`${LOCAL_AGENT_BASE_URL}/ingest-status/${jobId}`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Failed to get job status. Server returned an error.' }));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-    return await response.json(); // Expecting { status: string, progress?: number, message?: string, filesProcessed?: number, totalSizeMB?: number, errors?: string[], checksumResult?: string }
-  } catch (error) {
-    console.error('Error checking job status:', error);
-    throw error;
-  }
-}
-
-async function getAvailableDrives() {
-  try {
-    const response = await fetch(`${LOCAL_AGENT_BASE_URL}/available-drives`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Failed to get available drives. Server returned an error.' }));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-    return await response.json(); // Expecting { locations: string[] } or similar
-  } catch (error) {
-    console.error('Error getting available drives:', error);
-    throw error;
-  }
-}
-
+import { localUtility, type IngestJobStatus } from '@/services/localUtility';
 
 export default function IngestionUtilityPage() {
   const { selectedProject } = useProjectContext();
@@ -105,6 +44,8 @@ export default function IngestionUtilityPage() {
     finalMessage?: string;
     errors?: string[];
   } | null>(null);
+  
+  const [availablePaths, setAvailablePaths] = useState<string[]>([]); // For conceptual drive listing
 
   const availablePhotographers = initialPersonnelMock.filter(
     p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
@@ -127,14 +68,13 @@ export default function IngestionUtilityPage() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedFiles(event.target.files);
-    // Future: Could attempt EXIF parse of first file here for camera serial, but keeping it simple for now.
   };
 
   const handleStartIngestion = async () => {
-    if (!selectedPhotographerId || !selectedEventId || !selectedFiles || selectedFiles.length === 0) {
+    if (!selectedPhotographerId || !selectedEventId ) { // Removed selectedFiles check, paths are primary now
       toast({
         title: 'Missing Information',
-        description: 'Please select photographer, event, and source files for HIVE context.',
+        description: 'Please select photographer and event for HIVE context.',
         variant: 'destructive',
       });
       return;
@@ -178,7 +118,8 @@ export default function IngestionUtilityPage() {
     try {
       logMessage(`Sending job to local agent for Event: "${event.name}", Photographer: "${photographer.name}"...`);
       logMessage(`Job details: Source: ${sourcePath}, Working: ${workingPath}, Backup: ${backupPath}, Camera S/N: ${photographer.cameraSerial || 'N/A'}`);
-      const result = await startIngestJob(jobData);
+      
+      const result = await localUtility.startIngest(jobData);
       
       if (result.jobId) {
         setCurrentJobId(result.jobId);
@@ -187,28 +128,28 @@ export default function IngestionUtilityPage() {
 
         const interval = setInterval(async () => {
           const currentJobToPoll = result.jobId; 
-          if (!currentJobToPoll) {
+          if (!currentJobToPoll) { // Check against the jobId from *this* job submission
              clearInterval(interval);
              setPollingIntervalId(null);
              return;
           }
 
           try {
-            const statusResult = await checkJobStatus(currentJobToPoll);
+            const statusResult: IngestJobStatus = await localUtility.getJobStatus(currentJobToPoll);
             logMessage(`Agent status (${currentJobToPoll}): ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress || 0}%)`);
 
             if (statusResult.status === 'completed' || statusResult.status === 'failed') {
               clearInterval(interval);
               setPollingIntervalId(null);
               setIsIngesting(false);
-              setCurrentJobId(null);
+              setCurrentJobId(null); // Clear current job ID once polling stops for it
               logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
               
               setIngestionSummary({
                 filesProcessed: statusResult.filesProcessed || 0,
                 totalSizeMB: statusResult.totalSizeMB || 0,
                 shotsUpdated: 0, 
-                checksumStatus: statusResult.checksumResult || statusResult.checksumStatus || "N/A",
+                checksumStatus: statusResult.checksumResult || "N/A",
                 finalMessage: statusResult.message,
                 errors: statusResult.errors
               });
@@ -251,11 +192,10 @@ export default function IngestionUtilityPage() {
             }
           } catch (statusError: any) {
             logMessage(`Error polling job status: ${statusError.message || String(statusError)}`, 'error');
-            // Stop polling on error to prevent repeated failures.
             clearInterval(interval);
             setPollingIntervalId(null);
             setIsIngesting(false);
-            setCurrentJobId(null); // Clear current job ID as polling failed
+            setCurrentJobId(null); 
             toast({ title: 'Polling Error', description: `Could not get status for job. ${statusError.message || String(statusError)}`, variant: 'destructive' });
           }
         }, 3000); 
@@ -274,30 +214,34 @@ export default function IngestionUtilityPage() {
   const handleFetchAvailableDrives = async () => {
     logMessage("Attempting to fetch available drives from local agent...");
     try {
-      const drives = await getAvailableDrives();
+      const drives = await localUtility.getAvailableDrives();
       if (drives && drives.locations) {
         logMessage(`Available drive locations (conceptual): ${drives.locations.join(', ')}`, 'success');
         toast({ title: "Drives Fetched (Conceptual)", description: `Agent reported: ${drives.locations.join(', ')}`});
+        setAvailablePaths(drives.locations); // Example of using the data
       } else {
         logMessage("No drive locations reported by agent.", 'info');
+        setAvailablePaths([]);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logMessage(`Error fetching drives: ${errorMessage}`, 'error');
       toast({ title: 'Drive Fetch Error', description: errorMessage, variant: 'destructive' });
+      setAvailablePaths([]);
     }
   };
-
-  const isReadyToIngest = selectedPhotographerId && selectedEventId && selectedFiles && selectedFiles.length > 0 && sourcePath && workingPath && backupPath;
+  
+  const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
+    // Clear job ID and summary when inputs that define a new job change
     setCurrentJobId(null);
     if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
     }
     setIngestionSummary(null); 
-  }, [selectedPhotographerId, selectedEventId, sourcePath, workingPath, backupPath, selectedFiles]);
+  }, [selectedPhotographerId, selectedEventId, sourcePath, workingPath, backupPath]);
 
 
   if (isLoadingSettings || isLoadingEvents) {
@@ -340,7 +284,7 @@ export default function IngestionUtilityPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Ingestion Job Setup</CardTitle>
-          <CardDescription>Select photographer, event, files, and specify paths for the local agent.</CardDescription>
+          <CardDescription>Select photographer, event, and specify paths for the local agent.</CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-x-8 gap-y-6">
           <div className="space-y-4">
@@ -386,7 +330,7 @@ export default function IngestionUtilityPage() {
                <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches.</p>
             </div>
              <div>
-              <Label htmlFor="source-files">Source Image Files (for HIVE record)</Label>
+              <Label htmlFor="source-files">Source Image Files (Conceptual - For HIVE Record)</Label>
               <Input
                 id="source-files"
                 type="file"
@@ -430,6 +374,14 @@ export default function IngestionUtilityPage() {
             <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting}>
                 <Info className="mr-2 h-4 w-4" /> Fetch Drive Info (Conceptual)
             </Button>
+            {availablePaths.length > 0 && (
+                <div className="text-xs text-muted-foreground mt-2">
+                    <p className="font-medium">Agent reported drives (conceptual):</p>
+                    <ul className="list-disc list-inside pl-2">
+                        {availablePaths.map(p => <li key={p}>{p}</li>)}
+                    </ul>
+                </div>
+            )}
           </div>
         </CardContent>
         <CardFooter>
@@ -503,7 +455,7 @@ export default function IngestionUtilityPage() {
         <Info className="h-4 w-4" />
         <AlertTitle>Local Agent Interaction Notice</AlertTitle>
         <AlertDescription>
-          This utility attempts to communicate with a local agent expected to be running at <strong>{LOCAL_AGENT_BASE_URL}</strong>.
+          This utility attempts to communicate with a local agent expected to be running at <strong>http://localhost:8765</strong>.
           Ensure the local agent is running and configured for CORS if you encounter connection issues.
           The browser itself CANNOT directly access local/networked file paths or perform file system operations for writing.
           Path inputs are passed to the local agent. "Browse" buttons are conceptual for this web UI.
