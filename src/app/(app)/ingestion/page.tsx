@@ -23,7 +23,7 @@ type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnecte
 interface DriveInfo {
   path: string;
   // Allow any other properties that might come from the agent
-  [key: string]: any; 
+  [key: string]: any;
 }
 
 export default function IngestionUtilityPage() {
@@ -53,7 +53,7 @@ export default function IngestionUtilityPage() {
     finalMessage?: string;
     errors?: string[];
   } | null>(null);
-  
+
   const [availablePaths, setAvailablePaths] = useState<DriveInfo[]>([]);
   const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
 
@@ -62,7 +62,7 @@ export default function IngestionUtilityPage() {
       p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
     );
   }, []);
-  
+
   const selectedPhotographerDetails = useMemo(() => {
     return initialPersonnelMock.find(p => p.id === selectedPhotographerId);
   }, [selectedPhotographerId]);
@@ -73,7 +73,7 @@ export default function IngestionUtilityPage() {
   }, [selectedProject, eventsForSelectedProjectAndOrg]);
 
   const logMessage = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
-    const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : '';
+    const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : 'INFO: ';
     setIngestionLog(prev => [`${new Date().toLocaleTimeString()}: ${prefix}${message}`, ...prev].slice(0, 100));
   }, []);
 
@@ -81,7 +81,7 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying connection to local agent...");
     try {
-      await localUtility.getAvailableDrives(); 
+      await localUtility.getAvailableDrives();
       setAgentConnectionStatus('connected');
       logMessage("Successfully connected to local agent.", 'success');
       toast({ title: "Agent Connected", description: "Successfully connected to the local ingestion agent." });
@@ -103,7 +103,7 @@ export default function IngestionUtilityPage() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []);
 
 
   const handleStartIngestion = async () => {
@@ -133,8 +133,12 @@ export default function IngestionUtilityPage() {
     setIsIngesting(true);
     setIngestionLog([]);
     setIngestionSummary(null);
+    if (currentJobId && pollingIntervalId) { // Clear previous job if any
+        clearInterval(pollingIntervalId);
+        setPollingIntervalId(null);
+    }
     setCurrentJobId(null);
-    if (pollingIntervalId) clearInterval(pollingIntervalId);
+
 
     logMessage('Preparing ingestion job...');
 
@@ -156,26 +160,26 @@ export default function IngestionUtilityPage() {
     const jobData = {
       photographerId: selectedPhotographerId,
       eventId: selectedEventId,
-      sourcePaths: sourcePathsArray, 
+      sourcePaths: sourcePathsArray,
       workingPath: workingPath.trim(),
       backupPath: backupPath.trim(),
       photographerCameraSerial: photographer.cameraSerial || undefined,
     };
 
     try {
-      logMessage(`Sending job to local agent for Event: "${event.name}", Photographer: "${photographer.name}"...`);
+      logMessage(`Sending job request to local agent for Event: "${event.name}", Photographer: "${photographer.name}"...`);
       logMessage(`Job details: Sources: ${jobData.sourcePaths.join(', ')}, Working: ${jobData.workingPath}, Backup: ${jobData.backupPath}, Camera S/N: ${jobData.photographerCameraSerial || 'N/A'}`);
-      
+
       const result = await localUtility.startIngest(jobData);
-      
+
       if (result.jobId) {
         setCurrentJobId(result.jobId);
         logMessage(`Job submitted to local agent. Job ID: ${result.jobId}. ${result.message || ''}`, 'success');
         toast({ title: 'Job Submitted', description: `Job ID: ${result.jobId}. Polling for status...` });
 
         const interval = setInterval(async () => {
-          const currentJobToPoll = result.jobId; 
-          if (!currentJobToPoll) { 
+          const currentJobToPoll = result.jobId;
+          if (!currentJobToPoll) {
              clearInterval(interval);
              setPollingIntervalId(null);
              return;
@@ -183,19 +187,19 @@ export default function IngestionUtilityPage() {
 
           try {
             const statusResult: IngestJobStatus = await localUtility.getJobStatus(currentJobToPoll);
-            logMessage(`Agent status (${currentJobToPoll}): ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress || 0}%)`);
+            logMessage(`Agent reported status (${currentJobToPoll}): ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress || 0}%)`);
 
             if (statusResult.status === 'completed' || statusResult.status === 'failed') {
               clearInterval(interval);
               setPollingIntervalId(null);
               setIsIngesting(false);
-              setCurrentJobId(null); 
+              // setCurrentJobId(null); // Keep currentJobId to display it in the summary, clear on new job submission
               logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
-              
+
               setIngestionSummary({
                 filesProcessed: statusResult.filesProcessed || 0,
                 totalSizeMB: statusResult.totalSizeMB || 0,
-                shotsUpdated: 0, 
+                shotsUpdated: 0,
                 checksumStatus: statusResult.checksumResult || "N/A",
                 finalMessage: statusResult.message,
                 errors: statusResult.errors
@@ -203,11 +207,11 @@ export default function IngestionUtilityPage() {
 
               if (statusResult.status === 'completed') {
                 toast({ title: 'Ingestion Complete', description: statusResult.message || 'Files processed by local agent.' });
-                
+
                 let shotsUpdatedCount = 0;
                 const shotsForEvent = getShotRequestsForEvent(selectedEventId);
                 const updatableShots = shotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
-                
+
                 const filesToConsiderForShotUpdate = statusResult.filesProcessed || 0;
                 const shotsToUpdateCount = Math.min(updatableShots.length, filesToConsiderForShotUpdate);
 
@@ -233,19 +237,19 @@ export default function IngestionUtilityPage() {
                 } else {
                   logMessage(`No updatable shots found in HIVE for event "${event.name}" or no files reported processed by agent.`);
                 }
-              } else { 
+              } else {
                 toast({ title: 'Ingestion Failed', description: statusResult.message || 'Local agent reported an error.', variant: 'destructive' });
               }
             }
           } catch (statusError: any) {
             logMessage(`Error polling job status for ${currentJobToPoll}: ${statusError.message || String(statusError)}`, 'error');
-            if(pollingIntervalId) clearInterval(pollingIntervalId); 
+            if(pollingIntervalId) clearInterval(pollingIntervalId);
             setPollingIntervalId(null);
             setIsIngesting(false);
-            setCurrentJobId(null); 
+            // setCurrentJobId(null); // Clear only if polling definitively fails for this job
             toast({ title: 'Polling Error', description: `Could not get status for job ${currentJobToPoll}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
           }
-        }, 3000); 
+        }, 3000);
         setPollingIntervalId(interval);
       } else {
         throw new Error(result.message || "Local agent did not return a Job ID.");
@@ -257,18 +261,18 @@ export default function IngestionUtilityPage() {
       setIsIngesting(false);
     }
   };
-  
+
   const handleFetchAvailableDrives = async () => {
     const isConnected = await verifyAgentConnection();
     if (!isConnected) return;
 
-    logMessage("Attempting to fetch available drives from local agent...");
+    logMessage("Fetching available drives from local agent...");
     try {
       const drives = await localUtility.getAvailableDrives();
       if (drives && drives.locations) {
-        setAvailablePaths(drives.locations as DriveInfo[]); 
-        logMessage(`Agent reported drives (conceptual): ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`, 'success');
-        toast({ title: "Drives Fetched (Conceptual)", description: `Agent reported: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`});
+        setAvailablePaths(drives.locations as DriveInfo[]);
+        logMessage(`Agent reported drives: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`, 'success');
+        toast({ title: "Drives Fetched", description: `Agent reported: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`});
       } else {
         logMessage("No drive locations reported by agent.", 'info');
         setAvailablePaths([]);
@@ -280,18 +284,19 @@ export default function IngestionUtilityPage() {
       setAvailablePaths([]);
     }
   };
-  
+
   const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
-    setCurrentJobId(null);
+    // Clear previous job tracking when key selections change
     if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
     }
-    setIngestionSummary(null); 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath]);
+    setCurrentJobId(null);
+    setIngestionSummary(null);
+    // setIngestionLog([]); // Optionally clear log on selection change
+  }, [selectedPhotographerId, selectedEventId]);
 
 
   if (isLoadingSettings || isLoadingEvents) {
@@ -370,7 +375,7 @@ export default function IngestionUtilityPage() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <UploadCloud className="h-8 w-8 text-accent" /> Swift Ingestion Utility (Conceptual)
+          <UploadCloud className="h-8 w-8 text-accent" /> Swift Ingestion Utility
         </h1>
         <AgentStatusIndicator />
       </div>
@@ -463,11 +468,11 @@ export default function IngestionUtilityPage() {
               <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent. Enter path manually.</p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting || agentConnectionStatus !== 'connected'}>
-                <Info className="mr-2 h-4 w-4" /> Fetch Drive Info (Conceptual)
+                <Info className="mr-2 h-4 w-4" /> Fetch Drive Info
             </Button>
             {availablePaths.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-2">
-                    <p className="font-medium">Agent reported drives (conceptual):</p>
+                    <p className="font-medium">Agent reported drives:</p>
                     <ul className="list-disc list-inside pl-2">
                         {availablePaths.map((drive, index) => <li key={`${drive.path}-${index}`}>{drive.path}</li>)}
                     </ul>
@@ -489,7 +494,7 @@ export default function IngestionUtilityPage() {
       {ingestionLog.length > 0 && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Local Agent Communication Log (Simulated)</CardTitle>
+            <CardTitle>Local Agent Communication Log</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -505,7 +510,8 @@ export default function IngestionUtilityPage() {
       {ingestionSummary && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Ingestion Summary Report (from Local Agent)</CardTitle>
+            <CardTitle>Ingestion Summary Report</CardTitle>
+             {currentJobId && <CardDescription>Job ID: {currentJobId}</CardDescription>}
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p className="flex items-center gap-2">
@@ -552,11 +558,9 @@ export default function IngestionUtilityPage() {
           This utility attempts to communicate with a local agent expected to be running at <strong>http://localhost:8765</strong>.
           Ensure the local agent is running and configured for CORS if you encounter connection issues.
           The browser itself CANNOT directly access local/networked file paths or perform file system operations for writing.
-          Path inputs are passed to the local agent. "Browse" buttons are conceptual for this web UI.
+          Path inputs are passed to the local agent.
         </AlertDescription>
       </Alert>
     </div>
   );
 }
-
-    
