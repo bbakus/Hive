@@ -20,6 +20,15 @@ import { cn } from '@/lib/utils';
 
 type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
 
+interface DriveInfo {
+  path: string;
+  available?: boolean;
+  freeSpace?: string;
+  totalSpace?: string;
+  // Allow any other properties that might come from the agent
+  [key: string]: any; 
+}
+
 export default function IngestionUtilityPage() {
   const { selectedProject } = useProjectContext();
   const { eventsForSelectedProjectAndOrg, getShotRequestsForEvent, updateShotRequest, isLoadingEvents } = useEventContext();
@@ -48,7 +57,7 @@ export default function IngestionUtilityPage() {
     errors?: string[];
   } | null>(null);
   
-  const [availablePaths, setAvailablePaths] = useState<string[]>([]);
+  const [availablePaths, setAvailablePaths] = useState<DriveInfo[]>([]);
   const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
 
   const availablePhotographers = useMemo(() => {
@@ -75,6 +84,7 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying connection to local agent...");
     try {
+      // Using /available-drives as a simple ping endpoint
       await localUtility.getAvailableDrives(); 
       setAgentConnectionStatus('connected');
       logMessage("Successfully connected to local agent.", 'success');
@@ -97,7 +107,7 @@ export default function IngestionUtilityPage() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []); // Run once on mount
 
 
   const handleStartIngestion = async () => {
@@ -168,8 +178,8 @@ export default function IngestionUtilityPage() {
         toast({ title: 'Job Submitted', description: `Job ID: ${result.jobId}. Polling for status...` });
 
         const interval = setInterval(async () => {
-          const currentJobToPoll = result.jobId; 
-          if (!currentJobToPoll) {
+          const currentJobToPoll = result.jobId; // Capture jobId at the time interval is set up
+          if (!currentJobToPoll) { // Check if we still have a job to poll (it might have been cleared)
              clearInterval(interval);
              setPollingIntervalId(null);
              return;
@@ -227,7 +237,7 @@ export default function IngestionUtilityPage() {
                 } else {
                   logMessage(`No updatable shots found in HIVE for event "${event.name}" or no files reported processed by agent.`);
                 }
-              } else { 
+              } else { // status is 'failed'
                 toast({ title: 'Ingestion Failed', description: statusResult.message || 'Local agent reported an error.', variant: 'destructive' });
               }
             }
@@ -260,9 +270,12 @@ export default function IngestionUtilityPage() {
     try {
       const drives = await localUtility.getAvailableDrives();
       if (drives && drives.locations) {
-        logMessage(`Available drive locations (conceptual): ${drives.locations.join(', ')}`, 'success');
-        toast({ title: "Drives Fetched (Conceptual)", description: `Agent reported: ${drives.locations.join(', ')}`});
-        setAvailablePaths(drives.locations);
+        // Assuming drives.locations is now Array<DriveInfo> or Array<string>
+        // If it's Array<string>, no change needed in setAvailablePaths if type is string[]
+        // If it's Array<DriveInfo>, the type of availablePaths state should be DriveInfo[]
+        setAvailablePaths(drives.locations as DriveInfo[]); // Cast for now, ensure agent returns compatible structure or update DriveInfo
+        logMessage(`Available drive locations (conceptual): ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`, 'success');
+        toast({ title: "Drives Fetched (Conceptual)", description: `Agent reported: ${drives.locations.map((d: any) => typeof d === 'string' ? d : d.path).join(', ')}`});
       } else {
         logMessage("No drive locations reported by agent.", 'info');
         setAvailablePaths([]);
@@ -277,6 +290,7 @@ export default function IngestionUtilityPage() {
   
   const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
+  // Clear job ID and polling when inputs change
   useEffect(() => {
     setCurrentJobId(null);
     if (pollingIntervalId) {
@@ -284,6 +298,7 @@ export default function IngestionUtilityPage() {
       setPollingIntervalId(null);
     }
     setIngestionSummary(null); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPhotographerId, selectedEventId, sourcePath, sourcePath2, workingPath, backupPath]);
 
 
@@ -459,14 +474,14 @@ export default function IngestionUtilityPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent. "Browse" is conceptual.</p>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting}>
+            <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting || agentConnectionStatus !== 'connected'}>
                 <Info className="mr-2 h-4 w-4" /> Fetch Drive Info (Conceptual)
             </Button>
             {availablePaths.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-2">
                     <p className="font-medium">Agent reported drives (conceptual):</p>
                     <ul className="list-disc list-inside pl-2">
-                        {availablePaths.map((p, index) => <li key={`${p}-${index}`}>{p}</li>)}
+                        {availablePaths.map((drive, index) => <li key={`${drive.path}-${index}`}>{drive.path}</li>)}
                     </ul>
                 </div>
             )}
