@@ -40,22 +40,13 @@ import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useEventContext, type Event } from "@/contexts/EventContext"; 
 import { useProjectContext } from "@/contexts/ProjectContext"; 
 import { format, parseISO } from "date-fns";
-
-const personnelSchema = z.object({
-  name: z.string().min(3, { message: "Name must be at least 3 characters." }),
-  role: z.string().min(2, { message: "Role must be at least 2 characters." }),
-  avatar: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
-  status: z.enum(["Available", "Assigned", "On Leave"]),
-  cameraSerial: z.string().optional(),
-});
-
-type PersonnelFormData = z.infer<typeof personnelSchema>;
-
-export type Personnel = PersonnelFormData & {
-  id: string;
-};
+import { PersonnelFormDialog, type PersonnelFormDialogData } from "@/components/modals/PersonnelFormDialog";
 
 export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client"] as const;
+
+export type Personnel = z.infer<typeof import("@/components/modals/PersonnelFormDialog").personnelFormSchema> & {
+  id: string;
+};
 
 export const initialPersonnelMock: Personnel[] = [
   { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN12345A" },
@@ -64,7 +55,6 @@ export const initialPersonnelMock: Personnel[] = [
   { id: "user004", name: "Diana Prince", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN11223F" },
   { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", cameraSerial: "SN24680C" },
   { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", cameraSerial: "SN13579D" },
-  // { id: "user007", name: "George Jetson", role: "Editor", status: "Assigned" }, // No camera serial by default
   { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
 ];
 
@@ -88,43 +78,12 @@ export default function PersonnelPage() {
 
   const [selectedEventForAssignment, setSelectedEventForAssignment] = useState<string | null>(null);
   const [eventDetailsForAssignment, setEventDetailsForAssignment] = useState<Event | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    formState: { errors },
-  } = useForm<PersonnelFormData>({
-    resolver: zodResolver(personnelSchema),
-    defaultValues: {
-      name: "",
-      role: "Photographer",
-      avatar: "",
-      status: "Available",
-      cameraSerial: "",
-    },
-  });
   
   useEffect(() => {
     if (!isLoadingSettings) {
         setPersonnelList(useDemoData ? initialPersonnelMock : []);
     }
   }, [useDemoData, isLoadingSettings]);
-
-  useEffect(() => {
-    if (editingPersonnel) {
-      reset(editingPersonnel);
-    } else {
-      reset({
-        name: "",
-        role: "Photographer",
-        avatar: "",
-        status: "Available",
-        cameraSerial: "",
-      });
-    }
-  }, [editingPersonnel, reset, isPersonnelModalOpen]);
 
   useEffect(() => {
     if (selectedEventForAssignment && !isLoadingEvents) {
@@ -135,7 +94,7 @@ export default function PersonnelPage() {
     }
   }, [selectedEventForAssignment, getEventById, isLoadingEvents]);
 
-  const handlePersonnelSubmit: SubmitHandler<PersonnelFormData> = (data) => {
+  const handlePersonnelSubmit = (data: PersonnelFormDialogData) => {
     if (editingPersonnel) {
       setPersonnelList(prevList => 
         prevList.map(p => p.id === editingPersonnel.id ? { ...editingPersonnel, ...data } : p)
@@ -155,7 +114,8 @@ export default function PersonnelPage() {
         description: `"${data.name}" has been successfully added to the roster.`,
       });
     }
-    closePersonnelModal();
+    setIsPersonnelModalOpen(false);
+    setEditingPersonnel(null);
   };
 
   const openAddPersonnelModal = () => {
@@ -166,11 +126,6 @@ export default function PersonnelPage() {
   const openEditPersonnelModal = (personnel: Personnel) => {
     setEditingPersonnel(personnel);
     setIsPersonnelModalOpen(true);
-  };
-
-  const closePersonnelModal = () => {
-    setIsPersonnelModalOpen(false);
-    setEditingPersonnel(null);
   };
 
   const handleDeleteClick = (personnelId: string) => {
@@ -258,91 +213,12 @@ export default function PersonnelPage() {
         </Button>
       </div>
 
-      <Dialog open={isPersonnelModalOpen} onOpenChange={(isOpen) => {
-        if (!isOpen) closePersonnelModal(); else setIsPersonnelModalOpen(true);
-      }}>
-          <DialogContent className="sm:max-w-[525px]">
-            <DialogHeader>
-              <DialogTitle>{editingPersonnel ? "Edit Team Member" : "Add New Team Member"}</DialogTitle>
-              <DialogDescription>
-                {editingPersonnel ? "Update the details for this team member." : "Fill in the details for the new team member."}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(handlePersonnelSubmit)} className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Name</Label>
-                <div className="col-span-3">
-                  <Input id="name" {...register("name")} className={errors.name ? "border-destructive" : ""} />
-                  {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="role" className="text-right">Role</Label>
-                <div className="col-span-3">
-                  <Controller
-                    name="role"
-                    control={control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <SelectTrigger className={errors.role ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PHOTOGRAPHY_ROLES.map(role => (
-                            <SelectItem key={role} value={role}>{role}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.role && <p className="text-xs text-destructive mt-1">{errors.role.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="avatar" className="text-right">Avatar URL</Label>
-                <div className="col-span-3">
-                  <Input id="avatar" {...register("avatar")} placeholder="https://example.com/avatar.png" className={errors.avatar ? "border-destructive" : ""} />
-                  {errors.avatar && <p className="text-xs text-destructive mt-1">{errors.avatar.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="cameraSerial" className="text-right">Camera S/N</Label>
-                <div className="col-span-3">
-                  <Input id="cameraSerial" {...register("cameraSerial")} placeholder="Optional camera serial number" className={errors.cameraSerial ? "border-destructive" : ""} />
-                  {errors.cameraSerial && <p className="text-xs text-destructive mt-1">{errors.cameraSerial.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">Status</Label>
-                <div className="col-span-3">
-                  <Controller
-                    name="status"
-                    control={control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <SelectTrigger className={errors.status ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Available">Available</SelectItem>
-                          <SelectItem value="Assigned">Assigned</SelectItem>
-                          <SelectItem value="On Leave">On Leave</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.status && <p className="text-xs text-destructive mt-1">{errors.status.message}</p>}
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" onClick={closePersonnelModal}>Cancel</Button>
-                </DialogClose>
-                <Button type="submit">{editingPersonnel ? "Save Changes" : "Add Member"}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+      <PersonnelFormDialog
+        isOpen={isPersonnelModalOpen}
+        onOpenChange={setIsPersonnelModalOpen}
+        editingPersonnel={editingPersonnel}
+        onSubmit={handlePersonnelSubmit}
+      />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -466,7 +342,7 @@ export default function PersonnelPage() {
                       <Badge variant={
                         member.status === "Available" ? "default" :
                         member.status === "Assigned" ? "secondary" :
-                        "outline" // for On Leave
+                        "outline" 
                       }>{member.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -599,4 +475,5 @@ export default function PersonnelPage() {
     </div>
   );
 }
+
     

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -19,27 +19,18 @@ import { useProjectContext, type KeyPersonnel } from "@/contexts/ProjectContext"
 import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
 import { ArrowLeft, ArrowRight, CheckCircle, Users, MapPin, UserPlus } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; // Import the roles
+import { AddPersonnelToRosterDialog, type WizardAvailablePersonnel } from "@/components/modals/AddPersonnelToRosterDialog";
+import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; 
 
-type WizardAvailablePersonnel = {
-  id: string;
-  name: string;
-  capabilities: typeof PHOTOGRAPHY_ROLES[number][]; // Use the imported roles
-};
-
+// Initial mock data for available personnel for the wizard
 const initialAvailablePersonnelList: WizardAvailablePersonnel[] = [
   { id: "user001", name: "Alice Wonderland", capabilities: ["Photographer", "Editor"] },
-  { id: "user002", name: "Bob The Builder", capabilities: ["Editor", "Project Manager"] },
-  { id: "user003", name: "Charlie Chaplin", capabilities: ["Project Manager", "Photographer"] },
+  { id: "user002", name: "Bob The Builder", capabilities: ["Photographer", "Editor"] },
+  { id: "user003", name: "Charlie Chaplin", capabilities: ["Project Manager"] },
   { id: "user004", name: "Diana Prince", capabilities: ["Photographer"] },
   { id: "user005", name: "Edward Scissorhands", capabilities: ["Editor"] },
-  { id: "user006", name: "Fiona Gallagher", capabilities: ["Project Manager"] },
-  { id: "user007", name: "George Jetson", capabilities: ["Photographer"] },
-  { id: "user008", name: "Client Representative", capabilities: ["Client"] },
+  { id: "user006", name: "Fiona Gallagher", capabilities: ["Photographer"] },
 ];
-
-const allPossibleCapabilities = PHOTOGRAPHY_ROLES;
 
 const keyPersonnelSchema = z.object({
   personnelId: z.string(),
@@ -79,8 +70,6 @@ export default function NewProjectWizardPage() {
 
   const [currentAvailablePersonnel, setCurrentAvailablePersonnel] = useState<WizardAvailablePersonnel[]>(initialAvailablePersonnelList);
   const [isAddPersonnelDialogOpen, setIsAddPersonnelDialogOpen] = useState(false);
-  const [newPersonnelName, setNewPersonnelName] = useState("");
-  const [newPersonnelCapabilities, setNewPersonnelCapabilities] = useState<Record<string, boolean>>({});
   const [notifyTeam, setNotifyTeam] = useState(true); 
 
   const {
@@ -103,7 +92,7 @@ export default function NewProjectWizardPage() {
       endDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
       description: "",
       status: "Planning",
-      organizationId: globalSelectedOrgId !== ALL_ORGANIZATIONS_ID ? globalSelectedOrgId || "" : "",
+      organizationId: globalSelectedOrgId !== ALL_ORGANIZATIONS_ID ? globalSelectedOrgId || "" : (organizations.length > 0 ? organizations[0].id : ""),
       location: "",
       keyPersonnel: [],
       selectedPersonnelMap: {},
@@ -117,44 +106,38 @@ export default function NewProjectWizardPage() {
   useEffect(() => {
     if (globalSelectedOrgId !== ALL_ORGANIZATIONS_ID && globalSelectedOrgId && getValues("organizationId") !== globalSelectedOrgId) {
       setValue("organizationId", globalSelectedOrgId, { shouldValidate: true, shouldDirty: true });
+    } else if (getValues("organizationId") === "" && organizations.length > 0 && !isLoadingOrganizations) {
+        setValue("organizationId", organizations[0].id, { shouldValidate: true, shouldDirty: true });
     }
-  }, [globalSelectedOrgId, getValues, setValue]);
-
+  }, [globalSelectedOrgId, getValues, setValue, organizations, isLoadingOrganizations]);
+  
   useEffect(() => {
-    const currentKeyPersonnel = getValues("keyPersonnel") || [];
-    const newKeyPersonnel: KeyPersonnel[] = [];
-    let hasChanged = false;
+    const newKeyPersonnelArray: KeyPersonnel[] = [];
+    const currentFormKeyPersonnel = getValues("keyPersonnel") || [];
 
-    Object.keys(selectedPersonnelMap || {}).forEach(personId => {
-      if (selectedPersonnelMap?.[personId]) {
-        const personDetails = currentAvailablePersonnel.find(p => p.id === personId);
-        if (personDetails) {
-          const existingEntry = currentKeyPersonnel.find(kp => kp.personnelId === personId);
-          newKeyPersonnel.push({
-            personnelId: personDetails.id,
-            name: personDetails.name,
-            projectRole: existingEntry?.projectRole || "", // Preserve existing role if any
-          });
+    Object.keys(selectedPersonnelMap).forEach(personId => {
+        if (selectedPersonnelMap[personId]) {
+            const personDetails = currentAvailablePersonnel.find(p => p.id === personId);
+            if (personDetails) {
+                const existingEntry = currentFormKeyPersonnel.find(kp => kp.personnelId === personId);
+                newKeyPersonnelArray.push({
+                    personnelId: personDetails.id,
+                    name: personDetails.name,
+                    projectRole: existingEntry?.projectRole || "", 
+                });
+            }
         }
-      }
     });
-
-    // Check if the new array is different from the current one
-    if (newKeyPersonnel.length !== currentKeyPersonnel.length ||
-        !newKeyPersonnel.every((newKp, index) => 
-            currentKeyPersonnel[index] &&
-            newKp.personnelId === currentKeyPersonnel[index].personnelId &&
-            newKp.name === currentKeyPersonnel[index].name &&
-            newKp.projectRole === currentKeyPersonnel[index].projectRole
-        )
-    ) {
-      hasChanged = true;
-    }
     
-    if (hasChanged) {
-      setValue("keyPersonnel", newKeyPersonnel, { shouldValidate: true, shouldDirty: true });
+    // Sort for consistent comparison
+    const sortedNewKeyPersonnel = [...newKeyPersonnelArray].sort((a, b) => a.personnelId.localeCompare(b.personnelId));
+    const sortedCurrentKeyPersonnel = [...currentFormKeyPersonnel].sort((a, b) => a.personnelId.localeCompare(b.personnelId));
+
+    if (JSON.stringify(sortedNewKeyPersonnel) !== JSON.stringify(sortedCurrentKeyPersonnel)) {
+        setValue("keyPersonnel", sortedNewKeyPersonnel, { shouldValidate: true, shouldDirty: true });
     }
   }, [selectedPersonnelMap, currentAvailablePersonnel, getValues, setValue]);
+
 
   useEffect(() => {
     if (currentStep === 3 && typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.places && locationInputRef.current && !autocompleteRef.current) {
@@ -171,56 +154,44 @@ export default function NewProjectWizardPage() {
     }
   }, [currentStep, setValue]);
 
-  const handleAddNewPersonnelToRoster = () => {
-    if (!newPersonnelName.trim()) {
-      toast({ title: "Error", description: "New personnel name cannot be empty.", variant: "destructive" });
-      return;
-    }
-    const selectedCapabilities = Object.entries(newPersonnelCapabilities)
-      .filter(([, isSelected]) => isSelected)
-      .map(([capability]) => capability as typeof PHOTOGRAPHY_ROLES[number]);
-
-    if (selectedCapabilities.length === 0) {
-      toast({ title: "Error", description: "Please select at least one capability.", variant: "destructive" });
-      return;
-    }
-
-    const newId = `user_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const newPerson: WizardAvailablePersonnel = {
-      id: newId,
-      name: newPersonnelName.trim(),
-      capabilities: selectedCapabilities,
-    };
-    setCurrentAvailablePersonnel(prev => [...prev, newPerson]);
-    setValue("selectedPersonnelMap", { ...getValues("selectedPersonnelMap"), [newId]: true }, { shouldDirty: true });
-    toast({ title: "Team Member Added", description: `${newPerson.name} added to roster and selected for this project.` });
-    setIsAddPersonnelDialogOpen(false);
-    setNewPersonnelName("");
-    setNewPersonnelCapabilities({});
+  const handleAddNewPersonnelToRosterDialog = (newPersonnel: WizardAvailablePersonnel) => {
+    setCurrentAvailablePersonnel(prev => [...prev, newPersonnel]);
+    // Automatically select the new personnel for the current project
+    const currentMap = getValues("selectedPersonnelMap") || {};
+    currentMap[newPersonnel.id] = true;
+    setValue("selectedPersonnelMap", currentMap , { shouldValidate: true, shouldDirty: true });
   };
 
   const handleNextStep = async () => {
     let isValidStep = false;
+    clearErrors(); 
+
     if (currentStep === 1) {
       isValidStep = await trigger(["name", "startDate", "endDate", "status", "organizationId"]);
-    } else if (currentStep === 2) {
-      const keyPersonnelValues = getValues("keyPersonnel") || [];
-      if (keyPersonnelValues.some(kp => !kp.projectRole)) {
-        toast({
-          title: "Missing Roles",
-          description: "Please assign a project role to all selected key personnel.",
-          variant: "destructive",
-        });
-        // Manually set errors for specific fields if react-hook-form doesn't catch them all here
-        keyPersonnelValues.forEach((kp, index) => {
-          if(!kp.projectRole) {
-            control.setError(`keyPersonnel.${index}.projectRole`, { type: "manual", message: "Role is required."})
-          }
-        });
-        isValidStep = false;
-      } else {
-         isValidStep = await trigger("keyPersonnel"); // Zod validation for array structure
+      if (!isValidStep) {
+        toast({ title: "Core Details Incomplete", description: "Please fill all required fields for Step 1, including Organization.", variant: "destructive" });
+        return;
       }
+    } else if (currentStep === 2) {
+        isValidStep = await trigger("keyPersonnel");
+        const keyPersonnelValues = getValues("keyPersonnel") || [];
+        let allRolesValid = true;
+        if (keyPersonnelValues.length > 0) {
+            keyPersonnelValues.forEach((kp, index) => {
+                if (!kp.projectRole) {
+                    control.setError(`keyPersonnel.${index}.projectRole`, { type: "manual", message: "Role is required." });
+                    allRolesValid = false;
+                }
+            });
+        }
+        if (!allRolesValid) {
+            toast({
+                title: "Missing Roles",
+                description: "Please assign a project role to all selected key personnel.",
+                variant: "destructive",
+            });
+            isValidStep = false; 
+        }
     } else if (currentStep === 3) {
       isValidStep = await trigger("location");
     } else {
@@ -229,8 +200,6 @@ export default function NewProjectWizardPage() {
 
     if (isValidStep) {
       setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
-    } else if (currentStep === 1 && (errors.name || errors.startDate || errors.endDate || errors.status || errors.organizationId)) {
-      toast({ title: "Core Details Incomplete", description: "Please fill all required fields for Step 1, including Organization.", variant: "destructive" });
     }
   };
 
@@ -286,52 +255,11 @@ export default function NewProjectWizardPage() {
 
       <Progress value={progressValue} className="w-full mb-4" />
 
-      <Dialog open={isAddPersonnelDialogOpen} onOpenChange={setIsAddPersonnelDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New Team Member to Roster</DialogTitle>
-            <DialogDescription>
-              Define the new team member's name and their general capabilities.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new-personnel-name" className="text-right">Name</Label>
-              <Input
-                id="new-personnel-name"
-                value={newPersonnelName}
-                onChange={(e) => setNewPersonnelName(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label className="text-right pt-1">Capabilities</Label>
-              <ScrollArea className="col-span-3 h-40 rounded-md border p-2">
-                <div className="space-y-1">
-                  {allPossibleCapabilities.map(cap => (
-                    <div key={cap} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`cap-${cap}`}
-                        checked={!!newPersonnelCapabilities[cap]}
-                        onCheckedChange={(checked) => {
-                          setNewPersonnelCapabilities(prev => ({ ...prev, [cap]: !!checked }));
-                        }}
-                      />
-                      <Label htmlFor={`cap-${cap}`} className="font-normal text-sm">{cap}</Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => {
-              setIsAddPersonnelDialogOpen(false); setNewPersonnelName(""); setNewPersonnelCapabilities({});
-            }}>Cancel</Button>
-            <Button type="button" onClick={handleAddNewPersonnelToRoster}>Save New Member</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddPersonnelToRosterDialog
+        isOpen={isAddPersonnelDialogOpen}
+        onOpenChange={setIsAddPersonnelDialogOpen}
+        onPersonnelAdded={handleAddNewPersonnelToRosterDialog}
+      />
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card className="shadow-lg">
@@ -347,9 +275,7 @@ export default function NewProjectWizardPage() {
                   <Input id="name" {...register("name")} className={errors.name ? "border-destructive" : ""} />
                   {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
                 </div>
-
-                { (globalSelectedOrgId === ALL_ORGANIZATIONS_ID || !globalSelectedOrgId ) && (
-                  <div className="space-y-2">
+                 <div className="space-y-2">
                     <Label htmlFor="organizationId">Organization <span className="text-destructive">*</span></Label>
                     <Controller
                       name="organizationId"
@@ -358,7 +284,7 @@ export default function NewProjectWizardPage() {
                         <Select 
                             onValueChange={field.onChange} 
                             value={field.value}
-                            disabled={isLoadingOrganizations}
+                            disabled={isLoadingOrganizations || (globalSelectedOrgId !== ALL_ORGANIZATIONS_ID && !!globalSelectedOrgId)}
                         >
                           <SelectTrigger className={errors.organizationId ? "border-destructive" : ""}>
                             <SelectValue placeholder="Select organization for this project" />
@@ -367,19 +293,16 @@ export default function NewProjectWizardPage() {
                             {organizations.map((org: Organization) => (
                               <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
                             ))}
+                             {organizations.length === 0 && <p className="p-2 text-xs text-muted-foreground">No organizations available.</p>}
                           </SelectContent>
                         </Select>
                       )}
                     />
                     {errors.organizationId && <p className="text-xs text-destructive mt-1">{errors.organizationId.message}</p>}
+                     {globalSelectedOrgId && globalSelectedOrgId !== ALL_ORGANIZATIONS_ID && (
+                         <p className="text-xs text-muted-foreground mt-1">Project will be assigned to your currently selected organization: {organizations.find(o => o.id === globalSelectedOrgId)?.name}</p>
+                     )}
                   </div>
-                )}
-                {globalSelectedOrgId && globalSelectedOrgId !== ALL_ORGANIZATIONS_ID && (
-                     <div className="space-y-2">
-                        <Label>Organization</Label>
-                        <Input value={organizations.find(o => o.id === globalSelectedOrgId)?.name || "Selected Organization"} readOnly disabled className="bg-muted/50" />
-                     </div>
-                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start Date <span className="text-destructive">*</span></Label>
@@ -432,7 +355,7 @@ export default function NewProjectWizardPage() {
               <CardContent className="space-y-4">
                 <Label>Available Team Members:</Label>
                 <ScrollArea className="h-72 w-full rounded-md border p-3">
-                  {currentAvailablePersonnel.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No personnel in roster. Add some first.</p>}
+                  {currentAvailablePersonnel.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No personnel in roster. Add some first using the button above.</p>}
                   {currentAvailablePersonnel.map((person) => {
                     const isSelected = !!selectedPersonnelMap?.[person.id];
                     const keyPersonnelEntryIndex = watchedKeyPersonnel.findIndex(kp => kp.personnelId === person.id);
@@ -441,16 +364,16 @@ export default function NewProjectWizardPage() {
                       <div key={person.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2.5 rounded-md hover:bg-muted/50 transition-colors min-h-[48px] border-b last:border-b-0">
                         <div className="flex items-center flex-shrink-0 mb-2 sm:mb-0">
                           <Checkbox
-                            id={`person-select-${person.id}`}
+                            id={`wizard-person-select-${person.id}`}
                             checked={isSelected}
                             onCheckedChange={(checked) => {
-                              const currentMap = { ...(getValues("selectedPersonnelMap") || {}) };
-                              currentMap[person.id] = !!checked;
-                              setValue("selectedPersonnelMap", currentMap , { shouldDirty: true });
+                              const newMap = { ...(getValues("selectedPersonnelMap") || {}) };
+                              newMap[person.id] = !!checked;
+                              setValue("selectedPersonnelMap", newMap , { shouldValidate: true, shouldDirty: true });
                             }}
                             className="mr-2.5"
                           />
-                          <Label htmlFor={`person-select-${person.id}`} className="font-normal sm:w-40 truncate" title={person.name}>
+                          <Label htmlFor={`wizard-person-select-${person.id}`} className="font-normal sm:w-40 truncate" title={person.name}>
                             {person.name}
                           </Label>
                         </div>
@@ -474,7 +397,7 @@ export default function NewProjectWizardPage() {
                                         </SelectItem>
                                       ))
                                     ) : (
-                                      <SelectItem value="" disabled>No capabilities defined</SelectItem>
+                                      <SelectItem value="" disabled>No capabilities</SelectItem>
                                     )}
                                   </SelectContent>
                                 </Select>
@@ -487,8 +410,8 @@ export default function NewProjectWizardPage() {
                             )}
                           </div>
                         )}
-                         {isSelected && keyPersonnelEntryIndex === -1 && (
-                            <p className="text-xs text-muted-foreground italic w-full text-center sm:text-left sm:w-60 sm:ml-auto">Assigning role...</p>
+                         {isSelected && keyPersonnelEntryIndex === -1 && ( // Person selected but not yet in keyPersonnel array (React render lag)
+                            <p className="text-xs text-muted-foreground italic w-full text-center sm:text-left sm:w-60 sm:ml-auto">Loading role...</p>
                          )}
                       </div>
                     );
@@ -519,7 +442,7 @@ export default function NewProjectWizardPage() {
                   />
                   {errors.location && <p className="text-xs text-destructive mt-1">{errors.location.message}</p>}
                    <p className="text-xs text-muted-foreground mt-1">
-                    Start typing for address suggestions. Note: Google Maps Autocomplete requires API key setup for full functionality.
+                    Start typing for address suggestions. Note: Google Maps Autocomplete requires an API key setup and the script loaded in `layout.tsx` for full functionality.
                   </p>
                 </div>
               </CardContent>
@@ -619,3 +542,4 @@ export default function NewProjectWizardPage() {
   );
 }
 
+    

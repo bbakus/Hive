@@ -3,20 +3,11 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video as VideoIconLucide } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,24 +19,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { format, parseISO, isValid, setHours, setMinutes, isAfter, isBefore, startOfDay, endOfDay, isWithinInterval, addHours, isSameDay, lightFormat, type DateRange } from "date-fns";
+import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
-import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event as EventContextEvent } from "@/contexts/EventContext";
-import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -55,36 +35,15 @@ import {
   DropdownMenuTrigger,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { EventFormDialog, type EventFormDialogData, eventFormSchema } from "@/components/modals/EventFormDialog";
 
-
-export const eventSchema = z.object({
-  name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
-  projectId: z.string().min(1, { message: "Please select a project." }),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date must be YYYY-MM-DD." }),
-  time: z.string().regex(/^\d{2}:\d{2} - \d{2}:\d{2}$/, { message: "Time must be HH:MM - HH:MM." }),
-  priority: z.enum(["Low", "Medium", "High", "Critical"]),
-  assignedPersonnelIds: z.array(z.string()).optional(),
-  isQuickTurnaround: z.boolean().optional(),
-  deadline: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)) || val === "", {
-    message: "Deadline must be a valid date-time string or empty.",
-  }),
-  organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", ""]).optional(),
-  isCovered: z.boolean().optional(),
-  personnelActivity: z.record(z.object({
-    checkInTime: z.string().optional(),
-    checkOutTime: z.string().optional(),
-  })).optional(),
-});
-
-export type EventFormData = z.infer<typeof eventSchema>;
-
-export type Event = EventContextEvent & {
-  hasOverlap?: boolean;
-  organizationId?: string;
-};
-
+import { BlockScheduleView } from "@/components/block-schedule-view";
+import { useEventContext, type Event } from "@/contexts/EventContext";
+import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page"; 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   if (!dateStr || !timeStr) return null;
@@ -100,18 +59,19 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
   if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
 
-  let startDate = setHours(startOfDay(baseDate), startHour);
-  startDate = setMinutes(startDate, startMinute);
+  let startDate = startOfDay(baseDate);
+  startDate.setHours(startHour, startMinute);
 
-  let endDate = setHours(startOfDay(baseDate), endHour);
-  endDate = setMinutes(endDate, endMinute);
-
-  if (isBefore(endDate, startDate) || (isSameDay(startDate, endDate) && endHour * 60 + endMinute === 0 && startHour * 60 + startMinute > 0) ){
-    endDate = addHours(endDate, 24);
+  let endDate = startOfDay(baseDate);
+  endDate.setHours(endHour, endMinute);
+  
+  if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour > 0 || startMinute > 0) )) { // Handles overnight or events ending at midnight next day
+    endDate.setDate(endDate.getDate() + 1);
   }
-
+  
   return { start: startDate, end: endDate };
 };
+
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
   if (eventA.id === eventB.id) return false;
@@ -121,20 +81,16 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
 
   if (!timesA || !timesB) return false;
 
-
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
-
 
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-
-  return false;
+  return false; 
 };
-
 
 export function formatDeadline(deadlineString?: string): string | null {
   if (!deadlineString) return null;
@@ -148,15 +104,14 @@ export function formatDeadline(deadlineString?: string): string | null {
 }
 
 const getCoverageIcon = (isCovered?: boolean) => {
-  if (isCovered === true) return <Eye className="h-5 w-5 text-accent opacity-90 flex-shrink-0" title="Covered Event" />;
-  return <Eye className="h-5 w-5 text-muted-foreground/50 opacity-70 flex-shrink-0" title="Not Covered" />;
+  if (isCovered === true) return <Eye className="h-4 w-4 text-accent opacity-90 flex-shrink-0" title="Covered Event" />;
+  return <Eye className="h-4 w-4 text-muted-foreground/50 opacity-70 flex-shrink-0" title="Not Covered" />;
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />;
   return null;
 };
-
 
 type EventFiltersProps = {
   filterQuickTurnaround: boolean;
@@ -332,14 +287,14 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               <div className="space-y-4">
                 {dayEvents.map((event) => (
                    <Card key={event.id} className="shadow-md hover:shadow-lg transition-shadow">
-                    <div className="p-4 flex justify-between items-start gap-4">
-                      <div className="flex-grow space-y-1">
-                         <CardTitle className="text-lg flex items-center gap-1.5">
-                           {getCoverageIcon(event.isCovered)}
-                           <span className="truncate" title={event.name}>{event.name}</span>
-                           {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 ml-1.5" title="Quick Turnaround"/>}
-                        </CardTitle>
-                        <div className="text-xs text-muted-foreground space-y-0.5">
+                     <div className="p-4 flex justify-between items-start gap-4">
+                       <div className="flex-grow space-y-1">
+                          <CardTitle className="text-lg flex items-center gap-1.5">
+                            {getCoverageIcon(event.isCovered)}
+                            <span className="truncate" title={event.name}>{event.name}</span>
+                            {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 ml-1.5" title="Quick Turnaround"/>}
+                          </CardTitle>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
                             <p className="flex items-center gap-1">
                                 {event.time}
                                 {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
@@ -354,34 +309,33 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                   Project: {event.project}
                               </p>
                             )}
-                        </div>
-                        <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
-                            {event.deadline && (
-                                <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                                Deadline: {formatDeadline(event.deadline)}
-                                </p>
-                            )}
-                            {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                                <p className="flex items-center gap-1 whitespace-nowrap">
-                                <Users className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
-                                Assigned: {event.assignedPersonnelIds.length}
-                                </p>
-                            )}
-                            <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center gap-1 whitespace-nowrap">
-                                <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
-                                Shot Requests: {event.shotRequests}
-                            </Link>
-                            {event.discipline && (
-                                <p className="flex items-center gap-1 whitespace-nowrap">
-                                {getDisciplineIcon(event.discipline)}
-                                {event.discipline || "N/A"}
-                                </p>
-                            )}
-                            <p className="whitespace-nowrap">Deliverables: {event.deliverables}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2 items-end flex-shrink-0">
+                          </div>
+                          <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
+                              {event.deadline && (
+                                  <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                  Deadline: {formatDeadline(event.deadline)}
+                                  </p>
+                              )}
+                              {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
+                                  <p className="flex items-center gap-1 whitespace-nowrap">
+                                  <Users className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
+                                  Assigned: {event.assignedPersonnelIds.length}
+                                  </p>
+                              )}
+                              <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center gap-1 whitespace-nowrap">
+                                  <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
+                                  Shot Requests: {event.shotRequests}
+                              </Link>
+                              {event.discipline && (
+                                  <p className="flex items-center gap-1 whitespace-nowrap">
+                                  {getDisciplineIcon(event.discipline)}
+                                  {event.discipline || "N/A"}
+                                  </p>
+                              )}
+                              <p className="whitespace-nowrap">Deliverables: {event.deliverables}</p>
+                          </div>
+                       </div>
+                       <div className="flex flex-col gap-2 items-end flex-shrink-0">
                         <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                           <Link href={`/events/${event.id}/shots`}>
                             <Eye className="mr-2 h-4 w-4" /> Manage Shots
@@ -390,8 +344,8 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                         <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
                           <Edit className="mr-2 h-4 w-4" /> Edit Event
                         </Button>
-                      </div>
-                    </div>
+                       </div>
+                     </div>
                   </Card>
                 ))}
               </div>
@@ -413,9 +367,10 @@ type EventListTabContentProps = {
   useDemoData: boolean;
   openEditEventModal: (event: Event) => void;
   handleDeleteClick: (eventId: string) => void;
+  organizations: Organization[];
 };
 
-function EventListTabContent({ displayableEvents, selectedProject, useDemoData, openEditEventModal, handleDeleteClick }: EventListTabContentProps) {
+function EventListTabContent({ displayableEvents, selectedProject, useDemoData, openEditEventModal, handleDeleteClick, organizations }: EventListTabContentProps) {
   return (
     <Card className="shadow-lg mt-4">
       <CardHeader>
@@ -427,77 +382,79 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
       </CardHeader>
       <CardContent>
         {displayableEvents.length > 0 ? (
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-card">
-              <TableRow>
-                <TableHead>Event Name</TableHead>
-                {!selectedProject && <TableHead>Project</TableHead>}
-                <TableHead>Date & Time</TableHead>
-                <TableHead>Deadline</TableHead>
-                <TableHead>Discipline</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Assigned</TableHead>
-                <TableHead>Shot Requests</TableHead>
-                <TableHead>Deliverables</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayableEvents.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell className="font-medium flex items-center gap-1.5">
-                     {getCoverageIcon(event.isCovered)}
-                     {event.name}
-                    {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
-                  </TableCell>
-                  {!selectedProject && <TableCell>{event.project}</TableCell>}
-                  <TableCell className="flex items-center">
-                    {event.date ? format(parseISO(event.date), "PPP") : 'N/A'} <span className="text-muted-foreground ml-1">({event.time})</span>
-                    {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {event.deadline ? formatDeadline(event.deadline) : "N/A"}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground flex items-center gap-1">
-                    {getDisciplineIcon(event.discipline)}
-                    {event.discipline || "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      event.priority === "Critical" ? "destructive" :
-                      event.priority === "High" ? "secondary" :
-                      event.priority === "Medium" ? "outline" : "default"
-                    }>{event.priority}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {event.assignedPersonnelIds?.length || 0}
-                  </TableCell>
-                  <TableCell>
-                     <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
-                      {event.shotRequests}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{event.deliverables}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
-                      <Link href={`/events/${event.id}/shots`}>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">View/Manage Shots</span>
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
-                      <Edit className="h-4 w-4" />
-                      <span className="sr-only">Edit Event</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(event.id)}>
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Delete Event</span>
-                    </Button>
-                  </TableCell>
+          <div className="relative w-full overflow-auto">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-card">
+                <TableRow>
+                  <TableHead>Event Name</TableHead>
+                  {!selectedProject && organizations.length > 1 && <TableHead>Project</TableHead>}
+                  <TableHead>Date & Time</TableHead>
+                  <TableHead>Deadline</TableHead>
+                  <TableHead>Discipline</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Assigned</TableHead>
+                  <TableHead>Shot Requests</TableHead>
+                  <TableHead>Deliverables</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {displayableEvents.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell className="font-medium flex items-center gap-1.5">
+                      {getCoverageIcon(event.isCovered)}
+                      {event.name}
+                      {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
+                    </TableCell>
+                    {!selectedProject && organizations.length > 1 && <TableCell>{event.project}</TableCell>}
+                    <TableCell className="flex items-center">
+                      {event.date ? format(parseISO(event.date), "PPP") : 'N/A'} <span className="text-muted-foreground ml-1">({event.time})</span>
+                      {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {event.deadline ? formatDeadline(event.deadline) : "N/A"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground flex items-center gap-1">
+                      {getDisciplineIcon(event.discipline)}
+                      {event.discipline || "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        event.priority === "Critical" ? "destructive" :
+                        event.priority === "High" ? "secondary" :
+                        event.priority === "Medium" ? "outline" : "default"
+                      }>{event.priority}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {event.assignedPersonnelIds?.length || 0}
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
+                        {event.shotRequests}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{event.deliverables}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
+                        <Link href={`/events/${event.id}/shots`}>
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View/Manage Shots</span>
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
+                        <Edit className="h-4 w-4" />
+                        <span className="sr-only">Edit Event</span>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(event.id)}>
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Delete Event</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
           <p className="text-muted-foreground text-center py-8">
             No events found {selectedProject ? `for ${selectedProject.name}` : ""} that match your filter criteria. {useDemoData ? 'Toggle "Load Demo Data" in settings, adjust filters, or add an event.' : 'Add an event or adjust filters.'}
@@ -510,7 +467,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
 
 type BlockScheduleTabContentProps = {
   displayableEvents: Event[];
-  selectedEventDates: string[];
+  selectedEventDates: string[]; // Now used to determine the date for the block schedule
   openEditEventModal: (event: Event) => void;
   selectedProject: Project | null;
   useDemoData: boolean;
@@ -526,46 +483,48 @@ function BlockScheduleTabContent({
   allPersonnel
 }: BlockScheduleTabContentProps) {
   
-  const firstSelectedDate = useMemo(() => {
+  const activeBlockScheduleDate = useMemo(() => {
     if (selectedEventDates.length > 0) {
-      const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
-      return parseISO(sortedDates[0]);
+      // Sort to ensure consistency if multiple dates are somehow selected, take the earliest
+      const sortedSelectedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+      const dateObj = parseISO(sortedSelectedDates[0]);
+      return isValid(dateObj) ? dateObj : null;
     }
     return null;
   }, [selectedEventDates]);
 
-  const eventsForFirstSelectedDate = useMemo(() => {
-    if (!firstSelectedDate) return [];
-    const dateKey = format(firstSelectedDate, "yyyy-MM-dd");
+  const eventsForBlockSchedule = useMemo(() => {
+    if (!activeBlockScheduleDate) return [];
+    const dateKey = format(activeBlockScheduleDate, "yyyy-MM-dd");
     return displayableEvents.filter(event => event.date === dateKey);
-  }, [firstSelectedDate, displayableEvents]);
+  }, [activeBlockScheduleDate, displayableEvents]);
   
   const personnelForActiveDate = useMemo(() => {
-    if (!firstSelectedDate) return [];
+    if (!activeBlockScheduleDate) return [];
     const personnelIds = new Set<string>();
-    eventsForFirstSelectedDate.forEach(event => {
+    eventsForBlockSchedule.forEach(event => {
       event.assignedPersonnelIds?.forEach(id => personnelIds.add(id));
     });
     return allPersonnel
         .filter(p => personnelIds.has(p.id) && PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client")
         .sort((a, b) => a.name.localeCompare(b.name));
-  }, [firstSelectedDate, eventsForFirstSelectedDate, allPersonnel]);
+  }, [activeBlockScheduleDate, eventsForBlockSchedule, allPersonnel]);
 
   return (
     <Card className="shadow-lg mt-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
-          View events for the selected date laid out on an hourly timeline by assigned photographer.
-          {selectedEventDates.length > 0 ? ` Showing schedule for ${format(firstSelectedDate!, "PPP")}.` : " Select a date from the main filters to view its schedule."}
+          View events for the selected date(s) from the main filter, laid out on an hourly timeline by assigned photographer.
+          {activeBlockScheduleDate ? ` Showing schedule for ${format(activeBlockScheduleDate, "PPP")}.` : " Select date(s) from the main filters to view schedule."}
           {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {firstSelectedDate && eventsForFirstSelectedDate.length > 0 ? (
+        {activeBlockScheduleDate && eventsForBlockSchedule.length > 0 ? (
           <BlockScheduleView
-            selectedDate={firstSelectedDate}
-            eventsForDate={eventsForFirstSelectedDate}
+            selectedDate={activeBlockScheduleDate}
+            eventsForDate={eventsForBlockSchedule}
             personnelForDay={personnelForActiveDate}
             onEditEvent={openEditEventModal}
             allPersonnel={allPersonnel}
@@ -574,8 +533,10 @@ function BlockScheduleTabContent({
           <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
             <CalendarIconLucide size={48} className="mb-4 text-muted" />
             <p className="text-lg font-medium">
-              {selectedEventDates.length > 0 
-                ? `No events scheduled on ${format(firstSelectedDate!, "PPP")} that match your other filters.` 
+              {selectedEventDates.length > 0 && !activeBlockScheduleDate
+                ? `Invalid date selected.`
+                : selectedEventDates.length > 0 && eventsForBlockSchedule.length === 0
+                ? `No events scheduled on ${format(activeBlockScheduleDate!, "PPP")} that match your other filters.`
                 : "Please select one or more dates from the main 'Specific Dates' filter to view the block schedule."
               }
             </p>
@@ -589,10 +550,10 @@ function BlockScheduleTabContent({
   );
 }
 
-
 export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const { organizations, isLoadingOrganizations } = useOrganizationContext();
   const {
     eventsForSelectedProjectAndOrg = [], 
     addEvent,
@@ -613,75 +574,7 @@ export default function EventsPage() {
   const [filterCoverageStatus, setFilterCoverageStatus] = useState<"all" | "covered" | "not_covered">("all");
   const [selectedEventDates, setSelectedEventDates] = useState<string[]>([]);
 
-
   const { toast } = useToast();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    formState: { errors },
-    setValue,
-    watch
-  } = useForm<EventFormData>({
-    resolver: zodResolver(eventSchema),
-    defaultValues: {
-      isQuickTurnaround: false,
-      deadline: "",
-      assignedPersonnelIds: [],
-      discipline: "",
-      isCovered: true,
-      personnelActivity: {},
-      organizationId: selectedProject?.organizationId || ""
-    }
-  });
-
-  useEffect(() => {
-    let defaultEventDate = new Date();
-    if (selectedEventDates.length > 0) { 
-        const parsedKeyDate = parseISO(selectedEventDates[0]);
-        if (isValid(parsedKeyDate)) {
-            defaultEventDate = parsedKeyDate;
-        }
-    }
-
-    const selectedProjInfo = allProjectsFromContext.find(p => p.id === (editingEvent?.projectId || selectedProject?.id));
-
-    if (editingEvent) {
-      reset({
-        name: editingEvent.name,
-        projectId: editingEvent.projectId,
-        date: editingEvent.date,
-        time: editingEvent.time,
-        priority: editingEvent.priority as EventFormData['priority'],
-        assignedPersonnelIds: editingEvent.assignedPersonnelIds || [],
-        isQuickTurnaround: editingEvent.isQuickTurnaround || false,
-        deadline: editingEvent.deadline || "",
-        organizationId: editingEvent.organizationId || selectedProjInfo?.organizationId || "",
-        discipline: editingEvent.discipline || "",
-        isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
-        personnelActivity: editingEvent.personnelActivity || {},
-      });
-    } else {
-      const firstProjectForOrg = selectedProject || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0] : null);
-      reset({
-        name: "",
-        projectId: firstProjectForOrg?.id || "",
-        date: format(defaultEventDate, "yyyy-MM-dd"),
-        time: "09:00 - 17:00",
-        priority: "Medium",
-        assignedPersonnelIds: [],
-        isQuickTurnaround: false,
-        deadline: "",
-        organizationId: firstProjectForOrg?.organizationId || "",
-        discipline: "",
-        isCovered: true,
-        personnelActivity: {},
-      });
-    }
-  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjectsFromContext, selectedEventDates]);
-
 
   const assignedPersonnelForFilter = useMemo(() => {
     if (isLoadingContextEvents || !eventsForSelectedProjectAndOrg) return [];
@@ -692,10 +585,9 @@ export default function EventsPage() {
     return initialPersonnelMock.filter(person => personnelIds.has(person.id));
   }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents]);
 
-
   const displayableEvents = useMemo(() => {
     if (isLoadingContextEvents) return [];
-    let filtered: Event[] = eventsForSelectedProjectAndOrg || [];
+    let filtered: Event[] = [...(eventsForSelectedProjectAndOrg || [])];
 
     if (filterCoverageStatus !== "all") {
       if (filterCoverageStatus === "covered") {
@@ -704,40 +596,35 @@ export default function EventsPage() {
         filtered = filtered.filter(event => event.isCovered === false || event.isCovered === undefined);
       }
     }
-
     if (filterQuickTurnaround) {
       filtered = filtered.filter(event => event.isQuickTurnaround);
     }
-
     if (filterTimeStatus !== "all") {
       const now = new Date();
       filtered = filtered.filter(event => {
         const times = parseEventTimes(event.date, event.time);
         if (!times) return false;
-
         if (filterTimeStatus === "upcoming") return isAfter(times.start, now);
         if (filterTimeStatus === "past") return isBefore(times.end, now);
         if (filterTimeStatus === "now") return isWithinInterval(now, { start: times.start, end: times.end });
         return true;
       });
     }
-
     if (filterAssignedMemberId !== "all") {
       filtered = filtered.filter(event => event.assignedPersonnelIds?.includes(filterAssignedMemberId));
     }
-
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography");
+          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+      } else if (filterDiscipline === "Video") {
+          filtered = filtered.filter(event => event.discipline === "Video" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
     }
-    
     if (selectedEventDates.length > 0) {
       filtered = filtered.filter(event => selectedEventDates.includes(event.date));
     }
-
 
     const eventsGroupedByDay: Record<string, Event[]> = filtered.reduce((acc, event) => {
         const date = event.date;
@@ -760,9 +647,12 @@ export default function EventsPage() {
       const dateA = a.date ? parseISO(a.date).getTime() : 0;
       const dateB = b.date ? parseISO(b.date).getTime() : 0;
       if (dateA !== dateB) return dateA - dateB;
-      const timeA = a.date && a.time ? (parseEventTimes(a.date, a.time)?.start.getTime() || 0) : 0;
-      const timeB = b.date && b.time ? (parseEventTimes(b.date, b.time)?.start.getTime() || 0) : 0;
-      return timeA - timeB;
+      
+      const timesA = parseEventTimes(a.date, a.time);
+      const timesB = parseEventTimes(b.date, b.time);
+      const timeAVal = timesA ? timesA.start.getTime() : 0;
+      const timeBVal = timesB ? timesB.start.getTime() : 0;
+      return timeAVal - timeBVal;
     });
   }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, selectedEventDates, filterCoverageStatus]);
 
@@ -818,7 +708,9 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+      } else if (filterDiscipline === "Video") {
+           sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Video" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
           sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "");
       }
@@ -828,7 +720,7 @@ export default function EventsPage() {
   }, [eventsForSelectedProjectAndOrg, filterCoverageStatus, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline]);
 
 
-  const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
+  const handleEventSubmit: SubmitHandler<EventFormDialogData> = (data) => {
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
     if (!selectedProjInfo) {
       toast({ title: "Error", description: "Selected project not found.", variant: "destructive" });
@@ -863,68 +755,24 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      addEvent({...eventPayload, project: selectedProjInfo.name, deliverables: 0, shotRequests: 0 });
+      addEvent({...eventPayload, project: selectedProjInfo.name });
       toast({
         title: "Event Added",
         description: `"${data.name}" has been successfully added.`,
       });
     }
-    closeEventModal();
+    setIsEventModalOpen(false);
+    setEditingEvent(null);
   };
-
+  
   const openAddEventModal = () => {
     setEditingEvent(null);
-    const currentProjectId = selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : "");
-    const projectInfo = allProjectsFromContext.find(p => p.id === currentProjectId);
-    let defaultDate = new Date();
-    
-    // Use first selected date from filter if available and valid
-    if (selectedEventDates.length > 0) {
-      const parsedDate = parseISO(selectedEventDates[0]);
-      if (isValid(parsedDate)) defaultDate = parsedDate;
-    }
-
-
-    reset({
-      name: "",
-      projectId: currentProjectId,
-      date: format(defaultDate, "yyyy-MM-dd"),
-      time: "09:00 - 17:00",
-      priority: "Medium",
-      assignedPersonnelIds: [],
-      isQuickTurnaround: false,
-      deadline: "",
-      organizationId: projectInfo?.organizationId || "",
-      discipline: "",
-      isCovered: true,
-      personnelActivity: {},
-    });
     setIsEventModalOpen(true);
   };
 
   const openEditEventModal = (event: Event) => {
     setEditingEvent(event);
-    const projectInfo = allProjectsFromContext.find(p => p.id === event.projectId);
-    reset({
-      name: event.name,
-      projectId: event.projectId,
-      date: event.date,
-      time: event.time,
-      priority: event.priority as EventFormData['priority'],
-      assignedPersonnelIds: event.assignedPersonnelIds || [],
-      isQuickTurnaround: event.isQuickTurnaround || false,
-      deadline: event.deadline || "",
-      organizationId: event.organizationId || projectInfo?.organizationId || "",
-      discipline: event.discipline || "",
-      isCovered: event.isCovered === undefined ? true : event.isCovered,
-      personnelActivity: event.personnelActivity || {},
-    });
     setIsEventModalOpen(true);
-  };
-
-  const closeEventModal = () => {
-    setIsEventModalOpen(false);
-    setEditingEvent(null);
   };
 
   const handleDeleteClick = (eventId: string) => {
@@ -946,8 +794,16 @@ export default function EventsPage() {
     setIsDeleteDialogOpen(false);
   };
 
+  const firstSelectedDateForDialog = useMemo(() => {
+    if (selectedEventDates.length > 0) {
+        const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+        return sortedDates[0];
+    }
+    return null;
+  }, [selectedEventDates]);
 
-  if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents) {
+
+  if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents || isLoadingOrganizations) {
       return <div>Loading event data and filters...</div>;
   }
 
@@ -966,265 +822,34 @@ export default function EventsPage() {
         </Button>
       </div>
 
-      <EventFilters
-          filterQuickTurnaround={filterQuickTurnaround}
-          setFilterQuickTurnaround={setFilterQuickTurnaround}
-          filterTimeStatus={filterTimeStatus}
-          setFilterTimeStatus={setFilterTimeStatus}
-          filterAssignedMemberId={filterAssignedMemberId}
-          setFilterAssignedMemberId={setFilterAssignedMemberId}
-          assignedPersonnelForFilter={assignedPersonnelForFilter}
-          filterDiscipline={filterDiscipline}
-          setFilterDiscipline={setFilterDiscipline}
-          filterCoverageStatus={filterCoverageStatus}
-          setFilterCoverageStatus={setFilterCoverageStatus}
-          selectedEventDates={selectedEventDates}
-          setSelectedEventDates={setSelectedEventDates}
-          uniqueEventDatesForFilter={uniqueEventDatesForFilter}
+      <div className="p-4 border rounded-md bg-card/50 shadow-sm">
+        <EventFilters
+            filterQuickTurnaround={filterQuickTurnaround}
+            setFilterQuickTurnaround={setFilterQuickTurnaround}
+            filterTimeStatus={filterTimeStatus}
+            setFilterTimeStatus={setFilterTimeStatus}
+            filterAssignedMemberId={filterAssignedMemberId}
+            setFilterAssignedMemberId={setFilterAssignedMemberId}
+            assignedPersonnelForFilter={assignedPersonnelForFilter}
+            filterDiscipline={filterDiscipline}
+            setFilterDiscipline={setFilterDiscipline}
+            filterCoverageStatus={filterCoverageStatus}
+            setFilterCoverageStatus={setFilterCoverageStatus}
+            selectedEventDates={selectedEventDates}
+            setSelectedEventDates={setSelectedEventDates}
+            uniqueEventDatesForFilter={uniqueEventDatesForFilter}
+        />
+      </div>
+
+      <EventFormDialog
+        isOpen={isEventModalOpen}
+        onOpenChange={setIsEventModalOpen}
+        editingEvent={editingEvent}
+        onSubmit={handleEventSubmit}
+        allProjects={allProjectsFromContext}
+        allPersonnel={initialPersonnelMock}
+        activeBlockScheduleDate={firstSelectedDateForDialog}
       />
-
-
-      <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
-        if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
-      }}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingEvent ? "Edit Event" : "Add New Event"}</DialogTitle>
-            <DialogDescription>
-              {editingEvent ? "Update the details for this event." : "Fill in the details below to create a new event."}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit(handleEventSubmit)} className="grid gap-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-              <div className="space-y-4">
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
-                  <div className="col-span-3">
-                    <Input id="event-name" {...register("name")} className={errors.name ? "border-destructive" : ""} />
-                    {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-projectId" className="text-right col-span-1">Project</Label>
-                  <div className="col-span-3">
-                    <Controller
-                      name="projectId"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          onValueChange={(value) => {
-                            field.onChange(value);
-                            const projInfo = allProjectsFromContext.find(p => p.id === value);
-                            setValue("organizationId", projInfo?.organizationId || "");
-                          }}
-                          value={field.value}
-                          defaultValue={field.value || (selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : ""))}
-                        >
-                          <SelectTrigger className={errors.projectId ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Select project" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allProjectsFromContext.map((proj) => (
-                              <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
-                            ))}
-                             {allProjectsFromContext.length === 0 && <p className="p-2 text-xs text-muted-foreground">No projects available. Add one first.</p>}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.projectId && <p className="text-xs text-destructive mt-1">{errors.projectId.message}</p>}
-                  </div>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="event-date" className="text-right col-span-1">Date</Label>
-                    <div className="col-span-3">
-                        <Controller
-                            name="date"
-                            control={control}
-                            render={({ field }) => (
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground",
-                                    errors.date ? "border-destructive" : ""
-                                    )}
-                                >
-                                    <CalendarIconLucide className="mr-2 h-4 w-4" />
-                                    {field.value ? format(parseISO(field.value), "PPP") : <span>Pick a date</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={field.value ? parseISO(field.value) : undefined}
-                                    onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
-                                    initialFocus
-                                    defaultMonth={
-                                        selectedEventDates.length > 0 && isValid(parseISO(selectedEventDates[0])) 
-                                            ? parseISO(selectedEventDates[0]) 
-                                            : (field.value ? parseISO(field.value) : new Date())
-                                    }
-                                />
-                                </PopoverContent>
-                            </Popover>
-                            )}
-                        />
-                        {errors.date && <p className="text-xs text-destructive mt-1">{errors.date.message}</p>}
-                    </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-time" className="text-right col-span-1">Time</Label>
-                  <div className="col-span-3">
-                    <Input id="event-time" {...register("time")} placeholder="HH:MM - HH:MM" className={errors.time ? "border-destructive" : ""} />
-                    {errors.time && <p className="text-xs text-destructive mt-1">{errors.time.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-priority" className="text-right col-span-1">Priority</Label>
-                  <div className="col-span-3">
-                    <Controller
-                      name="priority"
-                      control={control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                          <SelectTrigger className={errors.priority ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Low">Low</SelectItem>
-                            <SelectItem value="Medium">Medium</SelectItem>
-                            <SelectItem value="High">High</SelectItem>
-                            <SelectItem value="Critical">Critical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
-                  </div>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-discipline" className="text-right col-span-1">Discipline</Label>
-                  <div className="col-span-3">
-                    <Controller
-                      name="discipline"
-                      control={control}
-                      render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
-                          <SelectTrigger className={errors.discipline ? "border-destructive" : ""}>
-                            <SelectValue placeholder="Select discipline (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">N/A or Other</SelectItem>
-                            <SelectItem value="Photography">Photography</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.discipline && <p className="text-xs text-destructive mt-1">{errors.discipline.message}</p>}
-                  </div>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-deadline" className="text-right col-span-1">Deadline</Label>
-                  <div className="col-span-3">
-                    <Input
-                      id="event-deadline"
-                      type="datetime-local"
-                      {...register("deadline")}
-                      className={errors.deadline ? "border-destructive" : ""}
-                    />
-                    {errors.deadline && <p className="text-xs text-destructive mt-1">{errors.deadline.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-isCovered" className="text-right col-span-1">Coverage</Label>
-                  <div className="col-span-3 flex items-center">
-                    <Controller
-                        name="isCovered"
-                        control={control}
-                        render={({ field }) => (
-                            <Checkbox
-                            id="event-isCovered"
-                            checked={field.value === undefined ? true : field.value}
-                            onCheckedChange={field.onChange}
-                            className="mr-2"
-                            />
-                        )}
-                    />
-                    <Label htmlFor="event-isCovered" className="font-normal text-sm">This event requires production coverage.</Label>
-                    {errors.isCovered && <p className="text-xs text-destructive mt-1">{errors.isCovered.message}</p>}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="event-quickTurnaround" className="text-right col-span-1">Quick Turn</Label>
-                  <div className="col-span-3 flex items-center">
-                    <Controller
-                        name="isQuickTurnaround"
-                        control={control}
-                        render={({ field }) => (
-                            <Checkbox
-                            id="event-quickTurnaround"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="mr-2"
-                            />
-                        )}
-                    />
-                    <Label htmlFor="event-quickTurnaround" className="font-normal text-sm">Mark as high priority with a tight deadline.</Label>
-                    {errors.isQuickTurnaround && <p className="text-xs text-destructive mt-1">{errors.isQuickTurnaround.message}</p>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Assign Personnel</Label>
-                <ScrollArea className="h-60 w-full rounded-md border p-4">
-                  <Controller
-                    name="assignedPersonnelIds"
-                    control={control}
-                    defaultValue={[]}
-                    render={({ field }) => (
-                      <div className="space-y-2">
-                        {initialPersonnelMock.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").map((person) => (
-                          <div key={person.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`person-${person.id}`}
-                              checked={field.value?.includes(person.id)}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([...(field.value || []), person.id])
-                                  : field.onChange(
-                                      (field.value || []).filter(
-                                        (id) => id !== person.id
-                                      )
-                                    );
-                              }}
-                            />
-                            <Label htmlFor={`person-${person.id}`} className="font-normal">
-                              {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
-                            </Label>
-                          </div>
-                        ))}
-                        {initialPersonnelMock.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").length === 0 && <p className="text-muted-foreground text-xs">No photography team members in system. Add them via Personnel page.</p>}
-                      </div>
-                    )}
-                  />
-                </ScrollArea>
-                {errors.assignedPersonnelIds && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelIds.message}</p>}
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={closeEventModal}>Cancel</Button>
-              </DialogClose>
-              <Button type="submit">{editingEvent ? "Save Changes" : "Add Event"}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -1264,6 +889,7 @@ export default function EventsPage() {
                 useDemoData={useDemoData}
                 openEditEventModal={openEditEventModal}
                 handleDeleteClick={handleDeleteClick}
+                organizations={organizations}
             />
         </TabsContent>
 

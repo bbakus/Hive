@@ -25,21 +25,10 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { BlockedReasonDialog } from "@/components/modals/BlockedReasonDialog";
 
-
-const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; // Simulates logged-in photographer
-const MOCK_CURRENT_USER_NAME = "Field Photographer";
-
+const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -59,12 +48,11 @@ export default function ShootPage() {
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
 
   const [isBlockedReasonDialogOpen, setIsBlockedReasonDialogOpen] = useState(false);
-  const [shotForBlockedReason, setShotForBlockedReason] = useState<{ eventId: string; shotId: string; description: string } | null>(null);
-  const [currentBlockedReasonInput, setCurrentBlockedReasonInput] = useState("");
+  const [shotForBlockedReasonDialog, setShotForBlockedReasonDialog] = useState<{ eventId: string; shotId: string; description: string; currentReason: string } | null>(null);
 
   useEffect(() => {
     setCurrentTime(new Date());
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update every minute
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -90,7 +78,7 @@ export default function ShootPage() {
 
   const getEventStatus = useCallback((event: Event, now: Date): "in_progress" | "upcoming" | "past" => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return "upcoming"; // Default for events with invalid times
+    if (!times) return "upcoming"; 
 
     if (isWithinInterval(now, { start: times.start, end: times.end })) {
       return "in_progress";
@@ -116,13 +104,13 @@ export default function ShootPage() {
   }, [todaysCoveredEvents, filterTimeStatus, filterQuickTurnaround, currentTime, getEventStatus]);
 
   const getEventStatusBadgeInfo = useCallback((event: Event): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } => {
-    if (!currentTime) return { label: "Pending", variant: "outline" }; // Should not happen if currentTime is set
+    if (!currentTime) return { label: "Pending", variant: "outline" };
     const status = getEventStatus(event, currentTime);
     switch (status) {
       case "in_progress": return { label: "In Progress", variant: "secondary" };
       case "upcoming": return { label: "Upcoming", variant: "outline" };
       case "past": return { label: "Completed", variant: "default" };
-      default: return { label: "Scheduled", variant: "outline" }; // Fallback
+      default: return { label: "Scheduled", variant: "outline" };
     }
   }, [currentTime, getEventStatus]);
 
@@ -145,7 +133,7 @@ export default function ShootPage() {
 
     if (actionType === 'toggleCapture') {
       if (shotToUpdate.status === "Captured" || shotToUpdate.status === "Completed") {
-        updatePayload.status = "Assigned";
+        updatePayload.status = "Assigned"; 
       } else {
         updatePayload.status = "Captured";
         if (!shotToUpdate.initialCapturerId) {
@@ -166,21 +154,24 @@ export default function ShootPage() {
         updateShotRequest(eventId, shotId, updatePayload);
         toast({ title: "Shot Unblocked", description: "Shot status set to Assigned."});
       } else {
-        setShotForBlockedReason({ eventId, shotId, description: shotToUpdate.description });
-        setCurrentBlockedReasonInput(shotToUpdate.blockedReason || "");
+        setShotForBlockedReasonDialog({ 
+            eventId, 
+            shotId, 
+            description: shotToUpdate.description,
+            currentReason: shotToUpdate.blockedReason || ""
+        });
         setIsBlockedReasonDialogOpen(true);
       }
     }
   };
-
-  const handleSaveBlockedReason = () => {
-    if (!shotForBlockedReason) return;
-    const { eventId, shotId, description } = shotForBlockedReason;
-    const reasonToSave = currentBlockedReasonInput.trim();
+  
+  const handleSaveBlockedReason = (reason: string) => {
+    if (!shotForBlockedReasonDialog) return;
+    const { eventId, shotId, description } = shotForBlockedReasonDialog;
     
     const updatePayload: Partial<ShotRequestFormData> = {
       status: "Blocked",
-      blockedReason: reasonToSave || "Blocked - (No specific reason provided)",
+      blockedReason: reason.trim() || "Blocked - (No specific reason provided)",
       lastStatusModifierId: MOCK_CURRENT_USER_ID,
       lastStatusModifiedAt: new Date().toISOString(),
     };
@@ -188,12 +179,12 @@ export default function ShootPage() {
     updateShotRequest(eventId, shotId, updatePayload);
     toast({
       title: "Shot Blocked",
-      description: `Shot "${description.substring(0,30)}..." Blocked. Reason: ${reasonToSave || "Not specified"}`
+      description: `Shot "${description.substring(0,30)}..." Blocked. Reason: ${updatePayload.blockedReason}`
     });
     setIsBlockedReasonDialogOpen(false);
-    setShotForBlockedReason(null);
-    setCurrentBlockedReasonInput("");
+    setShotForBlockedReasonDialog(null);
   };
+
 
   const handleCheckIn = (eventId: string, personnelId: string) => {
     checkInUserToEvent(eventId, personnelId);
@@ -245,42 +236,15 @@ export default function ShootPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Dialog open={isBlockedReasonDialogOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            setIsBlockedReasonDialogOpen(false);
-            setShotForBlockedReason(null);
-            setCurrentBlockedReasonInput("");
-          } else {
-            setIsBlockedReasonDialogOpen(true);
-          }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reason for Blocking Shot</DialogTitle>
-            <DialogDescription>
-              Provide a reason for blocking the shot: "{shotForBlockedReason?.description.substring(0,50)}...".
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="blockedReasonInput" className="sr-only">Blocked Reason</Label>
-            <Textarea
-              id="blockedReasonInput"
-              value={currentBlockedReasonInput}
-              onChange={(e) => setCurrentBlockedReasonInput(e.target.value)}
-              placeholder="e.g., Talent unavailable, Equipment malfunction, Location access issue..."
-              rows={3}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsBlockedReasonDialogOpen(false);
-              setShotForBlockedReason(null);
-              setCurrentBlockedReasonInput("");
-            }}>Cancel</Button>
-            <Button onClick={handleSaveBlockedReason}>Save Reason & Block Shot</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {shotForBlockedReasonDialog && (
+        <BlockedReasonDialog
+            isOpen={isBlockedReasonDialogOpen}
+            onOpenChange={setIsBlockedReasonDialogOpen}
+            shotDescription={shotForBlockedReasonDialog.description}
+            initialReason={shotForBlockedReasonDialog.currentReason}
+            onSave={handleSaveBlockedReason}
+        />
+      )}
 
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -292,8 +256,8 @@ export default function ShootPage() {
         </p>
       </div>
 
-      <Card className="shadow-sm border-border/50">
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3 px-4">
+       <div className="p-4 border rounded-md bg-card/50 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
             <div>
                 <Label htmlFor="filter-time-status" className="text-xs text-muted-foreground">Status</Label>
                 <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
@@ -308,17 +272,16 @@ export default function ShootPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-end space-x-2 pb-1">
+            <div className="flex items-center space-x-2 pt-2 sm:pt-0 sm:justify-end">
                 <Checkbox
                     id="filter-quick-turnaround"
                     checked={filterQuickTurnaround}
                     onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-                    // className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground" // Rely on global checkbox style
                 />
-                <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm">Quick Turnaround Only</Label>
+                <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
             </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {filteredTodaysEvents.length === 0 && (
         <Alert>
@@ -366,68 +329,47 @@ export default function ShootPage() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="p-4 border-t">
-                  {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 ? (
-                    event.assignedPersonnelIds.map(personnelId => {
-                      const person = initialPersonnelMock.find(p => p.id === personnelId);
-                      if (!person) return null;
+                    {(event.assignedPersonnelIds || []).map(personnelId => {
+                        const person = initialPersonnelMock.find(p => p.id === personnelId);
+                        if(!person) return null;
+                        const activity = event.personnelActivity?.[personnelId];
+                        const isCheckedIn = !!activity?.checkInTime && !activity?.checkOutTime;
+                        const hasCheckedOut = !!activity?.checkInTime && !!activity?.checkOutTime;
 
-                      const currentUserActivity = event.personnelActivity?.[personnelId];
-                      const isCheckedIn = !!currentUserActivity?.checkInTime && !currentUserActivity?.checkOutTime;
-                      const wasCheckedOut = !!currentUserActivity?.checkInTime && !!currentUserActivity?.checkOutTime;
-
-                      return (
-                        <div key={personnelId} className="mb-4 p-3 border rounded-md bg-muted/30">
-                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
-                            <div className="mb-2 sm:mb-0">
-                                <p className="font-semibold text-sm">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></p>
-                                {person.cameraSerial && <p className="text-xs text-muted-foreground flex items-center gap-1"><CameraIcon className="h-3 w-3" /> S/N: {person.cameraSerial}</p>}
+                        return (
+                            <div key={personnelId} className="mb-4 p-3 border rounded-md bg-muted/30">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
+                                    <div className="mb-2 sm:mb-0">
+                                        <p className="font-semibold text-sm">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></p>
+                                        {person.cameraSerial && <p className="text-xs text-muted-foreground flex items-center gap-1"><CameraIcon className="h-3 w-3" /> S/N: {person.cameraSerial}</p>}
+                                    </div>
+                                    <div className="flex flex-col xs:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
+                                        <Button
+                                            variant="outline" size="sm"
+                                            onClick={() => handleCheckIn(event.id, personnelId)}
+                                            disabled={isCheckedIn || hasCheckedOut}
+                                            className="w-full xs:w-auto"
+                                        > <LogIn className="mr-2 h-4 w-4"/> Check In</Button>
+                                        <Button
+                                            variant="outline" size="sm"
+                                            onClick={() => handleCheckOut(event.id, personnelId)}
+                                            disabled={!isCheckedIn || hasCheckedOut}
+                                            className="w-full xs:w-auto"
+                                        > <LogOut className="mr-2 h-4 w-4"/> Check Out</Button>
+                                    </div>
+                                </div>
+                                {isCheckedIn && <Badge variant="secondary" className="text-xs mb-1"><CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500"/>Checked In at {format(parseISO(activity!.checkInTime!), "p")}</Badge>}
+                                {hasCheckedOut && <Badge variant="outline" className="text-xs mb-1">Checked Out at {format(parseISO(activity!.checkOutTime!), "p")}</Badge>}
+                                {hasCheckedOut && activity?.checkInTime && (
+                                    <p className="text-xs text-muted-foreground">Activity: {format(parseISO(activity.checkInTime), "p")} - {format(parseISO(activity.checkOutTime!), "p")}</p>
+                                )}
+                                {!isCheckedIn && !hasCheckedOut && <p className="text-xs text-muted-foreground">Not yet checked in.</p>}
                             </div>
-                            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCheckIn(event.id, personnelId)}
-                                disabled={isCheckedIn || wasCheckedOut}
-                                className="w-full sm:w-auto"
-                              >
-                                <LogIn className="mr-2 h-4 w-4"/> Check In
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCheckOut(event.id, personnelId)}
-                                disabled={!isCheckedIn || wasCheckedOut}
-                                className="w-full sm:w-auto"
-                              >
-                                <LogOut className="mr-2 h-4 w-4"/> Check Out
-                              </Button>
-                            </div>
-                          </div>
-                          {isCheckedIn && (
-                              <Badge variant="secondary" className="text-xs">
-                                <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500"/>
-                                Checked In at {currentUserActivity!.checkInTime ? format(parseISO(currentUserActivity!.checkInTime), "p") : 'N/A'}
-                              </Badge>
-                            )}
-                            {wasCheckedOut && (
-                              <Badge variant="outline" className="text-xs">
-                                Checked Out at {currentUserActivity!.checkOutTime ? format(parseISO(currentUserActivity!.checkOutTime), "p") : 'N/A'}
-                              </Badge>
-                            )}
-                             {wasCheckedOut && currentUserActivity?.checkInTime && currentUserActivity.checkOutTime && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Activity: {format(parseISO(currentUserActivity.checkInTime), "p")} - {format(parseISO(currentUserActivity.checkOutTime), "p")}
-                                </p>
-                            )}
-                            {!isCheckedIn && !wasCheckedOut && (
-                                 <p className="text-xs text-muted-foreground">Not yet checked in.</p>
-                            )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground mb-3">No personnel assigned to this event.</p>
-                  )}
+                        );
+                    })}
+                    {(!event.assignedPersonnelIds || event.assignedPersonnelIds.length === 0) && (
+                        <p className="text-sm text-muted-foreground mb-3">No personnel assigned to this event for individual check-in/out.</p>
+                    )}
 
                   <Separator className="my-3" />
                   <div className="flex items-center justify-between mb-2">
@@ -442,39 +384,39 @@ export default function ShootPage() {
                     <div className="space-y-1">
                       {shotsForEvent.map(shot => (
                         <div key={shot.id} className="flex items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
-                          <Badge
-                            variant={
-                                shot.status === "Captured" ? "default" :
-                                shot.status === "Completed" ? "default" :
-                                shot.status === "Unassigned" ? "outline" :
-                                shot.status === "Assigned" ? "secondary" :
-                                shot.status === "Blocked" ? "destructive" :
-                                shot.status === "Request More" ? "destructive" :
-                                "outline"
-                            }
-                            className="text-xs whitespace-nowrap px-2 py-0.5 w-[120px] justify-center self-start sm:self-center flex-shrink-0"
-                          >
-                            {shot.status}
-                          </Badge>
-                          <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
-                            {shot.description}
-                          </p>
-                          <div className="flex flex-row gap-1.5 items-center flex-shrink-0 self-start sm:self-center mt-1 sm:mt-0">
-                            <Button
-                              variant={cn("h-auto text-xs px-2 py-1", (shot.status === "Captured" || shot.status === "Completed") ? "bg-green-600 hover:bg-green-700 text-white" : "outline")}
-                              size="sm"
-                              onClick={() => handleShotAction(event.id, shot.id, 'toggleCapture')}
+                            <Badge
+                                variant={
+                                    shot.status === "Captured" ? "default" :
+                                    shot.status === "Completed" ? "default" :
+                                    shot.status === "Unassigned" ? "outline" :
+                                    shot.status === "Assigned" ? "secondary" :
+                                    shot.status === "Blocked" ? "destructive" :
+                                    shot.status === "Request More" ? "destructive" :
+                                    "outline"
+                                }
+                                className="text-xs whitespace-nowrap px-2 py-0.5 w-[120px] justify-center self-start sm:self-center flex-shrink-0"
                             >
-                              {(shot.status === "Captured" || shot.status === "Completed") ? "Uncapture" : "Capture"}
-                            </Button>
-                            <Button
-                              variant={cn("h-auto text-xs px-2 py-1", shot.status === "Blocked" ? "destructive" : "outline")}
-                              size="sm"
-                              onClick={() => handleShotAction(event.id, shot.id, 'toggleBlock')}
-                            >
-                              {shot.status === "Blocked" ? "Unblock" : "Block"}
-                            </Button>
-                          </div>
+                                {shot.status}
+                            </Badge>
+                            <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
+                                {shot.description}
+                            </p>
+                            <div className="flex flex-row gap-1.5 items-center flex-shrink-0 self-start sm:self-center mt-1 sm:mt-0">
+                                <Button
+                                variant={cn("h-auto text-xs px-2 py-1", (shot.status === "Captured" || shot.status === "Completed") ? "bg-green-600 hover:bg-green-700 text-white" : "outline")}
+                                size="sm"
+                                onClick={() => handleShotAction(event.id, shot.id, 'toggleCapture')}
+                                >
+                                {(shot.status === "Captured" || shot.status === "Completed") ? "Uncapture" : "Capture"}
+                                </Button>
+                                <Button
+                                variant={cn("h-auto text-xs px-2 py-1", shot.status === "Blocked" ? "destructive" : "outline")}
+                                size="sm"
+                                onClick={() => handleShotAction(event.id, shot.id, 'toggleBlock')}
+                                >
+                                {shot.status === "Blocked" ? "Unblock" : "Block"}
+                                </Button>
+                            </div>
                         </div>
                       ))}
                     </div>

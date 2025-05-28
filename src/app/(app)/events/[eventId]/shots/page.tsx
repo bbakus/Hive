@@ -10,15 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Camera, PlusCircle, Edit, Trash2, AlertTriangle, User, CheckCircle, Info, UserCheck } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -28,20 +19,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal } from "@/contexts/EventContext";
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 import { format, parseISO } from "date-fns";
 import { usePhaseContext } from '@/contexts/PhaseContext';
+import { ShotRequestFormDialog } from '@/components/modals/ShotRequestFormDialog';
 
-const DEFAULT_SHOT_ASSIGNMENT_VALUE = "--NONE--";
+const MOCK_CURRENT_USER_ID = "user_admin_ops"; 
+const MOCK_CURRENT_USER_NAME = "Ops Admin";
+
+const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
 
 export default function ShotListPage() {
   const params = useParams();
@@ -69,34 +59,6 @@ export default function ShotListPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const MOCK_CURRENT_USER_ID = "user_admin_ops"; 
-  const MOCK_CURRENT_USER_NAME = "Ops Admin";
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<ShotRequestFormData>({
-    resolver: zodResolver(shotRequestSchemaInternal),
-    defaultValues: {
-      description: "",
-      priority: "Medium",
-      status: "Unassigned",
-      assignedPersonnelId: "",
-      notes: "",
-      blockedReason: "",
-      initialCapturerId: "",
-      lastStatusModifierId: "",
-      lastStatusModifiedAt: "",
-    },
-  });
-
-  const watchedStatus = watch("status");
-
   useEffect(() => {
     if (eventId && !isEventContextLoading && shotRequestsByEventId) {
       setCurrentShotRequests(shotRequestsByEventId[eventId] || []);
@@ -107,51 +69,11 @@ export default function ShotListPage() {
   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
       setEvent(undefined); 
-      setCurrentShotRequests([]);
       return;
     }
-
     const foundEvent = getEventById(eventId);
     setEvent(foundEvent || null); 
-
-  }, [eventId, useDemoData, isSettingsContextLoading, isEventContextLoading, getEventById]);
-
-
-  useEffect(() => {
-    if (isShotModalOpen) {
-        if (editingShotRequest) {
-          reset({
-            description: editingShotRequest.description,
-            priority: editingShotRequest.priority,
-            status: editingShotRequest.status,
-            assignedPersonnelId: editingShotRequest.assignedPersonnelId || "",
-            notes: editingShotRequest.notes || "",
-            blockedReason: editingShotRequest.blockedReason || "",
-            initialCapturerId: editingShotRequest.initialCapturerId || "",
-            lastStatusModifierId: editingShotRequest.lastStatusModifierId || "",
-            lastStatusModifiedAt: editingShotRequest.lastStatusModifiedAt || "",
-          });
-        } else {
-          reset({ 
-            description: "",
-            priority: "Medium",
-            status: "Unassigned",
-            assignedPersonnelId: "",
-            notes: "",
-            blockedReason: "",
-            initialCapturerId: "",
-            lastStatusModifierId: "",
-            lastStatusModifiedAt: "",
-          });
-        }
-    }
-  }, [editingShotRequest, reset, isShotModalOpen]);
-
-  useEffect(() => {
-    if (watchedStatus !== "Blocked") {
-      setValue("blockedReason", ""); 
-    }
-  }, [watchedStatus, setValue]);
+  }, [eventId, isSettingsContextLoading, isEventContextLoading, getEventById]);
 
 
   const handleShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
@@ -168,15 +90,14 @@ export default function ShotListPage() {
     
     if (editingShotRequest) {
       dataToSubmit.initialCapturerId = editingShotRequest.initialCapturerId;
-      // lastStatusModifierId and lastStatusModifiedAt are updated by the context/status change logic
       
-      if (editingShotRequest.status !== data.status) { // If status changed via dialog
+      if (editingShotRequest.status !== data.status) { 
           dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
           dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
           if ((data.status === "Captured" || data.status === "Completed") && !editingShotRequest.initialCapturerId) {
               dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
           }
-      } else { // If status didn't change, preserve old modifier info
+      } else { 
         dataToSubmit.lastStatusModifierId = editingShotRequest.lastStatusModifierId;
         dataToSubmit.lastStatusModifiedAt = editingShotRequest.lastStatusModifiedAt;
       }
@@ -186,20 +107,21 @@ export default function ShotListPage() {
         title: "Shot Request Updated",
         description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
-    } else { // Adding new shot
+    } else { 
       dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
       dataToSubmit.lastStatusModifiedAt = new Date().toISOString();
       if ((data.status === "Captured" || data.status === "Completed")) {
             dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
       }
       
-      addShotRequest(eventId, dataToSubmit as ShotRequestFormData);
+      addShotRequest(eventId, dataToSubmit as ShotRequestFormData); // Cast needed as some fields might be missing for new shot
       toast({
         title: "Shot Request Added",
         description: `"${data.description.substring(0,30)}..." has been added.`,
       });
     }
-    closeShotModal();
+    setIsShotModalOpen(false);
+    setEditingShotRequest(null);
   };
 
   const openAddShotModal = () => {
@@ -210,11 +132,6 @@ export default function ShotListPage() {
   const openEditShotModal = (shot: ShotRequest) => {
     setEditingShotRequest(shot);
     setIsShotModalOpen(true);
-  };
-
-  const closeShotModal = () => {
-    setIsShotModalOpen(false);
-    setEditingShotRequest(null);
   };
 
   const handleDeleteShotClick = (shotId: string) => {
@@ -249,13 +166,12 @@ export default function ShotListPage() {
       const oldStatus = shotToUpdate.status;
 
       if (newStatus === "Captured" || newStatus === "Completed") {
-        if (!shotToUpdate.initialCapturerId) { // First time captured/completed
+        if (!shotToUpdate.initialCapturerId) { 
             updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
-        } else { // Re-capturing or marking complete after other statuses
-            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; // Retain original capturer
+        } else { 
+            updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; 
         }
       } else if ((oldStatus === "Captured" || oldStatus === "Completed") && shotToUpdate.initialCapturerId) {
-        // If moving away from captured/completed, ensure initialCapturerId is retained
         updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
       }
       
@@ -293,11 +209,11 @@ export default function ShotListPage() {
     return initialPersonnelMock.filter(person => event.assignedPersonnelIds!.includes(person.id));
   }, [event]);
 
-  const getPersonnelNameById = (id?: string) : string => {
+  const getPersonnelNameById = useCallback((id?: string) : string => {
     if (!id) return "Unknown User";
     const person = initialPersonnelMock.find(p => p.id === id);
     return person ? person.name : "Unknown User";
-  };
+  }, []);
 
   const isLoading = isSettingsContextLoading || isEventContextLoading || event === undefined;
 
@@ -318,8 +234,6 @@ export default function ShotListPage() {
         </div>
     );
   }
-
-  const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
 
   const backButtonHref = activePhase === "Shoot" ? "/shoot" : "/events";
   const backButtonText = activePhase === "Shoot" ? "Back to Shoot Day Overview" : "Back to All Events";
@@ -353,129 +267,15 @@ export default function ShotListPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={isShotModalOpen} onOpenChange={(isOpen) => {
-        if (!isOpen) closeShotModal(); else setIsShotModalOpen(true);
-      }}>
-          <DialogContent className="sm:max-w-[525px]">
-            <DialogHeader>
-              <DialogTitle>{editingShotRequest ? "Edit Shot Request" : "Add New Shot Request"}</DialogTitle>
-              <DialogDescription>
-                {editingShotRequest ? "Update the details for this shot." : "Fill in the details for the new shot."}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(handleShotRequestSubmit)} className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">Description</Label>
-                <div className="col-span-3">
-                  <Input id="description" {...register("description")} className={errors.description ? "border-destructive" : ""} />
-                  {errors.description && <p className="text-xs text-destructive mt-1">{errors.description.message}</p>}
-                </div>
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="priority" className="text-right">Priority</Label>
-                <div className="col-span-3">
-                   <Controller
-                    name="priority"
-                    control={control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <SelectTrigger className={errors.priority ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select priority" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["Low", "Medium", "High", "Critical"].map(prio => (
-                            <SelectItem key={prio} value={prio}>{prio}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.priority && <p className="text-xs text-destructive mt-1">{errors.priority.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">Status</Label>
-                <div className="col-span-3">
-                   <Controller
-                    name="status"
-                    control={control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <SelectTrigger className={errors.status ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {shotStatuses.map(s => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.status && <p className="text-xs text-destructive mt-1">{errors.status.message}</p>}
-                </div>
-              </div>
-
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="assignedPersonnelId" className="text-right">Assign Shot To</Label>
-                <div className="col-span-3">
-                   <Controller
-                    name="assignedPersonnelId"
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        onValueChange={(value) => field.onChange(value === DEFAULT_SHOT_ASSIGNMENT_VALUE ? "" : value)}
-                        value={field.value || DEFAULT_SHOT_ASSIGNMENT_VALUE}
-                      >
-                        <SelectTrigger className={errors.assignedPersonnelId ? "border-destructive" : ""}>
-                          <SelectValue placeholder="-- Event's Assigned Personnel --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={DEFAULT_SHOT_ASSIGNMENT_VALUE}>-- Event's Assigned Personnel --</SelectItem>
-                          {personnelAssignedToEvent.map(person => (
-                            <SelectItem key={person.id} value={person.id}>{person.name} ({person.role})</SelectItem>
-                          ))}
-                           {personnelAssignedToEvent.length === 0 && <p className="p-2 text-xs text-muted-foreground">No personnel assigned to parent event.</p>}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Optional. Defaults to event's assigned team.</p>
-                  {errors.assignedPersonnelId && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelId.message}</p>}
-                </div>
-              </div>
-
-              {watchedStatus === "Blocked" && (
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="blockedReason" className="text-right pt-2">Blocked Reason</Label>
-                  <div className="col-span-3">
-                    <Textarea
-                      id="blockedReason"
-                      {...register("blockedReason")}
-                      placeholder="Reason why this shot is blocked..."
-                      className={errors.blockedReason ? "border-destructive" : ""}
-                    />
-                    {errors.blockedReason && <p className="text-xs text-destructive mt-1">{errors.blockedReason.message}</p>}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="notes" className="text-right pt-2">Notes</Label>
-                <div className="col-span-3">
-                  <Textarea id="notes" {...register("notes")} placeholder="Optional notes, camera settings, talent cues..." />
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" onClick={closeShotModal}>Cancel</Button>
-                </DialogClose>
-                <Button type="submit">{editingShotRequest ? "Save Changes" : "Add Shot"}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
+      <ShotRequestFormDialog
+        isOpen={isShotModalOpen}
+        onOpenChange={setIsShotModalOpen}
+        editingShotRequest={editingShotRequest}
+        onSubmit={handleShotRequestSubmit}
+        parentEvent={event}
+        personnelAssignedToEvent={personnelAssignedToEvent}
+      />
+        
       <Card className="shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>

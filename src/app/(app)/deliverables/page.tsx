@@ -8,21 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, CalendarIcon } from "lucide-react";
+import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle } from "lucide-react";
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,27 +23,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import type { SubmitHandler } from "react-hook-form";
 import { format, parseISO } from "date-fns";
-import { cn } from "@/lib/utils";
+import { DeliverableFormDialog, type DeliverableFormDialogData } from "@/components/modals/DeliverableFormDialog";
 
-const deliverableSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters."),
-  event: z.string().min(3, "Event name must be at least 3 characters."),
-  projectId: z.string().min(1, "Please select a project."),
-  dueDate: z.date({ required_error: "Due date is required." }),
-  status: z.enum(["Pending", "In Progress", "Completed", "Blocked"]),
-  type: z.string().min(2, "Type must be at least 2 characters."),
-});
 
-type DeliverableFormData = z.infer<typeof deliverableSchema>;
-
-export type Deliverable = DeliverableFormData & {
+export type Deliverable = DeliverableFormDialogData & {
   id: string;
   projectName: string;
 };
@@ -86,54 +61,6 @@ export default function DeliverablesPage() {
       setDeliverablesList(useDemoData ? initialDeliverablesMock : []);
     }
   }, [useDemoData, isLoadingSettings]);
-
-  const {
-    register: registerDeliverable,
-    handleSubmit: handleSubmitDeliverable,
-    reset: resetDeliverableForm,
-    control: controlDeliverable,
-    formState: { errors: deliverableErrors },
-  } = useForm<DeliverableFormData>({
-    resolver: zodResolver(deliverableSchema),
-    defaultValues: {
-      name: "",
-      event: "",
-      projectId: "",
-      dueDate: new Date(),
-      status: "Pending",
-      type: "",
-    },
-  });
-  
-  useEffect(() => {
-    if (isDeliverableModalOpen && editingDeliverable) {
-      resetDeliverableForm({
-        name: editingDeliverable.name,
-        event: editingDeliverable.event,
-        projectId: editingDeliverable.projectId,
-        dueDate: editingDeliverable.dueDate,
-        status: editingDeliverable.status,
-        type: editingDeliverable.type,
-      });
-    } else if (isDeliverableModalOpen && !editingDeliverable) {
-      resetDeliverableForm({
-        name: "",
-        event: "",
-        projectId: selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : ""),
-        dueDate: new Date(),
-        status: "Pending",
-        type: "",
-      });
-    }
-  }, [isDeliverableModalOpen, editingDeliverable, resetDeliverableForm, selectedProject, allProjectsFromContext]);
-
-
-  const filteredDeliverables = useMemo(() => {
-    if (!selectedProject) {
-      return deliverablesList;
-    }
-    return deliverablesList.filter(d => d.projectName === selectedProject.name);
-  }, [selectedProject, deliverablesList]);
   
   useEffect(() => {
     if (selectedProject) {
@@ -144,7 +71,16 @@ export default function DeliverablesPage() {
     setSummaryResult(null); 
   }, [selectedProject]);
 
-  const handleDeliverableSubmit: SubmitHandler<DeliverableFormData> = (data) => {
+
+  const filteredDeliverables = useMemo(() => {
+    if (!selectedProject) {
+      return deliverablesList;
+    }
+    return deliverablesList.filter(d => d.projectName === selectedProject.name);
+  }, [selectedProject, deliverablesList]);
+  
+
+  const handleDeliverableSubmit: SubmitHandler<DeliverableFormDialogData> = (data) => {
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
     
     if (editingDeliverable) {
@@ -169,7 +105,8 @@ export default function DeliverablesPage() {
         description: `"${data.name}" has been successfully added.`,
       });
     }
-    closeDeliverableModal();
+    setIsDeliverableModalOpen(false);
+    setEditingDeliverable(null);
   };
   
   const openAddDeliverableModal = () => {
@@ -180,11 +117,6 @@ export default function DeliverablesPage() {
   const openEditDeliverableModal = (deliverable: Deliverable) => {
     setEditingDeliverable(deliverable);
     setIsDeliverableModalOpen(true);
-  };
-
-  const closeDeliverableModal = () => {
-    setIsDeliverableModalOpen(false);
-    setEditingDeliverable(null);
   };
 
   const handleDeleteDeliverableClick = (id: string) => {
@@ -260,126 +192,14 @@ export default function DeliverablesPage() {
         </Button>
       </div>
 
-      <Dialog open={isDeliverableModalOpen} onOpenChange={(isOpen) => {
-        if (!isOpen) closeDeliverableModal(); else setIsDeliverableModalOpen(true);
-      }}>
-          <DialogContent className="sm:max-w-[525px]">
-            <DialogHeader>
-              <DialogTitle>{editingDeliverable ? "Edit Deliverable" : "Add New Deliverable"}</DialogTitle>
-              <DialogDescription>
-                {editingDeliverable ? "Update details for this deliverable." : "Fill in the details for the new deliverable."}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitDeliverable(handleDeliverableSubmit)} className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="deliverable-name" className="text-right">Name</Label>
-                <div className="col-span-3">
-                  <Input id="deliverable-name" {...registerDeliverable("name")} className={deliverableErrors.name ? "border-destructive" : ""} />
-                  {deliverableErrors.name && <p className="text-xs text-destructive mt-1">{deliverableErrors.name.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="deliverable-event" className="text-right">Event</Label>
-                <div className="col-span-3">
-                  <Input id="deliverable-event" {...registerDeliverable("event")} className={deliverableErrors.event ? "border-destructive" : ""} />
-                  {deliverableErrors.event && <p className="text-xs text-destructive mt-1">{deliverableErrors.event.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="deliverable-project" className="text-right">Project</Label>
-                <div className="col-span-3">
-                  <Controller
-                    name="projectId"
-                    control={controlDeliverable}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value || (selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : ""))}>
-                        <SelectTrigger className={deliverableErrors.projectId ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select project" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allProjectsFromContext.map((proj) => (
-                            <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {deliverableErrors.projectId && <p className="text-xs text-destructive mt-1">{deliverableErrors.projectId.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="deliverable-dueDate" className="text-right">Due Date</Label>
-                <div className="col-span-3">
-                  <Controller
-                    name="dueDate"
-                    control={controlDeliverable}
-                    render={({ field }) => (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !field.value && "text-muted-foreground",
-                              deliverableErrors.dueDate ? "border-destructive" : ""
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  />
-                  {deliverableErrors.dueDate && <p className="text-xs text-destructive mt-1">{deliverableErrors.dueDate.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="deliverable-status" className="text-right">Status</Label>
-                <div className="col-span-3">
-                  <Controller
-                    name="status"
-                    control={controlDeliverable}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                        <SelectTrigger className={deliverableErrors.status ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["Pending", "In Progress", "Completed", "Blocked"].map(s => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                   {deliverableErrors.status && <p className="text-xs text-destructive mt-1">{deliverableErrors.status.message}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="deliverable-type" className="text-right">Type</Label>
-                <div className="col-span-3">
-                  <Input id="deliverable-type" {...registerDeliverable("type")} placeholder="e.g., Video, Images, Report" className={deliverableErrors.type ? "border-destructive" : ""} />
-                  {deliverableErrors.type && <p className="text-xs text-destructive mt-1">{deliverableErrors.type.message}</p>}
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline" onClick={closeDeliverableModal}>Cancel</Button>
-                </DialogClose>
-                <Button type="submit">{editingDeliverable ? "Save Changes" : "Add Deliverable"}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+      <DeliverableFormDialog
+        isOpen={isDeliverableModalOpen}
+        onOpenChange={setIsDeliverableModalOpen}
+        editingDeliverable={editingDeliverable}
+        onSubmit={handleDeliverableSubmit}
+        allProjects={allProjectsFromContext}
+        selectedProject={selectedProject}
+      />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
@@ -500,6 +320,5 @@ export default function DeliverablesPage() {
     </div>
   );
 }
-
 
     
