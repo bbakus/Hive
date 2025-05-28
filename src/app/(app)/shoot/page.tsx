@@ -10,7 +10,7 @@ import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page"; 
+import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
 import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -24,10 +24,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page"; // For personnel names
+import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
-// MOCK_CURRENT_USER_ID simulates the logged-in photographer for actions on this page
-const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
+
+const MOCK_CURRENT_USER_ID = "user_photog_field_sim";
 const MOCK_CURRENT_USER_NAME = "Field Photographer";
 
 
@@ -48,9 +58,13 @@ export default function ShootPage() {
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "in_progress" | "past">("all");
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
 
+  const [isBlockedReasonDialogOpen, setIsBlockedReasonDialogOpen] = useState(false);
+  const [shotForBlockedReason, setShotForBlockedReason] = useState<{ eventId: string; shotId: string; description: string } | null>(null);
+  const [currentBlockedReasonInput, setCurrentBlockedReasonInput] = useState("");
+
   useEffect(() => {
-    setCurrentTime(new Date()); 
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
+    setCurrentTime(new Date());
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -77,7 +91,7 @@ export default function ShootPage() {
 
   const getEventStatus = useCallback((event: Event, now: Date): "in_progress" | "upcoming" | "past" => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return "upcoming"; 
+    if (!times) return "upcoming";
 
     if (isWithinInterval(now, { start: times.start, end: times.end })) {
       return "in_progress";
@@ -113,12 +127,6 @@ export default function ShootPage() {
     }
   }, [currentTime, getEventStatus]);
 
-  const getShotProgress = useCallback((eventId: string): { captured: number; total: number } => {
-    const shots = getShotRequestsForEvent(eventId);
-    const total = shots.length;
-    const captured = shots.filter(shot => shot.status === "Captured" || shot.status === "Completed").length;
-    return { captured, total };
-  }, [getShotRequestsForEvent]);
 
   const handleShotAction = (eventId: string, shotId: string, actionType: "toggleCapture" | "toggleBlock") => {
     const shots = getShotRequestsForEvent(eventId);
@@ -131,68 +139,62 @@ export default function ShootPage() {
     if (actionType === 'toggleCapture') {
       const oldStatus = shotToUpdate.status;
       if (oldStatus === "Captured" || oldStatus === "Completed") {
-        updatePayload.status = "Assigned"; 
+        updatePayload.status = "Assigned";
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
-        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; 
       } else {
         updatePayload.status = "Captured";
         if (!shotToUpdate.initialCapturerId) {
           updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
-        } else {
-          updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
         }
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
       }
+      updateShotRequest(eventId, shotId, updatePayload);
       toast({
         title: "Shot Status Updated",
         description: `Shot "${shotToUpdate.description.substring(0,30)}..." set to ${updatePayload.status}.`
       });
     } else if (actionType === 'toggleBlock') {
-      const oldStatus = shotToUpdate.status;
-      if (oldStatus === "Blocked") {
+      if (shotToUpdate.status === "Blocked") { // Unblocking
         updatePayload.status = "Assigned";
-        updatePayload.blockedReason = ""; 
+        updatePayload.blockedReason = "";
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
-        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId; 
+        updateShotRequest(eventId, shotId, updatePayload);
         toast({
           title: "Shot Unblocked",
           description: `Shot "${shotToUpdate.description.substring(0,30)}..." status set to Assigned.`
         });
-      } else { // Trying to block the shot
-        const reason = window.prompt("Please provide a reason for blocking this shot (optional):");
-        updatePayload.status = "Blocked";
-        updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
-        updatePayload.lastStatusModifiedAt = nowISO;
-        updatePayload.initialCapturerId = shotToUpdate.initialCapturerId;
-
-        if (reason === null) { // Prompt cancelled or failed
-          updatePayload.blockedReason = "Blocked - (Reason not specified via quick action)";
-          toast({
-            title: "Shot Blocked",
-            description: `Shot "${shotToUpdate.description.substring(0,30)}..." Blocked (Reason not specified via quick action).`,
-          });
-        } else if (reason.trim() === "") { // User clicked OK on empty prompt
-          updatePayload.blockedReason = "Blocked - (No reason provided)";
-          toast({
-            title: "Shot Blocked",
-            description: `Shot "${shotToUpdate.description.substring(0,30)}..." Blocked (No reason provided).`,
-          });
-        } else { // Reason provided
-          updatePayload.blockedReason = reason.trim();
-           toast({
-            title: "Shot Blocked",
-            description: `Shot "${shotToUpdate.description.substring(0,30)}..." Blocked. Reason: ${reason.trim()}`
-          });
-        }
+      } else { // Attempting to block
+        setShotForBlockedReason({ eventId, shotId, description: shotToUpdate.description });
+        setCurrentBlockedReasonInput(shotToUpdate.blockedReason || "");
+        setIsBlockedReasonDialogOpen(true);
       }
     }
+  };
 
-    if (Object.keys(updatePayload).length > 0) {
-      updateShotRequest(eventId, shotId, updatePayload);
-    }
+  const handleSaveBlockedReason = () => {
+    if (!shotForBlockedReason) return;
+
+    const { eventId, shotId, description } = shotForBlockedReason;
+    const reasonToSave = currentBlockedReasonInput.trim();
+    
+    const updatePayload: Partial<ShotRequestFormData> = {
+      status: "Blocked",
+      blockedReason: reasonToSave || "Blocked - (No specific reason provided)",
+      lastStatusModifierId: MOCK_CURRENT_USER_ID,
+      lastStatusModifiedAt: new Date().toISOString(),
+    };
+
+    updateShotRequest(eventId, shotId, updatePayload);
+    toast({
+      title: "Shot Blocked",
+      description: `Shot "${description.substring(0,30)}..." Blocked. Reason: ${reasonToSave || "Not specified"}`
+    });
+    setIsBlockedReasonDialogOpen(false);
+    setShotForBlockedReason(null);
+    setCurrentBlockedReasonInput("");
   };
 
 
@@ -246,6 +248,43 @@ export default function ShootPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Dialog open={isBlockedReasonDialogOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setIsBlockedReasonDialogOpen(false);
+            setShotForBlockedReason(null);
+            setCurrentBlockedReasonInput("");
+          } else {
+            setIsBlockedReasonDialogOpen(true);
+          }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reason for Blocking Shot</DialogTitle>
+            <DialogDescription>
+              Provide a reason for blocking the shot: "{shotForBlockedReason?.description.substring(0,50)}...". This helps the team understand the issue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="blockedReasonInput" className="sr-only">Blocked Reason</Label>
+            <Textarea
+              id="blockedReasonInput"
+              value={currentBlockedReasonInput}
+              onChange={(e) => setCurrentBlockedReasonInput(e.target.value)}
+              placeholder="e.g., Talent unavailable, Equipment malfunction, Location access issue..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsBlockedReasonDialogOpen(false);
+              setShotForBlockedReason(null);
+              setCurrentBlockedReasonInput("");
+            }}>Cancel</Button>
+            <Button onClick={handleSaveBlockedReason}>Save Reason & Block Shot</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <RadioTower className="h-8 w-8 text-accent" /> Shoot Day Operations
@@ -301,9 +340,12 @@ export default function ShootPage() {
       {filteredTodaysEvents.length > 0 && (
         <Accordion type="multiple" className="w-full space-y-3">
           {filteredTodaysEvents.map(event => {
-            const shotProgress = getShotProgress(event.id);
             const eventStatusBadge = getEventStatusBadgeInfo(event);
             const shotsForEvent = getShotRequestsForEvent(event.id);
+            const shotProgress = {
+              captured: shotsForEvent.filter(s => s.status === "Captured" || s.status === "Completed").length,
+              total: shotsForEvent.length,
+            };
 
             return (
               <AccordionItem value={event.id} key={event.id} className="bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow border">
@@ -349,13 +391,13 @@ export default function ShootPage() {
                                 <p className="font-semibold text-sm">{person.name} <span className="text-xs text-muted-foreground">({person.role})</span></p>
                                 {person.cameraSerial && <p className="text-xs text-muted-foreground flex items-center gap-1"><CameraIcon className="h-3 w-3" /> S/N: {person.cameraSerial}</p>}
                             </div>
-                            <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center w-full xs:w-auto">
+                            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleCheckIn(event.id, personnelId)}
                                 disabled={isCheckedIn || wasCheckedOut}
-                                className="w-full xs:w-auto"
+                                className="w-full sm:w-auto"
                               >
                                 <LogIn className="mr-2 h-4 w-4"/> Check In
                               </Button>
@@ -364,7 +406,7 @@ export default function ShootPage() {
                                 size="sm"
                                 onClick={() => handleCheckOut(event.id, personnelId)}
                                 disabled={!isCheckedIn || wasCheckedOut}
-                                className="w-full xs:w-auto"
+                                className="w-full sm:w-auto"
                               >
                                 <LogOut className="mr-2 h-4 w-4"/> Check Out
                               </Button>
@@ -409,7 +451,7 @@ export default function ShootPage() {
                     <div className="space-y-1">
                       {shotsForEvent.map(shot => (
                         <div key={shot.id} className="flex items-center gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
-                           <Badge
+                          <Badge
                              variant={
                                 shot.status === "Captured" ? "default" :
                                 shot.status === "Completed" ? "default" :
@@ -426,12 +468,6 @@ export default function ShootPage() {
                           <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
                             {shot.description}
                           </p>
-                           {shot.status === "Blocked" && shot.blockedReason && (
-                            <p className="text-xs text-destructive ml-2 flex items-center gap-1" title={shot.blockedReason}>
-                                <AlertTriangleIcon className="h-3.5 w-3.5" />
-                                <span className="truncate max-w-[100px] sm:max-w-[150px]">{shot.blockedReason}</span>
-                            </p>
-                           )}
                           <div className="flex flex-row gap-1.5 items-center flex-shrink-0">
                             <Button
                               variant={(shot.status === "Captured" || shot.status === "Completed") ? "secondary" : "outline"}
@@ -466,3 +502,4 @@ export default function ShootPage() {
   );
 }
 
+    
