@@ -2,23 +2,21 @@
 "use client";
 
 import type { Event } from "@/app/(app)/events/page";
-import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { parseEventTimes } from "@/app/(app)/events/page"; // Keep this import
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Users, Settings, Zap, Eye, Camera as CameraIcon, AlertTriangle } from "lucide-react";
+import type { Personnel } from "@/app/(app)/personnel/page"; // Keep this import
 
 interface BlockScheduleViewProps {
   selectedDate: Date;
   eventsForDate: Event[];
-  personnelForDay: { id: string; name: string; }[];
+  personnelForDay: Personnel[]; // Use full Personnel type if available, or a subset { id, name }
   onEditEvent?: (event: Event) => void;
-  allPersonnel: { id: string; name: string; role: string }[]; // To get names for general display
+  allPersonnel: Personnel[];
 }
 
-const HOUR_ROW_HEIGHT_REM = 4; 
+const HOUR_ROW_HEIGHT_REM = 4;
 const TOTAL_HOURS = 24;
 
 const getPriorityColor = (priority: Event['priority']): string => {
@@ -70,14 +68,14 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
       position: 'absolute',
       top: `${top}px`,
       height: `${height}px`,
-      left: '2%', 
+      left: '2%',
       width: '96%',
-      zIndex: times.start.getMinutes() + 10, // Simple stacking
+      zIndex: 10 + Math.floor(eventStartOffsetMinutes / 60), // Basic stacking based on start hour
       overflow: 'hidden',
     };
   };
-  
-  if (eventsForDate.length === 0) {
+
+  if (!eventsForDate || eventsForDate.length === 0) {
     return (
       <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
         <CalendarIcon className="h-12 w-12 mb-4 text-muted" />
@@ -97,9 +95,9 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
            <p className="text-sm text-muted-foreground">Events below are not assigned to specific personnel for this day's view.</p>
         )}
       </div>
-      <div className="flex flex-grow overflow-x-auto"> {/* Make this scrollable for many personnel */}
+      <div className="flex flex-grow overflow-x-auto">
         {/* Time Gutter */}
-        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r">
+        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r sticky left-0 bg-background z-30">
           {hours.map((hour) => (
             <div
               key={`time-${hour}`}
@@ -109,19 +107,19 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
               {`${String(hour).padStart(2, '0')}:00`}
             </div>
           ))}
-           <div className="h-1 border-b"></div> {/* Ensure last border line */}
+           <div className="h-1 border-b"></div>
         </div>
 
         {/* Schedule Area */}
         <div className="flex flex-grow">
           {personnelForDay.length > 0 ? (
             personnelForDay.map((person) => (
-              <div 
-                key={person.id} 
+              <div
+                key={person.id}
                 className="flex-1 min-w-[200px] sm:min-w-[250px] border-r last:border-r-0 relative"
-                style={{ flexBasis: `${100 / Math.max(1,personnelForDay.length)}%` }} // Attempt at equal width
+                style={{ flexBasis: `${100 / Math.max(1,personnelForDay.length)}%` }}
               >
-                {/* Column Header */}
+                {/* Column Header - Made Sticky */}
                 <div className="h-10 flex items-center justify-center p-2 border-b bg-muted/50 sticky top-0 z-20">
                   <p className="font-medium text-sm truncate" title={person.name}>{person.name}</p>
                 </div>
@@ -140,7 +138,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                       .map((event) => {
                         const style = getEventBlockStyle(event);
                         if (!style) return null;
-                        
+
                         const assignedPersonnelNames = event.assignedPersonnelIds
                             ?.map(pid => allPersonnel.find(p => p.id === pid)?.name)
                             .filter(Boolean)
@@ -158,20 +156,18 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                             title={`${event.name} (${event.time}) - Assigned: ${assignedPersonnelNames}`}
                           >
                             {onEditEvent && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="absolute top-0 right-0 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70"
+                              <button
+                                className="absolute top-0.5 right-0.5 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70 rounded-sm flex items-center justify-center"
                                 onClick={(e) => { e.stopPropagation(); onEditEvent(event); }}
                                 aria-label="Edit event"
                               >
                                 <Settings className="h-3 w-3" />
-                              </Button>
+                              </button>
                             )}
                             <div>
                               <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
                                 {getCoverageIcon(event.isCovered)}
-                                {event.name}
+                                <span className="truncate">{event.name}</span>
                                 {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0 ml-0.5" title="Quick Turnaround"/>}
                               </p>
                               <p className="opacity-80 truncate leading-tight">{event.time}</p>
@@ -214,7 +210,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                        const style = getEventBlockStyle(event);
                        if (!style) return null;
                        return (
-                        <div key={event.id + "-general"} style={style} 
+                        <div key={event.id + "-general"} style={style}
                              className={cn(
                               "rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
                               getPriorityColor(event.priority),
@@ -223,14 +219,14 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
                              title={`${event.name} (${event.time})`}
                         >
                            {onEditEvent && (
-                              <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70" onClick={(e) => { e.stopPropagation(); onEditEvent(event); }} aria-label="Edit event">
+                              <button className="absolute top-0.5 right-0.5 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70 rounded-sm flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onEditEvent(event); }} aria-label="Edit event">
                                 <Settings className="h-3 w-3" />
-                              </Button>
+                              </button>
                             )}
                             <div>
                                 <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
                                     {getCoverageIcon(event.isCovered)}
-                                    {event.name}
+                                    <span className="truncate">{event.name}</span>
                                     {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0 ml-0.5" title="Quick Turnaround"/>}
                                 </p>
                                 <p className="opacity-80 truncate leading-tight">{event.time}</p>
@@ -270,4 +266,3 @@ const CalendarIcon = ({ className, ...props }: React.ComponentProps<typeof Users
     <path d="M16 18h.01"/>
   </svg>
 );
-    
