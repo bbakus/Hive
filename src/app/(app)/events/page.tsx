@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video as VideoIconLucide } from "lucide-react";
@@ -82,8 +82,8 @@ export type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventContextEvent & {
   hasOverlap?: boolean;
-  organizationId?: string;
-  discipline?: "Photography" | "";
+  // organizationId is now part of EventContextEvent
+  // discipline is now part of EventContextEvent
 };
 
 
@@ -149,12 +149,12 @@ export function formatDeadline(deadlineString?: string): string | null {
 }
 
 const getCoverageIcon = (isCovered?: boolean) => {
-  if (isCovered === true) return <Eye className="h-5 w-5 text-accent opacity-90" title="Covered Event" />;
-  return <Eye className="h-5 w-5 text-muted-foreground/50 opacity-70" title="Not Covered" />;
+  if (isCovered === true) return <Eye className="h-5 w-5 text-accent opacity-90 flex-shrink-0" title="Covered Event" />;
+  return <Eye className="h-5 w-5 text-muted-foreground/50 opacity-70 flex-shrink-0" title="Not Covered" />;
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80" />;
+  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />;
   return null;
 };
 
@@ -187,15 +187,16 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="mb-6 p-4 border rounded-md shadow-sm bg-card"> {/* Simplified wrapper */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="flex items-center space-x-2">
+    <div className="mb-6 p-4 border rounded-md bg-card shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+        <div className="flex items-center space-x-2 pt-2">
           <Checkbox
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+            className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
           />
-          <Label htmlFor="filter-quick-turnaround" className="font-normal">Quick Turnaround</Label>
+          <Label htmlFor="filter-quick-turnaround" className="font-normal whitespace-nowrap">Quick Turnaround Only</Label>
         </div>
         <div>
           <Label htmlFor="filter-time-status" className="text-xs">Time Status</Label>
@@ -252,7 +253,7 @@ function EventFilters({
             </SelectContent>
           </Select>
         </div>
-        <div className="lg:col-span-1">
+        <div>
           <Label htmlFor="filter-specific-dates" className="text-xs">Specific Dates</Label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -338,8 +339,8 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                       <div className="flex-grow space-y-1">
                         <CardTitle className="text-lg flex items-center gap-1.5">
                            {getCoverageIcon(event.isCovered)}
-                          <span className="truncate" title={event.name}>{event.name}</span>
-                          {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
+                           <span className="truncate" title={event.name}>{event.name}</span>
+                           {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
                         </CardTitle>
                         <div className="text-xs text-muted-foreground space-y-0.5">
                             <p className="flex items-center gap-1">
@@ -727,7 +728,7 @@ export default function EventsPage() {
 
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+          filtered = filtered.filter(event => event.discipline === "Photography");
       } else if (filterDiscipline === "na_or_other") { 
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
