@@ -13,7 +13,7 @@ interface BlockScheduleViewProps {
   eventsForDate: Event[];
   personnelForDay: Personnel[];
   onEditEvent?: (event: Event) => void;
-  allPersonnel: Personnel[];
+  allPersonnel: Personnel[]; // Full list of personnel to get names from IDs
 }
 
 const HOUR_ROW_HEIGHT_REM = 4;
@@ -24,7 +24,7 @@ const getPriorityColor = (priority: Event['priority']): string => {
     case "Critical":
       return "bg-destructive/80 border-destructive text-destructive-foreground";
     case "High":
-      return "bg-secondary border-foreground/30 text-secondary-foreground"; // Keep distinct from accent for now
+      return "bg-secondary border-foreground/30 text-secondary-foreground";
     case "Medium":
       return "bg-primary/70 border-primary text-primary-foreground";
     case "Low":
@@ -47,7 +47,7 @@ const getDisciplineIcon = (discipline?: Event['discipline']) => {
 
 export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay, onEditEvent, allPersonnel }: BlockScheduleViewProps) {
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i);
-  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16; 
+  const hourRowHeightPx = HOUR_ROW_HEIGHT_REM * 16;
   const pixelsPerMinute = hourRowHeightPx / 60;
 
   const getEventBlockStyle = (event: Event): React.CSSProperties | null => {
@@ -59,7 +59,7 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
 
     const eventStartOffsetMinutes = (times.start.getTime() - startOfDayDate.getTime()) / (1000 * 60);
     let durationInMinutes = ((times.end.getTime() - times.start.getTime()) / (1000 * 60));
-    if (durationInMinutes <= 0) durationInMinutes = 15; 
+    if (durationInMinutes <= 0) durationInMinutes = 15;
 
     const top = eventStartOffsetMinutes * pixelsPerMinute;
     const height = Math.max(durationInMinutes * pixelsPerMinute, 30);
@@ -84,19 +84,35 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
     );
   }
 
+  const displayPersonnel = personnelForDay.length > 0 ? personnelForDay : [{ id: "general", name: "General / Unassigned" }];
+
   return (
     <div className="flex flex-col bg-background rounded-lg shadow">
       <div className="p-4 border-b">
         <h3 className="text-lg font-semibold">
           Schedule for: {format(selectedDate, "EEEE, MMMM do, yyyy")}
         </h3>
-        {personnelForDay.length === 0 && eventsForDate.length > 0 && (
-           <p className="text-sm text-muted-foreground">Events below are not assigned to specific personnel for this day's view.</p>
-        )}
       </div>
+
+      {/* Header Row for Personnel Names */}
+      <div className="flex sticky top-16 bg-background z-20 shadow-sm"> {/* Sticky header row */}
+        <div className="w-20 shrink-0 border-b border-r"> {/* Spacer for time gutter */}
+          &nbsp;
+        </div>
+        {displayPersonnel.map((person) => (
+          <div
+            key={`header-${person.id}`}
+            className="flex-1 min-w-[200px] sm:min-w-[250px] border-b border-r last:border-r-0 p-2 text-center font-medium text-sm"
+          >
+            {person.name}
+          </div>
+        ))}
+      </div>
+
+      {/* Timeline Area */}
       <div className="flex flex-grow overflow-x-auto">
         {/* Time Gutter */}
-        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r bg-background z-20"> {/* Added z-20 to keep it above grid lines potentially */}
+        <div className="w-20 text-xs text-muted-foreground shrink-0 border-r bg-background z-10"> {/* Ensure bg for time gutter */}
           {hours.map((hour) => (
             <div
               key={`time-${hour}`}
@@ -106,142 +122,86 @@ export function BlockScheduleView({ selectedDate, eventsForDate, personnelForDay
               {`${String(hour).padStart(2, '0')}:00`}
             </div>
           ))}
-           <div className="h-1 border-b"></div> 
+           <div className="h-1 border-b"></div>
         </div>
 
-        {/* Schedule Area */}
+        {/* Schedule Columns */}
         <div className="flex flex-grow">
-          {personnelForDay.length > 0 ? (
-            personnelForDay.map((person) => (
-              <div
-                key={person.id}
-                className="flex-1 min-w-[200px] sm:min-w-[250px] border-r last:border-r-0"
-              >
-                {/* Column Header - Sticky */}
-                <div className="h-10 flex items-center justify-center p-2 border-b bg-background sticky top-16 z-20 shadow-sm"> {/* Changed to bg-background, increased z-index slightly */}
-                  <p className="font-medium text-sm truncate" title={person.name}>{person.name}</p>
-                </div>
-                {/* Column Timeline - Events are positioned absolutely within this */}
-                <div className="relative">
-                    {hours.map((hour) => (
-                        <div key={`grid-${person.id}-${hour}`} className="border-b" style={{ height: `${HOUR_ROW_HEIGHT_REM}rem` }}>
-                            <div className="border-b border-dashed border-border/30" style={{height: `${HOUR_ROW_HEIGHT_REM / 2}rem`}}></div>
-                        </div>
-                    ))}
-                     <div className="h-1 border-b"></div>
+          {displayPersonnel.map((person) => (
+            <div
+              key={person.id}
+              className="flex-1 min-w-[200px] sm:min-w-[250px] border-r last:border-r-0"
+            >
+              {/* Column Timeline - Events are positioned absolutely within this */}
+              <div className="relative">
+                  {hours.map((hour) => (
+                      <div key={`grid-${person.id}-${hour}`} className="border-b" style={{ height: `${HOUR_ROW_HEIGHT_REM}rem` }}>
+                          <div className="border-b border-dashed border-border/30" style={{height: `${HOUR_ROW_HEIGHT_REM / 2}rem`}}></div>
+                      </div>
+                  ))}
+                   <div className="h-1 border-b"></div> {/* Extra border at bottom of timeline */}
 
-                    {eventsForDate
-                      .filter(event => event.assignedPersonnelIds?.includes(person.id))
-                      .map((event) => {
-                        const style = getEventBlockStyle(event);
-                        if (!style) return null;
+                  {eventsForDate
+                    .filter(event => person.id === "general" ? !event.assignedPersonnelIds || event.assignedPersonnelIds.length === 0 : event.assignedPersonnelIds?.includes(person.id))
+                    .map((event) => {
+                      const style = getEventBlockStyle(event);
+                      if (!style) return null;
 
-                        const assignedPersonnelNames = event.assignedPersonnelIds
-                            ?.map(pid => allPersonnel.find(p => p.id === pid)?.name)
-                            .filter(Boolean)
-                            .join(', ') || 'N/A';
+                      const assignedPersonnelNames = event.assignedPersonnelIds
+                          ?.map(pid => allPersonnel.find(p => p.id === pid)?.name)
+                          .filter(Boolean)
+                          .join(', ') || 'N/A';
 
-                        return (
-                          <div
-                            key={`${event.id}-col-${person.id}`}
-                            style={style}
-                            className={cn(
-                              "rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
-                              getPriorityColor(event.priority),
-                              event.isCovered === false && "opacity-60 bg-muted/50 border-muted-foreground/30 hover:opacity-90"
-                            )}
-                            title={`${event.name} (${event.time}) - Assigned: ${assignedPersonnelNames}`}
-                          >
-                            {onEditEvent && (
-                              <button
-                                className="absolute top-0.5 right-0.5 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70 rounded-sm flex items-center justify-center"
-                                onClick={(e) => { e.stopPropagation(); onEditEvent(event); }}
-                                aria-label="Edit event"
-                              >
-                                <Settings className="h-3 w-3" />
-                              </button>
-                            )}
-                            <div>
-                              <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
-                                {getCoverageIcon(event.isCovered)}
-                                <span className="truncate">{event.name}</span>
-                                {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0 ml-0.5" title="Quick Turnaround"/>}
-                              </p>
-                              <p className="opacity-80 truncate leading-tight">{event.time}</p>
-                            </div>
-                            <div className="mt-0.5 space-y-0.5 text-[9px]">
-                                {event.discipline && (
-                                    <p className="opacity-70 truncate leading-tight flex items-center gap-0.5">
-                                        {getDisciplineIcon(event.discipline)}
-                                        {event.discipline}
-                                    </p>
-                                )}
-                                {event.hasOverlap && <p className="text-destructive/80 font-semibold leading-tight flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5"/> Conflict</p>}
-                                {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 1 && (
-                                  <p className="opacity-70 truncate leading-tight flex items-center gap-0.5" title={`Assigned: ${assignedPersonnelNames}`}>
-                                    <Users className="h-2.5 w-2.5 shrink-0" />
-                                    Shared ({event.assignedPersonnelIds.length})
-                                  </p>
-                                )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                </div>
-              </div>
-            ))
-          ) : ( // Fallback for no personnel assigned to any event on this day
-            <div className="flex-1 min-w-[250px] border-r last:border-r-0">
-                <div className="h-10 flex items-center justify-center p-2 border-b bg-background sticky top-16 z-20 shadow-sm">
-                  <p className="font-medium text-sm truncate">General / Unassigned</p>
-                </div>
-                <div className="relative">
-                    {hours.map((hour) => (
-                        <div key={`grid-general-${hour}`} className="border-b" style={{ height: `${HOUR_ROW_HEIGHT_REM}rem` }}>
-                             <div className="border-b border-dashed border-border/30" style={{height: `${HOUR_ROW_HEIGHT_REM / 2}rem`}}></div>
-                        </div>
-                    ))}
-                    <div className="h-1 border-b"></div>
-                    {eventsForDate.map((event) => {
-                       const style = getEventBlockStyle(event);
-                       if (!style) return null;
-                       return (
-                        <div key={event.id + "-general"} style={style}
-                             className={cn(
-                              "rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
-                              getPriorityColor(event.priority),
-                               event.isCovered === false && "opacity-60 bg-muted/50 border-muted-foreground/30 hover:opacity-90"
-                            )}
-                             title={`${event.name} (${event.time})`}
+                      return (
+                        <div
+                          key={`${event.id}-col-${person.id}`}
+                          style={style}
+                          className={cn(
+                            "rounded-md p-1.5 border transition-all duration-150 ease-in-out shadow-md flex flex-col justify-between group text-[10px]",
+                            getPriorityColor(event.priority),
+                            event.isCovered === false && "opacity-60 bg-muted/50 border-muted-foreground/30 hover:opacity-90"
+                          )}
+                          title={`${event.name} (${event.time}) - Assigned: ${assignedPersonnelNames}`}
                         >
-                           {onEditEvent && (
-                              <button className="absolute top-0.5 right-0.5 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70 rounded-sm flex items-center justify-center" onClick={(e) => { e.stopPropagation(); onEditEvent(event); }} aria-label="Edit event">
-                                <Settings className="h-3 w-3" />
-                              </button>
-                            )}
-                            <div>
-                                <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
-                                    {getCoverageIcon(event.isCovered)}
-                                    <span className="truncate">{event.name}</span>
-                                    {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0 ml-0.5" title="Quick Turnaround"/>}
+                          {onEditEvent && (
+                            <button
+                              className="absolute top-0.5 right-0.5 h-5 w-5 p-0.5 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-card/50 hover:bg-card/70 rounded-sm flex items-center justify-center"
+                              onClick={(e) => { e.stopPropagation(); onEditEvent(event); }}
+                              aria-label="Edit event"
+                            >
+                              <Settings className="h-3 w-3" />
+                            </button>
+                          )}
+                          <div>
+                            <p className="text-xs font-semibold truncate leading-tight flex items-center gap-1">
+                              {getCoverageIcon(event.isCovered)}
+                              <span className="truncate">{event.name}</span>
+                              {event.isQuickTurnaround && <Zap className="h-3 w-3 text-red-400 flex-shrink-0 ml-0.5" title="Quick Turnaround"/>}
+                            </p>
+                            <p className="opacity-80 truncate leading-tight">{event.time}</p>
+                            <p className="opacity-70 truncate leading-tight">Proj: {event.project?.substring(0,15)}{event.project && event.project.length > 15 ? '...' : ''}</p>
+                          </div>
+                          <div className="mt-0.5 space-y-0.5 text-[9px]">
+                              {event.discipline && (
+                                  <p className="opacity-70 truncate leading-tight flex items-center gap-0.5">
+                                      {getDisciplineIcon(event.discipline)}
+                                      {event.discipline}
+                                  </p>
+                              )}
+                              {event.hasOverlap && <p className="text-destructive/80 font-semibold leading-tight flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5"/> Conflict</p>}
+                              {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 1 && (
+                                <p className="opacity-70 truncate leading-tight flex items-center gap-0.5" title={`Assigned: ${assignedPersonnelNames}`}>
+                                  <Users className="h-2.5 w-2.5 shrink-0" />
+                                  Shared ({event.assignedPersonnelIds.length})
                                 </p>
-                                <p className="opacity-80 truncate leading-tight">{event.time}</p>
-                            </div>
-                            <div className="mt-0.5 space-y-0.5 text-[9px]">
-                                {event.hasOverlap && <p className="text-destructive/80 font-semibold leading-tight flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5"/> Conflict</p>}
-                                {event.assignedPersonnelIds && event.assignedPersonnelIds.length > 0 && (
-                                    <p className="opacity-70 truncate leading-tight flex items-center gap-0.5" title={`Assigned: ${event.assignedPersonnelIds.map(pid => allPersonnel.find(p => p.id === pid)?.name).filter(Boolean).join(', ')}`}>
-                                        <Users className="h-2.5 w-2.5 shrink-0" />
-                                        {event.assignedPersonnelIds.length} Assigned
-                                    </p>
-                                )}
-                            </div>
+                              )}
+                          </div>
                         </div>
-                       );
+                      );
                     })}
-                </div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
     </div>
@@ -263,4 +223,6 @@ const CalendarIcon = ({ className, ...props }: React.ComponentProps<typeof Users
     <path d="M16 18h.01"/>
   </svg>
 );
+    
+
     
