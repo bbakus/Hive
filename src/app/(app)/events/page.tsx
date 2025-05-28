@@ -82,8 +82,8 @@ export type EventFormData = z.infer<typeof eventSchema>;
 
 export type Event = EventContextEvent & {
   hasOverlap?: boolean;
-  // organizationId is now part of EventContextEvent
-  // discipline is now part of EventContextEvent
+  organizationId?: string;
+  discipline?: "Photography" | "";
 };
 
 
@@ -194,7 +194,7 @@ function EventFilters({
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-            className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+            // className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground" // Rely on global checkbox styling
           />
           <Label htmlFor="filter-quick-turnaround" className="font-normal whitespace-nowrap">Quick Turnaround Only</Label>
         </div>
@@ -342,7 +342,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                            <span className="truncate" title={event.name}>{event.name}</span>
                            {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
                         </CardTitle>
-                        <div className="text-xs text-muted-foreground space-y-0.5">
+                         <div className="text-xs text-muted-foreground space-y-0.5">
                             <p className="flex items-center gap-1">
                                 {event.time}
                                 {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
@@ -352,7 +352,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                 event.priority === "Medium" ? "outline" : "default"
                                 } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
                             </p>
-                            {!selectedProject && event.project && (
+                             {!selectedProject && event.project && (
                               <p className="text-xs mt-0.5 truncate" title={event.project}>
                                   Project: {event.project}
                               </p>
@@ -601,7 +601,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [],
+    eventsForSelectedProjectAndOrg = [], // Ensure default to empty array
     addEvent,
     updateEvent,
     deleteEvent,

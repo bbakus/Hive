@@ -135,40 +135,6 @@ export default function ShootPage() {
     };
   }, [getShotRequestsForEvent]);
 
-  const handleShotCheckChange = (shotId: string, eventId: string, isChecked: boolean, currentStatus: ShotRequest['status']) => {
-    let newStatus: ShotRequest['status'] | undefined = undefined;
-    const updatePayload: Partial<ShotRequestFormData> = {};
-
-    if (isChecked) {
-      if (currentStatus !== "Captured" && currentStatus !== "Completed") {
-        newStatus = "Captured";
-      }
-    } else { // Unchecking
-      if (currentStatus === "Captured") { // Only un-capture if it was captured
-        newStatus = "Assigned"; // Or "Unassigned" if preferred
-      }
-    }
-
-    if (newStatus) {
-      updatePayload.status = newStatus;
-      updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
-      updatePayload.lastStatusModifiedAt = new Date().toISOString();
-
-      if (newStatus === "Captured") {
-        const shotToUpdate = getShotRequestsForEvent(eventId).find(s => s.id === shotId);
-        if (shotToUpdate && !shotToUpdate.initialCapturerId) {
-          updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
-        }
-      }
-      
-      updateShotRequest(eventId, shotId, updatePayload);
-      toast({
-        title: "Shot Status Updated",
-        description: `Shot status changed to ${newStatus}.`
-      });
-    }
-  };
-
   const handleShotAction = (eventId: string, shotId: string, actionType: "toggleCapture" | "toggleBlock") => {
     const shots = getShotRequestsForEvent(eventId);
     const shotToUpdate = shots.find(s => s.id === shotId);
@@ -194,7 +160,7 @@ export default function ShootPage() {
     } else if (actionType === 'toggleBlock') {
       if (shotToUpdate.status === "Blocked") {
         updatePayload.status = "Assigned";
-        updatePayload.blockedReason = ""; // Clear reason when unblocking
+        updatePayload.blockedReason = ""; 
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
         updateShotRequest(eventId, shotId, updatePayload);
@@ -327,9 +293,6 @@ export default function ShootPage() {
       </div>
 
       <Card className="shadow-sm border-border/50">
-        <CardHeader className="py-3 px-4">
-          {/* Title and Description removed */}
-        </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3 px-4">
             <div>
                 <Label htmlFor="filter-time-status" className="text-xs text-muted-foreground">Status</Label>
@@ -350,7 +313,7 @@ export default function ShootPage() {
                     id="filter-quick-turnaround"
                     checked={filterQuickTurnaround}
                     onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-                    className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
+                    // className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground" // Rely on global checkbox style
                 />
                 <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm">Quick Turnaround Only</Label>
             </div>
@@ -478,9 +441,9 @@ export default function ShootPage() {
                   {shotsForEvent.length > 0 ? (
                     <div className="space-y-1">
                       {shotsForEvent.map(shot => (
-                        <div key={shot.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
-                           <Badge
-                             variant={
+                        <div key={shot.id} className="flex items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors">
+                          <Badge
+                            variant={
                                 shot.status === "Captured" ? "default" :
                                 shot.status === "Completed" ? "default" :
                                 shot.status === "Unassigned" ? "outline" :
@@ -496,12 +459,6 @@ export default function ShootPage() {
                           <p className="flex-1 text-sm text-foreground truncate" title={shot.description}>
                             {shot.description}
                           </p>
-                          {shot.status === "Blocked" && shot.blockedReason && (
-                            <p className="text-xs text-destructive mt-1 sm:mt-0 flex items-center gap-1 w-full sm:w-auto" title={shot.blockedReason}>
-                              <AlertTriangleIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                              {shot.blockedReason}
-                            </p>
-                          )}
                           <div className="flex flex-row gap-1.5 items-center flex-shrink-0 self-start sm:self-center mt-1 sm:mt-0">
                             <Button
                               variant={cn("h-auto text-xs px-2 py-1", (shot.status === "Captured" || shot.status === "Completed") ? "bg-green-600 hover:bg-green-700 text-white" : "outline")}
