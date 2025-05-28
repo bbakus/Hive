@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive } from 'lucide-react';
+import { UploadCloud, User, CalendarDays, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, ScanLine } from 'lucide-react'; // Added ScanLine
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -23,8 +23,9 @@ async function startIngestJob(data: {
   photographerId: string;
   eventId: string;
   sourcePaths: string[];
-  workingPath: string; // Changed to workingPath for clarity, matching provided example
-  backupPath: string;  // Added backupPath
+  workingPath: string; 
+  backupPath: string;
+  photographerCameraSerial?: string; // Added for conceptual passing
 }) {
   try {
     const response = await fetch(`${LOCAL_AGENT_BASE_URL}/ingest`, {
@@ -55,14 +56,13 @@ async function checkJobStatus(jobId: string) {
       const errorData = await response.json().catch(() => ({ message: 'Failed to get job status. Server returned an error.' }));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
-    return await response.json(); // Expecting { status: string, progress?: number, message?: string, filesProcessed?: number, totalSizeMB?: number, errors?: string[] }
+    return await response.json(); // Expecting { status: string, progress?: number, message?: string, filesProcessed?: number, totalSizeMB?: number, errors?: string[], checksumResult?: string }
   } catch (error) {
     console.error('Error checking job status:', error);
     throw error;
   }
 }
 
-// Function to get available drives (conceptual, UI not fully implemented)
 async function getAvailableDrives() {
   try {
     const response = await fetch(`${LOCAL_AGENT_BASE_URL}/available-drives`);
@@ -101,7 +101,7 @@ export default function IngestionUtilityPage() {
     filesProcessed: number;
     totalSizeMB: number;
     shotsUpdated: number;
-    checksumStatus: string; // Updated to string to reflect agent's report
+    checksumStatus: string;
     finalMessage?: string;
     errors?: string[];
   } | null>(null);
@@ -109,6 +109,8 @@ export default function IngestionUtilityPage() {
   const availablePhotographers = initialPersonnelMock.filter(
     p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
   );
+  
+  const selectedPhotographerDetails = initialPersonnelMock.find(p => p.id === selectedPhotographerId);
 
   const logMessage = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
     const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : '';
@@ -116,7 +118,6 @@ export default function IngestionUtilityPage() {
   }, []);
 
   useEffect(() => {
-    // Cleanup polling interval on component unmount
     return () => {
       if (pollingIntervalId) {
         clearInterval(pollingIntervalId);
@@ -126,13 +127,14 @@ export default function IngestionUtilityPage() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedFiles(event.target.files);
+    // Future: Could attempt EXIF parse of first file here for camera serial, but keeping it simple for now.
   };
 
   const handleStartIngestion = async () => {
     if (!selectedPhotographerId || !selectedEventId || !selectedFiles || selectedFiles.length === 0) {
       toast({
         title: 'Missing Information',
-        description: 'Please select photographer, event, and source files.',
+        description: 'Please select photographer, event, and source files for HIVE context.',
         variant: 'destructive',
       });
       return;
@@ -167,17 +169,15 @@ export default function IngestionUtilityPage() {
     const jobData = {
       photographerId: selectedPhotographerId,
       eventId: selectedEventId,
-      sourcePaths: [sourcePath], // Assuming sourcePath is a single folder path for now
+      sourcePaths: [sourcePath], 
       workingPath: workingPath,
       backupPath: backupPath,
-      // You could add more details like file names if needed by your agent, 
-      // but typically the agent reads from sourcePaths.
-      // files: selectedFiles ? Array.from(selectedFiles).map(f => ({name: f.name, size: f.size})) : []
+      photographerCameraSerial: photographer.cameraSerial || undefined,
     };
 
     try {
       logMessage(`Sending job to local agent for Event: "${event.name}", Photographer: "${photographer.name}"...`);
-      logMessage(`Job details: Source: ${sourcePath}, Working: ${workingPath}, Backup: ${backupPath}`);
+      logMessage(`Job details: Source: ${sourcePath}, Working: ${workingPath}, Backup: ${backupPath}, Camera S/N: ${photographer.cameraSerial || 'N/A'}`);
       const result = await startIngestJob(jobData);
       
       if (result.jobId) {
@@ -186,13 +186,10 @@ export default function IngestionUtilityPage() {
         toast({ title: 'Job Submitted', description: `Job ID: ${result.jobId}. Polling for status...` });
 
         const interval = setInterval(async () => {
-          if (currentJobId === null && result.jobId === null) { // Ensure we use the latest jobId
-             clearInterval(interval);
-             return;
-          }
-          const currentJobToPoll = currentJobId || result.jobId; // Use the one that's set
+          const currentJobToPoll = result.jobId; 
           if (!currentJobToPoll) {
              clearInterval(interval);
+             setPollingIntervalId(null);
              return;
           }
 
@@ -210,7 +207,7 @@ export default function IngestionUtilityPage() {
               setIngestionSummary({
                 filesProcessed: statusResult.filesProcessed || 0,
                 totalSizeMB: statusResult.totalSizeMB || 0,
-                shotsUpdated: 0, // Will be updated after processing HIVE side
+                shotsUpdated: 0, 
                 checksumStatus: statusResult.checksumResult || statusResult.checksumStatus || "N/A",
                 finalMessage: statusResult.message,
                 errors: statusResult.errors
@@ -218,11 +215,11 @@ export default function IngestionUtilityPage() {
 
               if (statusResult.status === 'completed') {
                 toast({ title: 'Ingestion Complete', description: statusResult.message || 'Files processed by local agent.' });
-                // Update HIVE shot statuses
+                
                 let shotsUpdatedCount = 0;
                 const shotsForEvent = getShotRequestsForEvent(selectedEventId);
                 const updatableShots = shotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
-                // Use filesProcessed from agent if available, otherwise selectedFiles.length
+                
                 const filesToConsiderForShotUpdate = statusResult.filesProcessed || (selectedFiles ? selectedFiles.length : 0);
                 const shotsToUpdateCount = Math.min(updatableShots.length, filesToConsiderForShotUpdate);
 
@@ -237,26 +234,31 @@ export default function IngestionUtilityPage() {
                       lastStatusModifiedAt: new Date().toISOString(),
                     };
                     try {
-                      updateShotRequest(selectedEventId, shot.id, updatePayload); // Removed await
+                      updateShotRequest(selectedEventId, shot.id, updatePayload);
                       logMessage(`HIVE status updated for shot: "${shot.description.substring(0,30)}..." to Captured.`);
                       shotsUpdatedCount++;
-                    } catch (hiveError) {
-                      logMessage(`HIVE Error updating shot "${shot.description.substring(0,30)}...": ${hiveError}`, 'error');
+                    } catch (hiveError: any) {
+                      logMessage(`HIVE Error updating shot "${shot.description.substring(0,30)}...": ${hiveError.message || String(hiveError)}`, 'error');
                     }
                   }
                    setIngestionSummary(prev => prev ? {...prev, shotsUpdated: shotsUpdatedCount} : null);
                 } else {
                   logMessage(`No updatable shots found in HIVE for event "${event.name}" or no files reported processed by agent.`);
                 }
-              } else { // Failed
+              } else { 
                 toast({ title: 'Ingestion Failed', description: statusResult.message || 'Local agent reported an error.', variant: 'destructive' });
               }
             }
-          } catch (statusError) {
-            logMessage(`Error polling job status: ${statusError instanceof Error ? statusError.message : String(statusError)}`, 'error');
-            // Optionally stop polling on error, or let it retry
+          } catch (statusError: any) {
+            logMessage(`Error polling job status: ${statusError.message || String(statusError)}`, 'error');
+            // Stop polling on error to prevent repeated failures.
+            clearInterval(interval);
+            setPollingIntervalId(null);
+            setIsIngesting(false);
+            setCurrentJobId(null); // Clear current job ID as polling failed
+            toast({ title: 'Polling Error', description: `Could not get status for job. ${statusError.message || String(statusError)}`, variant: 'destructive' });
           }
-        }, 3000); // Poll every 3 seconds
+        }, 3000); 
         setPollingIntervalId(interval);
       } else {
         throw new Error(result.message || "Local agent did not return a Job ID.");
@@ -269,7 +271,6 @@ export default function IngestionUtilityPage() {
     }
   };
   
-  // Conceptual handler for available drives
   const handleFetchAvailableDrives = async () => {
     logMessage("Attempting to fetch available drives from local agent...");
     try {
@@ -287,17 +288,14 @@ export default function IngestionUtilityPage() {
     }
   };
 
-
   const isReadyToIngest = selectedPhotographerId && selectedEventId && selectedFiles && selectedFiles.length > 0 && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
-    // Clear currentJobId and stop polling if the selections change, forcing a new job submission
     setCurrentJobId(null);
     if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
     }
-    // Reset summary when inputs change
     setIngestionSummary(null); 
   }, [selectedPhotographerId, selectedEventId, sourcePath, workingPath, backupPath, selectedFiles]);
 
@@ -327,7 +325,6 @@ export default function IngestionUtilityPage() {
         </Alert>
     );
   }
-
 
   return (
     <div className="flex flex-col gap-8">
@@ -362,6 +359,12 @@ export default function IngestionUtilityPage() {
                   {availablePhotographers.length === 0 && <p className="p-2 text-xs text-muted-foreground">No photographers with camera S/N found.</p>}
                 </SelectContent>
               </Select>
+              {selectedPhotographerDetails && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <ScanLine className="h-3.5 w-3.5" />
+                  HIVE Camera S/N: {selectedPhotographerDetails.cameraSerial || "Not specified"}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="event-select">Target Event</Label>
@@ -380,6 +383,7 @@ export default function IngestionUtilityPage() {
                   )}
                 </SelectContent>
               </Select>
+               <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches.</p>
             </div>
              <div>
               <Label htmlFor="source-files">Source Image Files (for HIVE record)</Label>
@@ -390,7 +394,7 @@ export default function IngestionUtilityPage() {
                 onChange={handleFileChange}
                 disabled={isIngesting}
                 className="pt-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-accent-foreground hover:file:bg-accent/90"
-                accept="image/*,.nef,.arw,.cr2,.cr3,.raf,.orf,.dng" // Common image types
+                accept="image/*,.nef,.arw,.cr2,.cr3,.raf,.orf,.dng"
               />
               <p className="text-xs text-muted-foreground mt-1">Select files for HIVE context. Actual files processed by agent from Source Path.</p>
             </div>
@@ -399,28 +403,30 @@ export default function IngestionUtilityPage() {
             <div>
               <Label htmlFor="source-path">Source Path (for Local Agent)</Label>
               <div className="flex items-center gap-2">
-                <FolderInput className="h-5 w-5 text-muted-foreground" />
+                <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="source-path" value={sourcePath} onChange={(e) => setSourcePath(e.target.value)} placeholder="e.g., /Users/editor/Desktop/Card_01" disabled={isIngesting} />
+                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Path the local agent will read from.</p>
+              <p className="text-xs text-muted-foreground mt-1">Path the local agent will read from. "Browse" is conceptual for web UI.</p>
             </div>
             <div>
               <Label htmlFor="working-path">Working Destination Path (for Local Agent)</Label>
               <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-muted-foreground" />
+                <HardDrive className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="working-path" value={workingPath} onChange={(e) => setWorkingPath(e.target.value)} placeholder="e.g., /Volumes/ProductionDrive/ProjectX_Working" disabled={isIngesting}/>
+                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Path for primary ingested files by agent.</p>
+              <p className="text-xs text-muted-foreground mt-1">Path for primary ingested files by agent. "Browse" is conceptual.</p>
             </div>
             <div>
               <Label htmlFor="backup-path">Backup Destination Path (for Local Agent)</Label>
                <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-muted-foreground" />
+                <HardDrive className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <Input id="backup-path" value={backupPath} onChange={(e) => setBackupPath(e.target.value)} placeholder="e.g., //NAS_SERVER/ProjectX_Backup" disabled={isIngesting}/>
+                <Button variant="outline" size="sm" className="h-10 px-3 text-xs" disabled>Browse...</Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent.</p>
+              <p className="text-xs text-muted-foreground mt-1">Path for backup files by agent. "Browse" is conceptual.</p>
             </div>
-             {/* Conceptual button for getAvailableDrives */}
             <Button type="button" variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting}>
                 <Info className="mr-2 h-4 w-4" /> Fetch Drive Info (Conceptual)
             </Button>
@@ -428,8 +434,8 @@ export default function IngestionUtilityPage() {
         </CardContent>
         <CardFooter>
           <Button onClick={handleStartIngestion} disabled={!isReadyToIngest || isIngesting}>
-            {isIngesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-            {currentJobId ? `Ingesting Job: ${currentJobId.substring(0,8)}...` : "Send Job to Local Agent"}
+            {isIngesting && currentJobId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+            {isIngesting && currentJobId ? `Ingesting (Job: ${currentJobId.substring(0,8)}...)` : "Send Job to Local Agent"}
           </Button>
         </CardFooter>
       </Card>
@@ -469,7 +475,7 @@ export default function IngestionUtilityPage() {
               Shot Requests Updated in HIVE: <span className="font-semibold">{ingestionSummary.shotsUpdated}</span>
             </p>
             <p className="flex items-center gap-2">
-              {ingestionSummary.checksumStatus?.toLowerCase().includes('pass') ? (
+              {ingestionSummary.checksumStatus?.toLowerCase().includes('pass') || ingestionSummary.checksumStatus?.toLowerCase().includes('verified') ? (
                 <CheckCircle className="h-5 w-5 text-green-500" />
               ) : (
                 <XCircle className="h-5 w-5 text-red-500" />
@@ -489,7 +495,7 @@ export default function IngestionUtilityPage() {
             )}
           </CardContent>
            <CardFooter>
-            <p className="text-xs text-muted-foreground">This report is based on responses from the local agent. HIVE updates its internal shot statuses upon successful completion.</p>
+            <p className="text-xs text-muted-foreground">This report is based on responses from the local agent. HIVE updates its internal shot statuses upon successful completion by the agent.</p>
           </CardFooter>
         </Card>
       )}
@@ -497,10 +503,10 @@ export default function IngestionUtilityPage() {
         <Info className="h-4 w-4" />
         <AlertTitle>Local Agent Interaction Notice</AlertTitle>
         <AlertDescription>
-          This utility now attempts to communicate with a local agent expected to be running at <strong>{LOCAL_AGENT_BASE_URL}</strong>.
+          This utility attempts to communicate with a local agent expected to be running at <strong>{LOCAL_AGENT_BASE_URL}</strong>.
           Ensure the local agent is running and configured for CORS if you encounter connection issues.
-          The browser itself CANNOT directly access local/networked file paths or perform file system operations.
-          Path inputs are passed to the local agent.
+          The browser itself CANNOT directly access local/networked file paths or perform file system operations for writing.
+          Path inputs are passed to the local agent. "Browse" buttons are conceptual for this web UI.
         </AlertDescription>
       </Alert>
     </div>
