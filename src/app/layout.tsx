@@ -4,7 +4,7 @@ import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
-import { ThemeProvider } from '@/contexts/ThemeContext'; // Added import
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,7 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* Removed className="dark", added suppressHydrationWarning */}
+    <html lang="en" suppressHydrationWarning>
+      <head />{/* Explicit head tag to prevent whitespace issues */}
       <body className={cn(
         geistSans.variable,
         geistMono.variable,
