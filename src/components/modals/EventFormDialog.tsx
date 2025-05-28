@@ -27,7 +27,8 @@ import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Event } from "@/contexts/EventContext";
 import type { Project } from "@/contexts/ProjectContext";
-import type { Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
+import type { Personnel } from "@/app/(app)/personnel/page";
+import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; // Added import
 
 export const eventFormSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -41,7 +42,7 @@ export const eventFormSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", ""]).optional(), // Corrected: Removed "Video", "Both"
+  discipline: z.enum(["Photography", ""]).optional(),
   isCovered: z.boolean().optional(),
   personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
@@ -110,7 +111,7 @@ export function EventFormDialog({
         isQuickTurnaround: editingEvent.isQuickTurnaround || false,
         deadline: editingEvent.deadline || "",
         organizationId: editingEvent.organizationId || projectForEvent?.organizationId || "",
-        discipline: editingEvent.discipline === "Photography" ? "Photography" : "", // Ensure only valid values
+        discipline: editingEvent.discipline === "Photography" ? "Photography" : "",
         isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
         personnelActivity: editingEvent.personnelActivity || {},
       });
