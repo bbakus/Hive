@@ -13,11 +13,12 @@ import {
   LifeBuoy,
   Film,
   ClipboardList,
-  Video as VideoIcon, // Renamed to avoid conflict if we use 'Video' as a phase
+  Video as VideoIcon,
   Camera,
   ListChecks,
   PackageCheck,
-  RadioTower, // For Shoot phase
+  RadioTower,
+  UploadCloud, // Added for Ingestion
 } from "lucide-react";
 
 export type NavItem = {
@@ -32,7 +33,7 @@ export type Phase = "Dashboard" | "Plan" | "Shoot" | "Edit" | "Deliver";
 export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"];
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [], // No items in the sidebar when Dashboard phase is active in top nav
+  "Dashboard": [],
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -41,7 +42,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Shoot": [
     { href: "/shoot", label: "Live Schedule & Tracking", icon: RadioTower, matchStartsWith: true },
-    // Future: Could add quick links here or specific tools for "on-set"
+    { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true },
   ],
   "Edit": [
     { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
@@ -70,10 +71,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
   const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    if (phase === "Dashboard") {
-      return []; 
-    }
-    return phaseNavConfigs[phase] || []; 
+    return phaseNavConfigs[phase] || [];
   };
 
   const value = useMemo(() => ({
