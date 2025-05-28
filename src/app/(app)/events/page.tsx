@@ -70,7 +70,7 @@ export const eventSchema = z.object({
     message: "Deadline must be a valid date-time string or empty.",
   }),
   organizationId: z.string().optional(),
-  discipline: z.enum(["Photography", ""]).optional(), // "Video", "Both" removed
+  discipline: z.enum(["Photography", ""]).optional(),
   isCovered: z.boolean().optional(),
   personnelActivity: z.record(z.object({
     checkInTime: z.string().optional(),
@@ -83,7 +83,7 @@ export type EventFormData = z.infer<typeof eventSchema>;
 export type Event = EventContextEvent & {
   hasOverlap?: boolean;
   organizationId?: string;
-  discipline?: "Photography" | ""; // "Video", "Both" removed
+  discipline?: "Photography" | "";
 };
 
 
@@ -148,14 +148,14 @@ export function formatDeadline(deadlineString?: string): string | null {
   }
 }
 
-const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80" />;
-  return null;
-};
-
 const getCoverageIcon = (isCovered?: boolean) => {
   if (isCovered === true) return <Eye className="h-3.5 w-3.5 text-accent opacity-90" title="Covered Event" />;
   return <Eye className="h-3.5 w-3.5 text-muted-foreground/50 opacity-70" title="Not Covered" />;
+};
+
+const getDisciplineIcon = (discipline?: Event['discipline']) => {
+  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80" />;
+  return null;
 };
 
 
@@ -239,6 +239,7 @@ function EventFilters({
             <SelectContent>
               <SelectItem value="all">All Disciplines</SelectItem>
               <SelectItem value="Photography">Photography Only</SelectItem>
+              <SelectItem value="">N/A or Other</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -453,7 +454,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                 <TableRow key={event.id}>
                   <TableCell className="font-medium flex items-center gap-1.5">
                      {getCoverageIcon(event.isCovered)}
-                    {event.name}
+                     {event.name}
                     {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 flex-shrink-0 ml-1.5" title="Quick Turnaround"/>}
                   </TableCell>
                   {!selectedProject && <TableCell>{event.project}</TableCell>}
@@ -521,6 +522,7 @@ type BlockScheduleTabContentProps = {
   openEditEventModal: (event: Event) => void;
   selectedProject: Project | null;
   useDemoData: boolean;
+  allPersonnel: Personnel[];
 };
 
 function BlockScheduleTabContent({
@@ -529,14 +531,28 @@ function BlockScheduleTabContent({
   setActiveBlockScheduleDateKey,
   openEditEventModal,
   selectedProject,
-  useDemoData
+  useDemoData,
+  allPersonnel
 }: BlockScheduleTabContentProps) {
+
+  const personnelForActiveDate = useMemo(() => {
+    if (!activeBlockScheduleDateKey) return [];
+    const eventsOnActiveDate = groupedAndSortedEventsForDisplay.find(([dateKey]) => dateKey === activeBlockScheduleDateKey)?.[1] || [];
+    const personnelIds = new Set<string>();
+    eventsOnActiveDate.forEach(event => {
+      event.assignedPersonnelIds?.forEach(id => personnelIds.add(id));
+    });
+    return allPersonnel.filter(p => personnelIds.has(p.id) && PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client")
+                       .sort((a,b) => a.name.localeCompare(b.name));
+  }, [activeBlockScheduleDateKey, groupedAndSortedEventsForDisplay, allPersonnel]);
+
+
   return (
     <Card className="shadow-lg mt-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
-          View events for a selected day laid out on an hourly timeline. Select a day tab below to view its schedule.
+          View events for a selected day laid out on an hourly timeline by assigned photographer. Select a day tab below to view its schedule.
           {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
           ({groupedAndSortedEventsForDisplay.reduce((sum, [, dayEvents]) => sum + dayEvents.length, 0)} total events matching filters)
         </CardDescription>
@@ -560,7 +576,9 @@ function BlockScheduleTabContent({
                 <BlockScheduleView
                   selectedDate={parseISO(dateKey)}
                   eventsForDate={dayEvents}
+                  personnelForDay={personnelForActiveDate}
                   onEditEvent={openEditEventModal}
+                  allPersonnel={allPersonnel}
                 />
               </TabsContent>
             ))}
@@ -714,6 +732,8 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
           filtered = filtered.filter(event => event.discipline === "Photography");
+      } else if (filterDiscipline === "") { // For "N/A or Other"
+          filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
     }
 
@@ -1068,7 +1088,7 @@ export default function EventsPage() {
                             <SelectValue placeholder="Select discipline (optional)" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">N/A</SelectItem>
+                            <SelectItem value="">N/A or Other</SelectItem>
                             <SelectItem value="Photography">Photography</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1225,9 +1245,12 @@ export default function EventsPage() {
                 openEditEventModal={openEditEventModal}
                 selectedProject={selectedProject}
                 useDemoData={useDemoData}
+                allPersonnel={initialPersonnelMock} 
             />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
+
+    
