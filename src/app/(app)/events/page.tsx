@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video as VideoIconLucide } from "lucide-react";
@@ -83,7 +83,7 @@ export type EventFormData = z.infer<typeof eventSchema>;
 export type Event = EventContextEvent & {
   hasOverlap?: boolean;
   organizationId?: string;
-  discipline?: "Photography" | "";
+  // discipline?: "Photography" | "Video" | "Both" | ""; // Already in EventContextEvent
 };
 
 
@@ -155,6 +155,8 @@ const getCoverageIcon = (isCovered?: boolean) => {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />;
+  // if (discipline === "Video") return <VideoIconLucide className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />;
+  // if (discipline === "Both") return <><CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0" /><VideoIconLucide className="h-3.5 w-3.5 opacity-80 flex-shrink-0 ml-0.5" /></>;
   return null;
 };
 
@@ -194,7 +196,6 @@ function EventFilters({
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-            // className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground" // Rely on global checkbox styling
           />
           <Label htmlFor="filter-quick-turnaround" className="font-normal whitespace-nowrap">Quick Turnaround Only</Label>
         </div>
@@ -223,7 +224,7 @@ function EventFilters({
               {assignedPersonnelForFilter.map(person => (
                 <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
               ))}
-              {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel in project.</p>}
+              {assignedPersonnelForFilter.length === 0 && <p className="p-2 text-xs text-muted-foreground text-center">No personnel assigned in current view.</p>}
             </SelectContent>
           </Select>
         </div>
@@ -335,7 +336,6 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                 {dayEvents.map((event) => (
                    <Card key={event.id} className="shadow-md hover:shadow-lg transition-shadow">
                     <div className="p-4 flex justify-between items-start gap-4">
-                      {/* Main Info Section - Left */}
                       <div className="flex-grow space-y-1">
                         <CardTitle className="text-lg flex items-center gap-1.5">
                            {getCoverageIcon(event.isCovered)}
@@ -384,7 +384,6 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                         </div>
                       </div>
 
-                      {/* Action Buttons - Right, Stacked */}
                       <div className="flex flex-col gap-2 items-end flex-shrink-0">
                         <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
                           <Link href={`/events/${event.id}/shots`}>
@@ -513,9 +512,8 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
 }
 
 type BlockScheduleTabContentProps = {
-  groupedAndSortedEventsForDisplay: [string, Event[]][];
-  activeBlockScheduleDateKey: string | null;
-  setActiveBlockScheduleDateKey: (key: string | null) => void;
+  displayableEvents: Event[];
+  selectedEventDates: string[]; // Changed from activeBlockScheduleDateKey
   openEditEventModal: (event: Event) => void;
   selectedProject: Project | null;
   useDemoData: boolean;
@@ -523,71 +521,69 @@ type BlockScheduleTabContentProps = {
 };
 
 function BlockScheduleTabContent({
-  groupedAndSortedEventsForDisplay,
-  activeBlockScheduleDateKey,
-  setActiveBlockScheduleDateKey,
+  displayableEvents,
+  selectedEventDates, // Use the array of selected dates from main filter
   openEditEventModal,
   selectedProject,
   useDemoData,
   allPersonnel
 }: BlockScheduleTabContentProps) {
+  
+  const firstSelectedDate = useMemo(() => {
+    if (selectedEventDates.length > 0) {
+      // Ensure dates are sorted if they might not be, though uniqueEventDatesForFilter should be
+      const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+      return parseISO(sortedDates[0]);
+    }
+    return null;
+  }, [selectedEventDates]);
 
-  const personnelForActiveDate = useMemo(() => {
-    if (!activeBlockScheduleDateKey) return [];
-    const eventsOnActiveDate = groupedAndSortedEventsForDisplay.find(([dateKey]) => dateKey === activeBlockScheduleDateKey)?.[1] || [];
+  const eventsForFirstSelectedDate = useMemo(() => {
+    if (!firstSelectedDate) return [];
+    const dateKey = format(firstSelectedDate, "yyyy-MM-dd");
+    return displayableEvents.filter(event => event.date === dateKey);
+  }, [firstSelectedDate, displayableEvents]);
+  
+  const personnelForFirstSelectedDate = useMemo(() => {
+    if (!firstSelectedDate) return [];
     const personnelIds = new Set<string>();
-    eventsOnActiveDate.forEach(event => {
+    eventsForFirstSelectedDate.forEach(event => {
       event.assignedPersonnelIds?.forEach(id => personnelIds.add(id));
     });
     return allPersonnel.filter(p => personnelIds.has(p.id) && PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client")
                        .sort((a,b) => a.name.localeCompare(b.name));
-  }, [activeBlockScheduleDateKey, groupedAndSortedEventsForDisplay, allPersonnel]);
-
+  }, [firstSelectedDate, eventsForFirstSelectedDate, allPersonnel]);
 
   return (
     <Card className="shadow-lg mt-4">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
-          View events for a selected day laid out on an hourly timeline by assigned photographer. Select a day tab below to view its schedule.
+          View events for the selected date laid out on an hourly timeline by assigned photographer.
+          {selectedEventDates.length > 0 ? ` Showing schedule for ${format(firstSelectedDate!, "PPP")}.` : " Select a date from the main filters to view its schedule."}
           {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
-          ({groupedAndSortedEventsForDisplay.reduce((sum, [, dayEvents]) => sum + dayEvents.length, 0)} total events matching filters)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {groupedAndSortedEventsForDisplay.length > 0 && activeBlockScheduleDateKey ? (
-          <Tabs
-            value={activeBlockScheduleDateKey}
-            onValueChange={(value) => setActiveBlockScheduleDateKey(value || null)}
-            className="w-full"
-          >
-            <TabsList className="mb-4 overflow-x-auto whitespace-nowrap justify-start h-auto p-1">
-              {groupedAndSortedEventsForDisplay.map(([dateKey, _]) => (
-                <TabsTrigger key={dateKey} value={dateKey} className="px-3 py-1.5">
-                  {format(parseISO(dateKey), "EEE, MMM d")}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {groupedAndSortedEventsForDisplay.map(([dateKey, dayEvents]) => (
-              <TabsContent key={`content-${dateKey}`} value={dateKey}>
-                <BlockScheduleView
-                  selectedDate={parseISO(dateKey)}
-                  eventsForDate={dayEvents}
-                  personnelForDay={personnelForActiveDate}
-                  onEditEvent={openEditEventModal}
-                  allPersonnel={allPersonnel}
-                />
-              </TabsContent>
-            ))}
-          </Tabs>
+        {firstSelectedDate && eventsForFirstSelectedDate.length > 0 ? (
+          <BlockScheduleView
+            selectedDate={firstSelectedDate}
+            eventsForDate={eventsForFirstSelectedDate}
+            personnelForDay={personnelForFirstSelectedDate}
+            onEditEvent={openEditEventModal}
+            allPersonnel={allPersonnel}
+          />
         ) : (
           <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
             <CalendarIconLucide size={48} className="mb-4 text-muted" />
             <p className="text-lg font-medium">
-              No events scheduled {selectedProject ? `for ${selectedProject.name}` : ""} to display in timeline based on current filters.
+              {selectedEventDates.length > 0 
+                ? `No events scheduled on ${format(firstSelectedDate!, "PPP")} that match your other filters.` 
+                : "Please select one or more dates from the main 'Specific Dates' filter to view the block schedule."
+              }
             </p>
             <p>
-              {useDemoData ? 'Add some events for the selected project, adjust your project/event filters, or ensure demo data is loaded.' : 'Add events or adjust filters to see the timeline view.'}
+              {useDemoData ? 'Add some events, adjust filters, or ensure demo data is loaded.' : 'Add events or adjust filters.'}
             </p>
           </div>
         )}
@@ -601,7 +597,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const {
-    eventsForSelectedProjectAndOrg = [], // Ensure default to empty array
+    eventsForSelectedProjectAndOrg = [], 
     addEvent,
     updateEvent,
     deleteEvent,
@@ -612,7 +608,6 @@ export default function EventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
-  const [activeBlockScheduleDateKey, setActiveBlockScheduleDateKey] = useState<string | null>(null);
 
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
@@ -647,11 +642,11 @@ export default function EventsPage() {
 
   useEffect(() => {
     let defaultEventDate = new Date();
-    if (activeBlockScheduleDateKey) {
-      const parsedKeyDate = parseISO(activeBlockScheduleDateKey);
-      if (isValid(parsedKeyDate)) {
-        defaultEventDate = parsedKeyDate;
-      }
+    if (selectedEventDates.length > 0) { // Use first selected date from filter if available
+        const parsedKeyDate = parseISO(selectedEventDates[0]);
+        if (isValid(parsedKeyDate)) {
+            defaultEventDate = parsedKeyDate;
+        }
     }
 
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === (editingEvent?.projectId || selectedProject?.id));
@@ -688,7 +683,7 @@ export default function EventsPage() {
         personnelActivity: {},
       });
     }
-  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjectsFromContext, activeBlockScheduleDateKey]);
+  }, [editingEvent, reset, isEventModalOpen, selectedProject, allProjectsFromContext, selectedEventDates]);
 
 
   const assignedPersonnelForFilter = useMemo(() => {
@@ -704,6 +699,14 @@ export default function EventsPage() {
   const displayableEvents = useMemo(() => {
     if (isLoadingContextEvents) return [];
     let filtered: Event[] = eventsForSelectedProjectAndOrg || [];
+
+    if (filterCoverageStatus !== "all") {
+      if (filterCoverageStatus === "covered") {
+        filtered = filtered.filter(event => event.isCovered === true);
+      } else if (filterCoverageStatus === "not_covered") {
+        filtered = filtered.filter(event => event.isCovered === false || event.isCovered === undefined);
+      }
+    }
 
     if (filterQuickTurnaround) {
       filtered = filtered.filter(event => event.isQuickTurnaround);
@@ -733,15 +736,7 @@ export default function EventsPage() {
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
     }
-
-    if (filterCoverageStatus !== "all") {
-      if (filterCoverageStatus === "covered") {
-        filtered = filtered.filter(event => event.isCovered === true);
-      } else if (filterCoverageStatus === "not_covered") {
-        filtered = filtered.filter(event => event.isCovered === false || event.isCovered === undefined);
-      }
-    }
-
+    
     if (selectedEventDates.length > 0) {
       filtered = filtered.filter(event => selectedEventDates.includes(event.date));
     }
@@ -799,21 +794,42 @@ export default function EventsPage() {
   }, [displayableEvents]);
 
   const uniqueEventDatesForFilter = useMemo(() => {
-    const dates = new Set((eventsForSelectedProjectAndOrg || []).map(event => event.date));
-    return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-  }, [eventsForSelectedProjectAndOrg]);
-
-
-  useEffect(() => {
-    if (groupedAndSortedEventsForDisplay.length > 0) {
-      const firstDateKey = groupedAndSortedEventsForDisplay[0][0];
-      if (!activeBlockScheduleDateKey || !groupedAndSortedEventsForDisplay.find(g => g[0] === activeBlockScheduleDateKey)) {
-        setActiveBlockScheduleDateKey(firstDateKey);
+    // Base unique dates on events *before* specific date filtering is applied, but *after* other filters
+    let sourceForDateFiltering = eventsForSelectedProjectAndOrg || [];
+     if (filterCoverageStatus !== "all") {
+      if (filterCoverageStatus === "covered") {
+        sourceForDateFiltering = sourceForDateFiltering.filter(event => event.isCovered === true);
+      } else if (filterCoverageStatus === "not_covered") {
+        sourceForDateFiltering = sourceForDateFiltering.filter(event => event.isCovered === false || event.isCovered === undefined);
       }
-    } else {
-      setActiveBlockScheduleDateKey(null);
     }
-  }, [groupedAndSortedEventsForDisplay, activeBlockScheduleDateKey]);
+    if (filterQuickTurnaround) {
+      sourceForDateFiltering = sourceForDateFiltering.filter(event => event.isQuickTurnaround);
+    }
+     if (filterTimeStatus !== "all") {
+      const now = new Date();
+      sourceForDateFiltering = sourceForDateFiltering.filter(event => {
+        const times = parseEventTimes(event.date, event.time);
+        if (!times) return false;
+        if (filterTimeStatus === "upcoming") return isAfter(times.start, now);
+        if (filterTimeStatus === "past") return isBefore(times.end, now);
+        if (filterTimeStatus === "now") return isWithinInterval(now, { start: times.start, end: times.end });
+        return true;
+      });
+    }
+    if (filterAssignedMemberId !== "all") {
+      sourceForDateFiltering = sourceForDateFiltering.filter(event => event.assignedPersonnelIds?.includes(filterAssignedMemberId));
+    }
+    if (filterDiscipline !== "all") {
+      if (filterDiscipline === "Photography") {
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
+      } else if (filterDiscipline === "na_or_other") { 
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "");
+      }
+    }
+    const dates = new Set(sourceForDateFiltering.map(event => event.date));
+    return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  }, [eventsForSelectedProjectAndOrg, filterCoverageStatus, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline]);
 
 
   const handleEventSubmit: SubmitHandler<EventFormData> = (data) => {
@@ -823,8 +839,15 @@ export default function EventsPage() {
       return;
     }
 
-    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' > & { organizationId: string } = {
-      ...data,
+    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity' | 'organizationId' > & { organizationId: string } = {
+      name: data.name,
+      projectId: data.projectId,
+      date: data.date,
+      time: data.time,
+      priority: data.priority,
+      assignedPersonnelIds: data.assignedPersonnelIds || [],
+      isQuickTurnaround: data.isQuickTurnaround || false,
+      deadline: data.deadline || "",
       organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
@@ -834,8 +857,8 @@ export default function EventsPage() {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
         ...eventPayload,
         project: selectedProjInfo.name,
-        deliverables: editingEvent.deliverables,
-        shotRequests: editingEvent.shotRequests,
+        deliverables: editingEvent.deliverables, // Preserve existing counts
+        shotRequests: editingEvent.shotRequests, // Preserve existing counts
         personnelActivity: editingEvent.personnelActivity || data.personnelActivity || {},
       };
       updateEvent(editingEvent.id, fullUpdatePayload);
@@ -857,10 +880,16 @@ export default function EventsPage() {
     setEditingEvent(null);
     const currentProjectId = selectedProject?.id || (allProjectsFromContext.length > 0 ? allProjectsFromContext[0].id : "");
     const projectInfo = allProjectsFromContext.find(p => p.id === currentProjectId);
+    let defaultDate = new Date();
+    if (selectedEventDates.length > 0) {
+      const parsedDate = parseISO(selectedEventDates[0]);
+      if (isValid(parsedDate)) defaultDate = parsedDate;
+    }
+
     reset({
       name: "",
       projectId: currentProjectId,
-      date: format(activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date(), "yyyy-MM-dd"),
+      date: format(defaultDate, "yyyy-MM-dd"),
       time: "09:00 - 17:00",
       priority: "Medium",
       assignedPersonnelIds: [],
@@ -938,22 +967,25 @@ export default function EventsPage() {
         </Button>
       </div>
 
-      <EventFilters
-        filterQuickTurnaround={filterQuickTurnaround}
-        setFilterQuickTurnaround={setFilterQuickTurnaround}
-        filterTimeStatus={filterTimeStatus}
-        setFilterTimeStatus={setFilterTimeStatus}
-        filterAssignedMemberId={filterAssignedMemberId}
-        setFilterAssignedMemberId={setFilterAssignedMemberId}
-        assignedPersonnelForFilter={assignedPersonnelForFilter}
-        filterDiscipline={filterDiscipline}
-        setFilterDiscipline={setFilterDiscipline}
-        filterCoverageStatus={filterCoverageStatus}
-        setFilterCoverageStatus={setFilterCoverageStatus}
-        selectedEventDates={selectedEventDates}
-        setSelectedEventDates={setSelectedEventDates}
-        uniqueEventDatesForFilter={uniqueEventDatesForFilter}
-      />
+      <div className="bg-card p-4 rounded-md shadow">
+        <EventFilters
+            filterQuickTurnaround={filterQuickTurnaround}
+            setFilterQuickTurnaround={setFilterQuickTurnaround}
+            filterTimeStatus={filterTimeStatus}
+            setFilterTimeStatus={setFilterTimeStatus}
+            filterAssignedMemberId={filterAssignedMemberId}
+            setFilterAssignedMemberId={setFilterAssignedMemberId}
+            assignedPersonnelForFilter={assignedPersonnelForFilter}
+            filterDiscipline={filterDiscipline}
+            setFilterDiscipline={setFilterDiscipline}
+            filterCoverageStatus={filterCoverageStatus}
+            setFilterCoverageStatus={setFilterCoverageStatus}
+            selectedEventDates={selectedEventDates}
+            setSelectedEventDates={setSelectedEventDates}
+            uniqueEventDatesForFilter={uniqueEventDatesForFilter}
+        />
+      </div>
+
 
       <Dialog open={isEventModalOpen} onOpenChange={(isOpen) => {
         if (!isOpen) closeEventModal(); else setIsEventModalOpen(true);
@@ -1034,7 +1066,7 @@ export default function EventsPage() {
                                     selected={field.value ? parseISO(field.value) : undefined}
                                     onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
                                     initialFocus
-                                    defaultMonth={field.value ? parseISO(field.value) : (activeBlockScheduleDateKey ? parseISO(activeBlockScheduleDateKey) : new Date())}
+                                    defaultMonth={selectedEventDates.length > 0 && isValid(parseISO(selectedEventDates[0])) ? parseISO(selectedEventDates[0]) : (field.value ? parseISO(field.value) : new Date())}
                                 />
                                 </PopoverContent>
                             </Popover>
@@ -1236,9 +1268,8 @@ export default function EventsPage() {
 
         <TabsContent value="block-schedule">
             <BlockScheduleTabContent
-                groupedAndSortedEventsForDisplay={groupedAndSortedEventsForDisplay}
-                activeBlockScheduleDateKey={activeBlockScheduleDateKey}
-                setActiveBlockScheduleDateKey={setActiveBlockScheduleDateKey}
+                displayableEvents={displayableEvents} // Pass filtered events
+                selectedEventDates={selectedEventDates} // Pass selected dates from main filter
                 openEditEventModal={openEditEventModal}
                 selectedProject={selectedProject}
                 useDemoData={useDemoData}
