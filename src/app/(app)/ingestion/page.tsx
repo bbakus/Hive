@@ -25,7 +25,7 @@ export default function IngestionUtilityPage() {
 
   const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>('');
   const [selectedEventId, setSelectedEventId] = useState<string>('');
-  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
+  // Removed selectedFiles state
   const [ingestionLog, setIngestionLog] = useState<string[]>([]);
   const [isIngesting, setIsIngesting] = useState(false);
 
@@ -45,7 +45,7 @@ export default function IngestionUtilityPage() {
     errors?: string[];
   } | null>(null);
   
-  const [availablePaths, setAvailablePaths] = useState<string[]>([]); // For conceptual drive listing
+  const [availablePaths, setAvailablePaths] = useState<string[]>([]);
 
   const availablePhotographers = initialPersonnelMock.filter(
     p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
@@ -66,12 +66,10 @@ export default function IngestionUtilityPage() {
     };
   }, [pollingIntervalId]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedFiles(event.target.files);
-  };
+  // Removed handleFileChange function
 
   const handleStartIngestion = async () => {
-    if (!selectedPhotographerId || !selectedEventId ) { // Removed selectedFiles check, paths are primary now
+    if (!selectedPhotographerId || !selectedEventId ) {
       toast({
         title: 'Missing Information',
         description: 'Please select photographer and event for HIVE context.',
@@ -128,7 +126,7 @@ export default function IngestionUtilityPage() {
 
         const interval = setInterval(async () => {
           const currentJobToPoll = result.jobId; 
-          if (!currentJobToPoll) { // Check against the jobId from *this* job submission
+          if (!currentJobToPoll) {
              clearInterval(interval);
              setPollingIntervalId(null);
              return;
@@ -142,7 +140,7 @@ export default function IngestionUtilityPage() {
               clearInterval(interval);
               setPollingIntervalId(null);
               setIsIngesting(false);
-              setCurrentJobId(null); // Clear current job ID once polling stops for it
+              setCurrentJobId(null);
               logMessage(`Ingestion job ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
               
               setIngestionSummary({
@@ -161,7 +159,7 @@ export default function IngestionUtilityPage() {
                 const shotsForEvent = getShotRequestsForEvent(selectedEventId);
                 const updatableShots = shotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
                 
-                const filesToConsiderForShotUpdate = statusResult.filesProcessed || (selectedFiles ? selectedFiles.length : 0);
+                const filesToConsiderForShotUpdate = statusResult.filesProcessed || 0;
                 const shotsToUpdateCount = Math.min(updatableShots.length, filesToConsiderForShotUpdate);
 
                 if (shotsToUpdateCount > 0) {
@@ -218,7 +216,7 @@ export default function IngestionUtilityPage() {
       if (drives && drives.locations) {
         logMessage(`Available drive locations (conceptual): ${drives.locations.join(', ')}`, 'success');
         toast({ title: "Drives Fetched (Conceptual)", description: `Agent reported: ${drives.locations.join(', ')}`});
-        setAvailablePaths(drives.locations); // Example of using the data
+        setAvailablePaths(drives.locations);
       } else {
         logMessage("No drive locations reported by agent.", 'info');
         setAvailablePaths([]);
@@ -234,7 +232,6 @@ export default function IngestionUtilityPage() {
   const isReadyToIngest = selectedPhotographerId && selectedEventId && sourcePath && workingPath && backupPath;
 
   useEffect(() => {
-    // Clear job ID and summary when inputs that define a new job change
     setCurrentJobId(null);
     if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
@@ -329,19 +326,7 @@ export default function IngestionUtilityPage() {
               </Select>
                <p className="text-xs text-muted-foreground mt-1">Local agent can use image timestamps against this event's time and photographer's check-in/out to confirm matches.</p>
             </div>
-             <div>
-              <Label htmlFor="source-files">Source Image Files (Conceptual - For HIVE Record)</Label>
-              <Input
-                id="source-files"
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                disabled={isIngesting}
-                className="pt-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-accent-foreground hover:file:bg-accent/90"
-                accept="image/*,.nef,.arw,.cr2,.cr3,.raf,.orf,.dng"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Select files for HIVE context. Actual files processed by agent from Source Path.</p>
-            </div>
+            {/* Removed Source Image Files input field */}
           </div>
           <div className="space-y-4">
             <div>
@@ -464,5 +449,3 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
-
-    
