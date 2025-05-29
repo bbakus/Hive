@@ -7,17 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, HelpCircle, ListChecks } from 'lucide-react'; // Removed unused FolderInput, HardDrive
+import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, HelpCircle, ListChecks, FolderInput, HardDrive } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
+import { useEventContext, type Event } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
 import { initialPersonnelMock, type Personnel } from '@/app/(app)/personnel/page';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { localUtility, type IngestJobStatus } from '@/services/localUtility'; // Removed DriveInfo as it's not directly used in state here
+import { localUtility, type IngestJobStatus, type DriveInfo } from '@/services/localUtility';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-// Select imports removed as they are no longer used in this revised workflow
 
 type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
 
@@ -31,7 +30,7 @@ interface MonitoredJobDetails {
 export default function IngestionUtilityPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
   const { 
-    // eventsForSelectedProjectAndOrg, // Not directly used for primary selection anymore
+    eventsForSelectedProjectAndOrg, 
     updateShotRequest, 
     isLoadingEvents, 
     getEventById 
@@ -76,10 +75,9 @@ export default function IngestionUtilityPage() {
   useEffect(() => {
     verifyAgentConnection();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Called on mount
+  }, []); 
 
   useEffect(() => {
-    // Cleanup interval on component unmount or when pollingIntervalId changes
     return () => {
       if (pollingIntervalId) {
         clearInterval(pollingIntervalId);
@@ -88,11 +86,18 @@ export default function IngestionUtilityPage() {
   }, [pollingIntervalId]);
 
   const handleSignalAgent = () => {
-    logMessage("User Action: Please use your local desktop agent to select paths, confirm context (photographer/event), and start the ingestion job. Then, enter the Job ID provided by the agent below to monitor in HIVE.");
+    if (!selectedProject) {
+        toast({title: "No Project Selected", description: "Please select a project in HIVE first.", variant: "destructive"});
+        return;
+    }
+    // Log messages for the user in HIVE UI
+    logMessage(`Signaling local agent: Please use your local desktop agent application to select paths, confirm context (HIVE recommends Project: '${selectedProject.name}'), and start the ingestion job.`);
+    logMessage("Once the local agent starts the job, it will provide a Job ID. Enter that Job ID below to monitor in HIVE.");
+    
     toast({
       title: "Proceed with Local Agent",
       description: "Use your local desktop agent to initiate ingestion. Enter the Job ID it provides below to monitor.",
-      duration: 7000,
+      duration: 10000,
     });
   };
 
@@ -108,24 +113,24 @@ export default function IngestionUtilityPage() {
     }
 
     if (pollingIntervalId) {
-      clearInterval(pollingIntervalId); // Clear any existing interval
+      clearInterval(pollingIntervalId);
     }
 
-    setCurrentJobId(jobId); // Set current job ID being monitored
+    setCurrentJobId(jobId);
     setIngestionSummary(null); 
     setMonitoredJobDetails(null);
     setIngestionLog(prev => [`${new Date().toLocaleTimeString()}: INFO: HIVE monitoring Job ID: ${jobId}. Polling local agent for status updates.`, ...prev.slice(0,99)]);
 
     const newIntervalId = setInterval(async () => {
-      // Use a direct reference to currentJobId from the outer scope for comparisons
-      // This ensures that if setCurrentJobId is called elsewhere, this interval stops processing for the old job.
-      if (currentJobId !== jobId) { 
-          clearInterval(newIntervalId);
-          return;
+      if (jobId !== (document.getElementById('jobIdInputForPollingHack') as HTMLInputElement)?.value && (document.getElementById('jobIdInputForPollingHack') as HTMLInputElement)?.value !== "") {
+         // This interval is for an old job; it should have been cleared.
+         // To be absolutely safe, clear it again and return.
+        clearInterval(newIntervalId);
+        return;
       }
       
       try {
-        const statusResult: IngestJobStatus = await localUtility.getJobStatus(jobId); // Poll with the jobId this interval was started for
+        const statusResult: IngestJobStatus = await localUtility.getJobStatus(jobId);
         logMessage(`Agent reported status for Job ${jobId}: ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress !== undefined ? statusResult.progress : 'N/A'}%)`);
         setIngestionSummary(statusResult);
 
@@ -145,11 +150,11 @@ export default function IngestionUtilityPage() {
 
         if (statusResult.status === 'completed' || statusResult.status === 'failed' || statusResult.status === 'cancelled') {
           clearInterval(newIntervalId); 
-          setPollingIntervalId(prevIntervalId => (prevIntervalId === newIntervalId ? null : prevIntervalId)); // Clear if it's the current interval
+          setPollingIntervalId(prevIntervalId => (prevIntervalId === newIntervalId ? null : prevIntervalId)); 
           logMessage(`Ingestion job ${jobId} ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
           
-          const effectiveEventId = statusResult.determinedEventId;
-          const effectivePhotographerId = statusResult.determinedPhotographerId;
+          const effectiveEventId = monitoredJobDetails?.eventId || statusResult.determinedEventId;
+          const effectivePhotographerId = monitoredJobDetails?.photographerId || statusResult.determinedPhotographerId;
           
           if (statusResult.status === 'completed' && effectiveEventId && effectivePhotographerId) {
             const shotsToUpdateInHIVE = statusResult.filesMatchedToEvents ?? statusResult.filesProcessed ?? 0;
@@ -161,9 +166,10 @@ export default function IngestionUtilityPage() {
                 const allShotsForEvent = getEventById(effectiveEventId)?.shotRequestsData || [];
                 const updatableShots = allShotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
                 let shotsUpdatedCount = 0;
+
                 for (let i = 0; i < Math.min(updatableShots.length, shotsToUpdateInHIVE); i++) {
                     const shotToUpdate = updatableShots[i];
-                    if (shotToUpdate && shotToUpdate.id) { 
+                    if (shotToUpdate && shotToUpdate.id) {
                         updateShotRequest(effectiveEventId, shotToUpdate.id, {
                           status: 'Captured',
                           initialCapturerId: effectivePhotographerId,
@@ -175,7 +181,6 @@ export default function IngestionUtilityPage() {
                     }
                 }
                 setIngestionSummary(prev => prev ? {...prev, filesMatchedToEvents: shotsUpdatedCount } : { jobId: jobId, status: 'completed', filesMatchedToEvents: shotsUpdatedCount });
-
                 if (shotsUpdatedCount > 0) {
                     toast({ title: "HIVE Shot Statuses Updated", description: `${shotsUpdatedCount} shot requests for event "${effectiveEvent.name}" marked as 'Captured'.`});
                 } else {
@@ -203,66 +208,25 @@ export default function IngestionUtilityPage() {
     pollingIntervalId,
     logMessage, 
     toast, 
-    currentJobId, 
     getEventById, 
     updateShotRequest,
+    monitoredJobDetails?.eventId, // Added these to ensure closure has latest value
+    monitoredJobDetails?.photographerId // Added these to ensure closure has latest value
   ]);
 
   const isLoading = isLoadingSettings || isLoadingEvents || isLoadingProjects;
 
-  const expectedFolderPath = useMemo(() => {
-    const contextPhotographerName = monitoredJobDetails?.photographerName;
-    const contextEventName = monitoredJobDetails?.eventName;
-    const contextEventIdForPath = monitoredJobDetails?.eventId;
-    
-    const eventForDateLookup = monitoredJobDetails?.eventId 
-      ? getEventById(monitoredJobDetails.eventId) 
-      : undefined;
-    const contextEventDate = eventForDateLookup?.date;
-
-    if (!contextEventName || !contextPhotographerName) return "[Monitor Job for Contextual Path Example]";
-    
-    const eventDateFormatted = contextEventDate ? format(new Date(contextEventDate.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
-    const eventNameSanitized = contextEventName.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
-    
-    let photographerNameSanitized = "PHOTOG";
-    if (contextPhotographerName) {
-        const nameParts = contextPhotographerName.split(" ");
-        const initials = nameParts.map(part => part[0]).join("").toUpperCase();
-        photographerNameSanitized = initials || contextPhotographerName.replace(/[^a-zA-Z0-9_]/g, '_').substring(0,10);
-    }
-    const projectNameSanitized = selectedProject?.name.replace(/[^a-zA-Z0-9_]/g, '_') || 'PROJECT_NAME';
-    
-    return `[Your_Root_Destination_Path]/CLIENT_XYZ/${projectNameSanitized}/CAPTURE/${eventDateFormatted}/${contextEventIdForPath?.substring(0,4) || 'EVT'}_${eventNameSanitized}/${photographerNameSanitized}/`;
-  }, [monitoredJobDetails, selectedProject, getEventById]);
-
   useEffect(() => {
-    if (currentJobId && selectedProject && monitoredJobDetails?.eventId) {
+    if (selectedProject && monitoredJobDetails?.eventId) {
       const projectOfMonitoredEvent = getEventById(monitoredJobDetails.eventId)?.projectId;
       if (projectOfMonitoredEvent && selectedProject.id !== projectOfMonitoredEvent) {
-         logMessage(`Warning: HIVE's selected project (${selectedProject.name}) differs from the project associated with the agent-determined event (${getEventById(monitoredJobDetails.eventId)?.project || 'Unknown Project'}). Updates will apply to the agent-determined event.`, "info");
+         logMessage(`Warning: HIVE's selected project (${selectedProject.name}) differs from the project associated with the agent-determined event (${getEventById(monitoredJobDetails.eventId)?.project || 'Unknown Project'}). Updates will apply to the agent-determined event. This monitoring session might become invalid if you change HIVE's context.`, "info");
       }
     }
-  }, [selectedProject, currentJobId, monitoredJobDetails, getEventById, logMessage]);
-
-
-  if (isLoading) {
-    return <div className="p-4">Loading ingestion utility settings...</div>;
-  }
-  if (!useDemoData && !isLoadingSettings) {
-     return (
-      <Alert variant="default" className="mt-4">
-        <Info className="h-4 w-4" />
-        <AlertTitle>Demo Data Disabled</AlertTitle>
-        <AlertDescription>
-          The Ingestion Utility uses demo data for HIVE context (photographers, events). Please enable "Load Demo Data" in Settings. The local agent operates independently.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  }, [selectedProject, monitoredJobDetails, getEventById, logMessage]);
 
   const AgentStatusIndicator = () => {
-    let IconComponent = HelpCircle; // Default Icon, ensure it's imported
+    let IconComponent = HelpCircle; 
     let textColor = "text-muted-foreground";
     let bgColor = "bg-gray-400";
     let statusText = "Unknown";
@@ -305,6 +269,46 @@ export default function IngestionUtilityPage() {
       </div>
     );
   };
+
+  const expectedFolderPath = useMemo(() => {
+    const contextPhotographerName = monitoredJobDetails?.photographerName;
+    const contextEventName = monitoredJobDetails?.eventName;
+    
+    const eventForDateLookup = monitoredJobDetails?.eventId 
+      ? getEventById(monitoredJobDetails.eventId) 
+      : undefined;
+    const contextEventDate = eventForDateLookup?.date;
+
+    if (!contextEventName || !contextPhotographerName) return "[Monitor Job for Contextual Path Example]";
+    
+    const eventDateFormatted = contextEventDate ? format(new Date(contextEventDate.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
+    const eventNameSanitized = contextEventName.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
+    
+    let photographerNameSanitized = "PHOTOG";
+    if (contextPhotographerName) {
+        const nameParts = contextPhotographerName.split(" ");
+        const initials = nameParts.map(part => part[0]).join("").toUpperCase();
+        photographerNameSanitized = initials || contextPhotographerName.replace(/[^a-zA-Z0-9_]/g, '_').substring(0,10);
+    }
+    const projectNameSanitized = selectedProject?.name.replace(/[^a-zA-Z0-9_]/g, '_') || 'PROJECT_NAME';
+    
+    return `[Your_Root_Destination_Path]/CLIENT_XYZ/${projectNameSanitized}/CAPTURE/${eventDateFormatted}/${monitoredJobDetails?.eventId?.substring(0,4) || 'EVT'}_${eventNameSanitized}/${photographerNameSanitized}/`;
+  }, [monitoredJobDetails, selectedProject, getEventById]);
+  
+  if (isLoading) {
+    return <div className="p-4">Loading ingestion utility settings...</div>;
+  }
+  if (!useDemoData && !isLoadingSettings) {
+     return (
+      <Alert variant="default" className="mt-4">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Demo Data Disabled</AlertTitle>
+        <AlertDescription>
+          The Ingestion Utility uses demo data for HIVE context (photographers, events). Please enable "Load Demo Data" in Settings. The local agent operates independently.
+        </AlertDescription>
+      </Alert>
+    );
+  }
   
   return (
     <div className="flex flex-col gap-8">
@@ -315,7 +319,7 @@ export default function IngestionUtilityPage() {
         <AgentStatusIndicator />
       </div>
        <p className="text-muted-foreground -mt-6">
-          Use your local desktop agent to select paths & start an ingestion job. Enter the Job ID it provides below to monitor progress and update HIVE.
+          Use your local desktop agent to select paths and start an ingestion job. The agent will provide a Job ID. Enter that Job ID below to monitor its progress through HIVE.
       </p>
       
       <Card className="shadow-lg">
@@ -327,10 +331,10 @@ export default function IngestionUtilityPage() {
         </CardHeader>
         <CardContent>
              <p className="text-sm text-muted-foreground">
-                HIVE Project Context (for reference): <span className="font-semibold">{selectedProject?.name || "No Project Selected"}</span>
+                HIVE Project Context (for reference by agent): <span className="font-semibold">{selectedProject?.name || "No HIVE Project Selected"}</span>
             </p>
              <p className="text-xs text-muted-foreground mt-1">
-                The local agent determines the actual photographer and event from media metadata. HIVE updates its records based on the agent&apos;s report for the monitored Job ID.
+                The local agent determines the actual photographer and event context from media metadata and its own job setup. HIVE updates its records based on the agent&apos;s report for the monitored Job ID.
             </p>
         </CardContent>
         <CardFooter>
@@ -356,16 +360,17 @@ export default function IngestionUtilityPage() {
                         value={jobIdToMonitorInput} 
                         onChange={(e) => setJobIdToMonitorInput(e.target.value)} 
                         placeholder="Paste Job ID here" 
-                        disabled={agentConnectionStatus !== 'connected' || !!currentJobId}
+                        disabled={agentConnectionStatus !== 'connected' || !!pollingIntervalId} 
                         className="font-mono"
                     />
+                     <input type="hidden" id="jobIdInputForPollingHack" value={currentJobId || ""} />
                 </div>
-                <Button onClick={startMonitoringJob} disabled={!jobIdToMonitorInput.trim() || !!currentJobId || agentConnectionStatus !== 'connected'}>
+                <Button onClick={startMonitoringJob} disabled={!jobIdToMonitorInput.trim() || !!pollingIntervalId || agentConnectionStatus !== 'connected'}>
                  <ListChecks className="mr-2 h-4 w-4" />
                  Monitor This Job
                 </Button>
             </div>
-             {currentJobId && !monitoredJobDetails && agentConnectionStatus === 'connected' && (
+             {pollingIntervalId && currentJobId && !monitoredJobDetails && agentConnectionStatus === 'connected' && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin text-accent" />
                     <span>Polling for Job ID: <span className="font-semibold text-foreground">{currentJobId}</span>. Waiting for agent&apos;s initial context...</span>
@@ -402,7 +407,7 @@ export default function IngestionUtilityPage() {
             />
           </CardContent>
         </Card>
-      </Card>
+      )}
 
       {ingestionSummary && (
         <Card className="shadow-lg">
