@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, List, KeySquare, HelpCircle, Power, PowerOff, Briefcase, CalendarDays } from 'lucide-react';
+import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, List, KeySquare, HelpCircle, Power, PowerOff, Briefcase, CalendarDays, Link as LinkIcon, Eye } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useEventContext, type Event, type ShotRequest } from '@/contexts/EventContext';
+import { useEventContext, type Event } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
 import { initialPersonnelMock, type Personnel } from '@/app/(app)/personnel/page';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +35,7 @@ export default function IngestionUtilityPage() {
 
   const [ingestionJobs, setIngestionJobs] = useState<IngestJobStatus[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
-  const [ingestionLog, setIngestionLog] = useState<string[]>([]); // For HIVE's own actions or errors
+  const [ingestionLog, setIngestionLog] = useState<string[]>([]);
   
   const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
   
@@ -60,7 +60,7 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying HIVE connection to local agent (http://localhost:8765/available-drives)...");
     try {
-      await localUtility.getAvailableDrives(); // Call to local agent for connection check
+      await localUtility.getAvailableDrivesFromLocalAgent();
       setAgentConnectionStatus('connected');
       logMessage("HIVE successfully connected to local agent.", 'success');
       if (showToast) {
@@ -107,20 +107,20 @@ export default function IngestionUtilityPage() {
     let shotsUpdatedCountOverall = 0;
     const updatedJobs = jobs.map(job => {
       if (job.status === 'completed' && !job.hiveProcessedCompletion && job.determinedEventId && job.determinedPhotographerId) {
-        const shotsToUpdateCount = job.filesMatchedToEvents ?? job.filesProcessed ?? 0;
-        if (shotsToUpdateCount > 0) {
-          logMessage(`Updating ${shotsToUpdateCount} shot requests in HIVE for completed Job ID: ${job.jobId}, Event: ${getEventName(job.determinedEventId)}, Photographer: ${getPersonnelName(job.determinedPhotographerId)}...`);
-          const allShotsForEvent = getShotRequestsForEvent(job.determinedEventId) || [];
+        const filesToUpdateCount = job.filesMatchedToEvents ?? job.filesProcessed ?? 0;
+        if (filesToUpdateCount > 0) {
+          logMessage(`Updating shot requests in HIVE for completed Job ID: ${job.jobId}, Event: ${getEventName(job.determinedEventId)}, Photographer: ${getPersonnelName(job.determinedPhotographerId)}...`);
+          const allShotsForEvent = getShotRequestsForEvent(job.determinedEventId);
           const unassignedOrAssignedShots = allShotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
           
           let shotsActuallyUpdatedCount = 0;
-          for (let i = 0; i < Math.min(unassignedOrAssignedShots.length, shotsToUpdateCount); i++) {
+          for (let i = 0; i < Math.min(unassignedOrAssignedShots.length, filesToUpdateCount); i++) {
             const shotToUpdate = unassignedOrAssignedShots[i];
             if (shotToUpdate && shotToUpdate.id) {
               updateShotRequest(job.determinedEventId, shotToUpdate.id, {
                 status: 'Captured',
                 initialCapturerId: job.determinedPhotographerId,
-                lastStatusModifierId: job.determinedPhotographerId, // Assume agent/photog is modifier
+                lastStatusModifierId: job.determinedPhotographerId, 
                 lastStatusModifiedAt: new Date().toISOString(),
               });
               shotsActuallyUpdatedCount++;
@@ -150,11 +150,16 @@ export default function IngestionUtilityPage() {
       const processedJobs = processJobCompletions(fetchedJobs);
       setIngestionJobs(processedJobs);
       logMessage(`Successfully fetched ${fetchedJobs.length} ingestion jobs.`, 'success');
-      toast({ title: "Ingestion Jobs Fetched", description: `Retrieved ${fetchedJobs.length} jobs.` });
+      if (fetchedJobs.length > 0) {
+        toast({ title: "Ingestion Jobs Fetched", description: `Retrieved ${fetchedJobs.length} jobs.` });
+      } else {
+        toast({ title: "No Ingestion Jobs Found", description: "No jobs reported by the local utility yet." });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logMessage(`Error fetching ingestion jobs: ${errorMessage}`, 'error');
       toast({ title: "Error Fetching Jobs", description: errorMessage, variant: "destructive" });
+      setIngestionJobs([]); // Clear jobs on error
     } finally {
       setIsLoadingJobs(false);
     }
@@ -248,7 +253,7 @@ export default function IngestionUtilityPage() {
                 disabled={isLoadingJobs || agentConnectionStatus !== 'connected'}
              >
                 {isLoadingJobs ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <List className="mr-2 h-4 w-4" />}
-                Refresh Ingestion Data
+                {isLoadingJobs ? "Fetching Jobs..." : "Refresh Ingestion Data"}
             </Button>
             <p className="text-xs text-muted-foreground mt-1">
                 This will fetch the latest list of jobs and their statuses from HIVE's backend.
@@ -256,7 +261,25 @@ export default function IngestionUtilityPage() {
         </CardContent>
       </Card>
 
-      {ingestionJobs.length > 0 && (
+      {isLoadingJobs && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="ml-2 text-muted-foreground">Loading ingestion jobs...</p>
+        </div>
+      )}
+
+      {!isLoadingJobs && ingestionJobs.length === 0 && (
+         <Card className="shadow-sm">
+          <CardContent className="py-12 text-center">
+            <ListChecks className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
+            <p className="mt-4 text-lg font-medium text-muted-foreground">No Ingestion Jobs Reported Yet</p>
+            <p className="text-sm text-muted-foreground">Click "Refresh Ingestion Data" to fetch any jobs reported by the local utility.</p>
+             <p className="text-xs text-muted-foreground mt-2">Ensure your local utility is running and has pushed data to HIVE's backend.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoadingJobs && ingestionJobs.length > 0 && (
         <Card className="shadow-lg">
             <CardHeader>
                 <CardTitle>Reported Ingestion Jobs</CardTitle>
@@ -272,13 +295,16 @@ export default function IngestionUtilityPage() {
                             <TableHead>Event</TableHead>
                             <TableHead>Progress</TableHead>
                             <TableHead>Message</TableHead>
+                            <TableHead>Files</TableHead>
+                            <TableHead>Size (MB)</TableHead>
+                            <TableHead>Checksum</TableHead>
                             <TableHead>Report</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {ingestionJobs.map((job) => (
                             <TableRow key={job.jobId}>
-                                <TableCell className="font-mono text-xs">{job.jobId.substring(0,15)}...</TableCell>
+                                <TableCell className="font-mono text-xs" title={job.jobId}>{job.jobId.substring(0,12)}...</TableCell>
                                 <TableCell>
                                     <Badge variant={
                                         job.status === 'completed' ? 'default' :
@@ -287,13 +313,27 @@ export default function IngestionUtilityPage() {
                                     }>{job.status}</Badge>
                                 </TableCell>
                                 <TableCell className="text-xs">{getPersonnelName(job.determinedPhotographerId)}</TableCell>
-                                <TableCell className="text-xs max-w-[200px] truncate" title={getEventName(job.determinedEventId)}>{getEventName(job.determinedEventId)}</TableCell>
-                                <TableCell className="text-xs">{job.progress !== undefined ? `${job.progress}%` : 'N/A'}</TableCell>
-                                <TableCell className="text-xs max-w-[250px] truncate" title={job.message}>{job.message || 'N/A'}</TableCell>
+                                <TableCell className="text-xs max-w-[180px] truncate" title={getEventName(job.determinedEventId)}>{getEventName(job.determinedEventId)}</TableCell>
+                                <TableCell className="text-xs text-center">{job.progress !== undefined ? `${job.progress}%` : 'N/A'}</TableCell>
+                                <TableCell className="text-xs max-w-[200px] truncate" title={job.message}>{job.message || 'N/A'}</TableCell>
+                                <TableCell className="text-xs text-center">
+                                    {job.filesMatchedToEvents !== undefined ? `${job.filesMatchedToEvents} (matched)` : (job.filesProcessed !== undefined ? `${job.filesProcessed}` : 'N/A')}
+                                    {job.totalFiles !== undefined && ` / ${job.totalFiles}`}
+                                </TableCell>
+                                <TableCell className="text-xs text-center">{job.totalSizeMB?.toFixed(1) || 'N/A'}</TableCell>
+                                <TableCell className="text-xs">
+                                    {job.checksumResult && job.checksumResult !== 'pending' && job.checksumResult !== 'not_run' ? (
+                                        <Badge variant={job.checksumResult === 'passed' || job.checksumResult === 'verified' ? 'default' : 'destructive'}>
+                                            {job.checksumResult}
+                                        </Badge>
+                                    ) : (job.checksumResult || 'N/A')}
+                                </TableCell>
                                 <TableCell>
                                     {job.reportUrl ? (
                                         <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs">
-                                            <a href={job.reportUrl} target="_blank" rel="noopener noreferrer">View Report</a>
+                                            <a href={job.reportUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                                <LinkIcon className="h-3 w-3" /> View
+                                            </a>
                                         </Button>
                                     ) : 'N/A'}
                                 </TableCell>
@@ -332,3 +372,4 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
+
