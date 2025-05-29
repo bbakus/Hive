@@ -8,16 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, FolderInput, HardDrive, Power, PowerOff, Briefcase, CalendarDays, KeySquare, HelpCircle } from 'lucide-react';
+import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, FolderInput, HardDrive, Power, PowerOff, Briefcase, CalendarDays, HelpCircle, KeySquare } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequest } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
 import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from '@/app/(app)/personnel/page';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { localUtility, type IngestJobStatus, type DriveInfo, type PhotographerInfoForAgent, type IngestJobRequest } from '@/services/localUtility';
+import { localUtility, type IngestJobStatus, type DriveInfo, type PhotographerInfoForAgent as PhotographerInfoFromLocalUtil, type IngestJobRequest } from '@/services/localUtility';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
 
@@ -35,26 +35,20 @@ export default function IngestionUtilityPage() {
     isLoadingEvents, 
     getEventById,
     updateShotRequest,
-    getShotRequestsForEvent
+    getShotRequestsForEvent,
   } = useEventContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { toast } = useToast();
 
-  const [selectedPhotographerId, setSelectedPhotographerId] = useState<string>("");
-  const [selectedEventId, setSelectedEventId] = useState<string>("");
-  const [sourcePath1, setSourcePath1] = useState<string>("/Users/Default/Downloads/SourceCard1"); // Example default
-  const [sourcePath2, setSourcePath2] = useState<string>("");
-  const [workingPath, setWorkingPath] = useState<string>("/Volumes/RAID/WorkingFolder"); // Example default
-  const [backupPath, setBackupPath] = useState<string>("");
-
-
+  const [jobIdToMonitorInput, setJobIdToMonitorInput] = useState<string>("");
   const [ingestionLog, setIngestionLog] = useState<string[]>([]);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [ingestionSummary, setIngestionSummary] = useState<IngestJobStatus | null>(null);
   const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
   const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [isStartingJob, setIsStartingJob] = useState(false);
+  const [isStartingJob, setIsStartingJob] = useState(false); // Renamed from isSignaling
+  const [monitoredJobDetails, setMonitoredJobDetails] = useState<MonitoredJobDetails | null>(null);
 
   const logMessage = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
     const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : 'INFO: ';
@@ -65,7 +59,7 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying HIVE connection to local agent (http://localhost:8765/available-drives)...");
     try {
-      await localUtility.getAvailableDrives();
+      await localUtility.getAvailableDrives(); // Assuming this is a simple GET endpoint
       setAgentConnectionStatus('connected');
       logMessage("HIVE successfully connected to local agent.", 'success');
       if (showToast) {
@@ -81,7 +75,7 @@ export default function IngestionUtilityPage() {
       logMessage(`HIVE failed to connect to local agent: ${errorMessage}`, 'error');
 
       let toastDescription = `Error: ${errorMessage}`;
-      if (errorMessage.toLowerCase().includes("failed to fetch") ||
+       if (errorMessage.toLowerCase().includes("failed to fetch") ||
           errorMessage.toLowerCase().includes("networkerror") || 
           errorMessage.toLowerCase().includes("connection refused")) {
         toastDescription = "Could not reach local agent. Please ensure it's running on http://localhost:8765 and that CORS is correctly configured on the agent to allow requests from HIVE's origin.";
@@ -90,6 +84,7 @@ export default function IngestionUtilityPage() {
       } else if (errorMessage.includes("status:")) { 
         toastDescription = `Agent responded with an error: ${errorMessage}. Check agent logs.`;
       }
+
       if (showToast) {
         toast({
           title: "Agent Connection Failed",
@@ -114,26 +109,7 @@ export default function IngestionUtilityPage() {
       }
     };
   }, [pollingIntervalId]);
-
-  const availablePhotographers = useMemo(() => {
-    return initialPersonnelMock.filter(p => PHOTOGRAPHY_ROLES.includes(p.role as any) && p.role !== "Client" && p.cameraSerials && p.cameraSerials.length > 0);
-  }, []);
-
-  const selectedPhotographerDetails = useMemo(() => {
-    return initialPersonnelMock.find(p => p.id === selectedPhotographerId);
-  }, [selectedPhotographerId]);
-
-  const availableEvents = useMemo(() => {
-    if (!selectedProject) return [];
-    return eventsForSelectedProjectAndOrg.filter(e => e.isCovered);
-  }, [selectedProject, eventsForSelectedProjectAndOrg]);
-
-  const selectedEventDetails = useMemo(() => {
-    return availableEvents.find(e => e.id === selectedEventId);
-  }, [selectedEventId, availableEvents]);
-
-
-  // Ref to keep track of isMonitoring state inside interval
+  
   const isMonitoringRef = useRef(isMonitoring);
   useEffect(() => {
     isMonitoringRef.current = isMonitoring;
@@ -144,161 +120,129 @@ export default function IngestionUtilityPage() {
     currentJobIdRef.current = currentJobId;
   }, [currentJobId]);
 
-  const handleStartIngestion = async () => {
-    if (!selectedPhotographerId || !selectedEventId || !sourcePath1.trim() || !workingPath.trim()) {
-      toast({ title: "Missing Information", description: "Please select a photographer, event, and specify at least Source Path 1 and Working Destination Path.", variant: "destructive" });
+
+  const startMonitoringJob = async () => {
+    if (!jobIdToMonitorInput.trim()) {
+      toast({ title: "Job ID Required", description: "Please enter a Job ID provided by your local utility.", variant: "destructive" });
       return;
     }
-    if (!(await verifyAgentConnection(true))) { // Pass true to show toast on explicit action
-      toast({ title: 'Agent Not Connected', description: 'Cannot start job. Please ensure the local agent is running and HIVE is connected.', variant: 'destructive'});
+    if (!(await verifyAgentConnection(true))) {
+      toast({ title: 'Agent Not Connected', description: 'Cannot start monitoring. Please ensure the local agent is running and HIVE is connected.', variant: 'destructive'});
       return;
     }
 
     if (pollingIntervalId) clearInterval(pollingIntervalId);
-    setIsStartingJob(true);
-    setIsMonitoring(false);
-    setCurrentJobId(null);
+    setIsMonitoring(true);
+    setCurrentJobId(jobIdToMonitorInput.trim());
+    setMonitoredJobDetails(null); // Clear previous monitored details
     setIngestionSummary(null);
-    setIngestionLog([]);
-    logMessage("Preparing job request for local agent...");
+    setIngestionLog([`${new Date().toLocaleTimeString()}: INFO: Attempting to monitor Job ID: ${jobIdToMonitorInput.trim()}`]);
+    logMessage(`Monitoring started for Job ID: ${jobIdToMonitorInput.trim()}. Polling local agent...`);
 
-    const photographerDetails = initialPersonnelMock.find(p => p.id === selectedPhotographerId);
-    if (!photographerDetails) {
-        toast({ title: "Error", description: "Selected photographer details not found.", variant: "destructive" });
-        setIsStartingJob(false);
+    const newJobId = jobIdToMonitorInput.trim(); 
+
+    const intervalId = setInterval(async () => {
+      if (!isMonitoringRef.current || currentJobIdRef.current !== newJobId) {
+        logMessage(`Polling stopped for ${newJobId} as monitoring state or job ID changed.`);
+        clearInterval(intervalId);
+        setPollingIntervalId(null);
+        setIsMonitoring(false); 
         return;
-    }
-    const photographerForAgent: PhotographerInfoForAgent = {
-      id: photographerDetails.id,
-      name: photographerDetails.name,
-      cameraSerials: photographerDetails.cameraSerials || [],
-      // email, preferredRawFormat, notes can be added if available in HIVE's personnel model
-    };
-    
-    const jobData: IngestJobRequest = {
-      photographer: photographerForAgent,
-      photographerCameraSerial: photographerForAgent.cameraSerials?.[0] || undefined, // Send first serial as primary
-      eventId: selectedEventId,
-      sourcePaths: [sourcePath1.trim(), ...(sourcePath2.trim() ? [sourcePath2.trim()] : [])],
-      workingPath: workingPath.trim(),
-      backupPath: backupPath.trim() || undefined, // Send undefined if empty
-    };
+      }
+      try {
+        logMessage(`Polling status for Job ID: ${newJobId}...`);
+        const statusResult: IngestJobStatus = await localUtility.getJobStatus(newJobId);
+        logMessage(`Agent reported status for Job ${newJobId}: ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress !== undefined ? statusResult.progress : 'N/A'}%)`);
+        setIngestionSummary(statusResult);
 
-    logMessage(`Sending job request to local agent for Event: ${selectedEventDetails?.name}, Photographer: ${photographerDetails?.name}.`);
-    logMessage(`Conceptual Job Details Sent: ${JSON.stringify(jobData, null, 2)}`);
-    logMessage("Waiting for local agent to confirm job start (this may take a moment if agent shows its own UI for path confirmation)...");
+        // Update monitored job details if not yet set and agent provides them
+        if (!monitoredJobDetails && (statusResult.determinedEventId || statusResult.determinedPhotographerId)) {
+          const determinedEvent = statusResult.determinedEventId ? getEventById(statusResult.determinedEventId) : null;
+          const determinedPhotographer = statusResult.determinedPhotographerId ? initialPersonnelMock.find(p => p.id === statusResult.determinedPhotographerId) : null;
+          setMonitoredJobDetails({
+            eventId: statusResult.determinedEventId,
+            eventName: determinedEvent?.name || statusResult.determinedEventId || "N/A",
+            photographerId: statusResult.determinedPhotographerId,
+            photographerName: determinedPhotographer?.name || statusResult.determinedPhotographerId || "N/A",
+          });
+          logMessage(`Context from agent: Event="${determinedEvent?.name || 'ID:'+statusResult.determinedEventId}", Photographer="${determinedPhotographer?.name || 'ID:'+statusResult.determinedPhotographerId}"`);
+        }
+        
+        if (statusResult.status === 'completed' || statusResult.status === 'failed' || statusResult.status === 'cancelled') {
+          clearInterval(intervalId);
+          setPollingIntervalId(null);
+          setIsMonitoring(false); 
+          logMessage(`Ingestion job ${newJobId} ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
+          
+          if (statusResult.status === 'completed' && monitoredJobDetails?.eventId && monitoredJobDetails?.photographerId) {
+            const shotsToUpdateCount = statusResult.filesMatchedToEvents ?? statusResult.filesProcessed ?? 0;
+             const eventIdForUpdate = monitoredJobDetails.eventId;
+            const photographerIdForUpdate = monitoredJobDetails.photographerId;
 
-
-    try {
-      const result = await localUtility.startIngest(jobData);
-      if (result && result.jobId) {
-        logMessage(`Local agent responded. Job ID: ${result.jobId}. ${result.message || ''}`, 'success');
-        setCurrentJobId(result.jobId);
-        setIsMonitoring(true); // Start monitoring state
-
-        const newIntervalId = setInterval(async () => {
-          if (!isMonitoringRef.current || currentJobIdRef.current !== result.jobId) {
-            logMessage(`Polling stopped for ${result.jobId} as monitoring state or job ID changed.`);
-            clearInterval(newIntervalId);
-            setPollingIntervalId(null);
-            setIsMonitoring(false); 
-            return;
-          }
-          try {
-            logMessage(`Polling status for Job ID: ${result.jobId}...`);
-            const statusResult: IngestJobStatus = await localUtility.getJobStatus(result.jobId);
-            logMessage(`Agent reported status for Job ${result.jobId}: ${statusResult.status} - ${statusResult.message || ''} (Progress: ${statusResult.progress !== undefined ? statusResult.progress : 'N/A'}%)`);
-            setIngestionSummary(statusResult);
-            
-            if (statusResult.status === 'completed' || statusResult.status === 'failed' || statusResult.status === 'cancelled') {
-              clearInterval(newIntervalId);
-              setPollingIntervalId(null);
-              setIsMonitoring(false); 
-              logMessage(`Ingestion job ${result.jobId} ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
+            if (shotsToUpdateCount > 0 && eventIdForUpdate && photographerIdForUpdate) {
+              logMessage(`Updating up to ${shotsToUpdateCount} shot requests in HIVE for event "${monitoredJobDetails.eventName}" by ${monitoredJobDetails.photographerName}...`);
+              const allShotsForEvent = getShotRequestsForEvent(eventIdForUpdate) || [];
+              const unassignedOrAssignedShots = allShotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
               
-              if (statusResult.status === 'completed' && selectedEventId && selectedPhotographerId) {
-                const shotsToUpdateCount = statusResult.filesMatchedToEvents ?? statusResult.filesProcessed ?? 0;
-                const eventIdForUpdate = statusResult.determinedEventId || selectedEventId; // Prefer agent determined event
-                const photographerIdForUpdate = statusResult.determinedPhotographerId || selectedPhotographerId; // Prefer agent determined photographer
-
-                if (shotsToUpdateCount > 0 && eventIdForUpdate && photographerIdForUpdate) {
-                  const eventNameForLog = getEventById(eventIdForUpdate)?.name || eventIdForUpdate;
-                  const photographerNameForLog = initialPersonnelMock.find(p=>p.id === photographerIdForUpdate)?.name || photographerIdForUpdate;
-
-                  logMessage(`Updating up to ${shotsToUpdateCount} shot requests in HIVE for event "${eventNameForLog}" by ${photographerNameForLog}...`);
-                  const allShotsForEvent = getShotRequestsForEvent(eventIdForUpdate) || [];
-                  const unassignedOrAssignedShots = allShotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
-                  
-                  let shotsActuallyUpdatedCount = 0;
-                  for (let i = 0; i < Math.min(unassignedOrAssignedShots.length, shotsToUpdateCount); i++) {
-                    const shotToUpdate = unassignedOrAssignedShots[i];
-                    if (shotToUpdate && shotToUpdate.id) {
-                      updateShotRequest(eventIdForUpdate, shotToUpdate.id, {
-                        status: 'Captured',
-                        initialCapturerId: photographerIdForUpdate,
-                        lastStatusModifierId: photographerIdForUpdate,
-                        lastStatusModifiedAt: new Date().toISOString(),
-                      });
-                      logMessage(`HIVE status updated for shot: "${shotToUpdate.description.substring(0,30)}..." to Captured by ${photographerNameForLog}.`);
-                      shotsActuallyUpdatedCount++;
-                    }
-                  }
-                  setIngestionSummary(prev => prev ? {...prev, filesMatchedToEvents: shotsActuallyUpdatedCount } : { jobId: result.jobId, status: 'completed', filesMatchedToEvents: shotsActuallyUpdatedCount });
-                  if (shotsActuallyUpdatedCount > 0) {
-                      toast({ title: "HIVE Shot Statuses Updated", description: `${shotsActuallyUpdatedCount} shot requests for event "${eventNameForLog}" marked as 'Captured'.`});
-                  } else {
-                      logMessage("No uncaptured shot requests were available in HIVE to update for this event, or agent reported 0 files processed/matched.");
-                  }
-                } else {
-                   logMessage("Agent reported 0 files processed/matched for HIVE update, or no value provided. No HIVE shot statuses updated.");
+              let shotsActuallyUpdatedCount = 0;
+              for (let i = 0; i < Math.min(unassignedOrAssignedShots.length, shotsToUpdateCount); i++) {
+                const shotToUpdate = unassignedOrAssignedShots[i];
+                if (shotToUpdate && shotToUpdate.id) {
+                  updateShotRequest(eventIdForUpdate, shotToUpdate.id, {
+                    status: 'Captured',
+                    initialCapturerId: photographerIdForUpdate,
+                    lastStatusModifierId: photographerIdForUpdate,
+                    lastStatusModifiedAt: new Date().toISOString(),
+                  });
+                  logMessage(`HIVE status updated for shot: "${shotToUpdate.description.substring(0,30)}..." to Captured by ${monitoredJobDetails.photographerName}.`);
+                  shotsActuallyUpdatedCount++;
                 }
               }
+              setIngestionSummary(prev => prev ? {...prev, filesMatchedToEvents: shotsActuallyUpdatedCount } : { jobId: newJobId, status: 'completed', filesMatchedToEvents: shotsActuallyUpdatedCount });
+              if (shotsActuallyUpdatedCount > 0) {
+                  toast({ title: "HIVE Shot Statuses Updated", description: `${shotsActuallyUpdatedCount} shot requests for event "${monitoredJobDetails.eventName}" marked as 'Captured'.`});
+              } else {
+                  logMessage("No uncaptured shot requests were available in HIVE to update for this event, or agent reported 0 files processed/matched.");
+              }
+            } else {
+               logMessage("Agent reported 0 files processed/matched for HIVE update, or context (Event/Photographer ID from agent) missing. No HIVE shot statuses updated.");
             }
-          } catch (statusError: any) {
-            logMessage(`Error polling job status for ${result.jobId} from local agent: ${statusError.message || String(statusError)}`, 'error');
-            if (newIntervalId) clearInterval(newIntervalId);
-            setPollingIntervalId(null);
-            setIsMonitoring(false); 
-            toast({ title: 'Polling Error', description: `Could not get status for job ${result.jobId}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
           }
-        }, 5000);
-        setPollingIntervalId(newIntervalId);
-
-      } else {
-        logMessage(`Failed to start job with local agent. Agent response: ${JSON.stringify(result)}`, 'error');
-        toast({ title: "Job Start Failed", description: result?.message || "Local agent did not return a Job ID.", variant: "destructive" });
+        }
+      } catch (statusError: any) {
+        logMessage(`Error polling job status for ${newJobId} from local agent: ${statusError.message || String(statusError)}`, 'error');
+        if (intervalId) clearInterval(intervalId);
+        setPollingIntervalId(null);
+        setIsMonitoring(false); 
+        toast({ title: 'Polling Error', description: `Could not get status for job ${newJobId}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
       }
-    } catch (error: any) {
-      logMessage(`Error starting ingestion job with local agent: ${error.message || String(error)}`, 'error');
-      toast({ title: "Error Starting Job", description: error.message || "Could not communicate with local agent.", variant: "destructive" });
-    } finally {
-      setIsStartingJob(false);
-    }
+    }, 5000);
+    setPollingIntervalId(intervalId);
   };
   
   const AgentStatusIndicator = () => {
-    let IconComponent = HelpCircle; // Default Icon
+    let IconComponent = HelpCircle;
     let textColor = "text-muted-foreground";
-    let iconColor = "text-muted-foreground"; // For the icon color
+    let iconColor = "text-muted-foreground";
     let statusText = "Unknown";
 
     switch (agentConnectionStatus) {
       case 'connected':
         IconComponent = Power;
         textColor = "text-green-600 dark:text-green-400";
-        iconColor = textColor; // Green icon
+        iconColor = textColor;
         statusText = "Connected";
         break;
       case 'disconnected':
         IconComponent = PowerOff;
         textColor = "text-red-600 dark:text-red-400";
-        iconColor = textColor; // Red icon
+        iconColor = textColor;
         statusText = "Disconnected";
         break;
       case 'checking':
         IconComponent = Loader2;
         textColor = "text-yellow-600 dark:text-yellow-400";
-        iconColor = textColor; // Yellow icon
+        iconColor = textColor;
         statusText = "Checking...";
         break;
     }
@@ -315,28 +259,30 @@ export default function IngestionUtilityPage() {
   };
   
   const expectedFolderPath = useMemo(() => {
-    if (!selectedEventDetails || !selectedPhotographerDetails) return "[Select Event & Photographer in HIVE to see example structure]";
-    
-    const eventDateFormatted = selectedEventDetails.date ? format(new Date(selectedEventDetails.date.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
-    const eventNameSanitized = selectedEventDetails.name.replace(/[^a-zA-Z0-9_.-]/g, '_').substring(0, 30);
-    const photographerNameSanitized = selectedPhotographerDetails.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    if (!monitoredJobDetails?.eventName || !monitoredJobDetails?.photographerName || !monitoredJobDetails?.eventId) {
+      return "[Context from Local Agent will populate example structure]";
+    }
+    const eventForPath = getEventById(monitoredJobDetails.eventId);
+    const eventDateFormatted = eventForPath?.date ? format(parseISO(eventForPath.date), 'yyyyMMdd') : 'EVENT_DATE';
+    const eventNameSanitized = monitoredJobDetails.eventName.replace(/[^a-zA-Z0-9_.-]/g, '_').substring(0, 30);
+    const photographerNameSanitized = monitoredJobDetails.photographerName.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const projectNameSanitized = selectedProject ? selectedProject.name.replace(/[^a-zA-Z0-9_.-]/g, '_') : 'PROJECT_NAME';
     
     return `[Your_Root_Destination_Path_Selected_In_Local_Utility]/${projectNameSanitized}/CAPTURE/${eventDateFormatted}/${eventNameSanitized}/${photographerNameSanitized}/`;
-  }, [selectedPhotographerDetails, selectedEventDetails, selectedProject]);
+  }, [monitoredJobDetails, selectedProject, getEventById]);
   
   const isLoadingContexts = isLoadingSettings || isLoadingEvents || isLoadingProjects;
 
   if (isLoadingContexts && agentConnectionStatus === 'unknown') {
     return <div className="p-4">Loading HIVE context...</div>;
   }
-  if (!useDemoData && !isLoadingSettings) {
+   if (!useDemoData && !isLoadingSettings) {
      return (
       <Alert variant="default" className="mt-4">
         <Info className="h-4 w-4" />
         <AlertTitle>Demo Data Disabled</AlertTitle>
         <AlertDescription>
-          The Ingestion Utility relies on HIVE demo data for context (events, personnel) for its UI displays. Please enable "Load Demo Data" in Settings for full UI functionality.
+          The Ingestion Monitor relies on HIVE demo data for context (events, personnel) to display names. Enable "Load Demo Data" in Settings for full UI functionality. Monitoring of Job IDs will still work.
         </AlertDescription>
       </Alert>
     );
@@ -346,7 +292,7 @@ export default function IngestionUtilityPage() {
     <div className="flex flex-col gap-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <UploadCloud className="h-8 w-8 text-accent" /> Ingestion Job Utility
+          <UploadCloud className="h-8 w-8 text-accent" /> Ingestion Job Monitor
         </h1>
         <AgentStatusIndicator />
       </div>
@@ -355,94 +301,42 @@ export default function IngestionUtilityPage() {
         <KeySquare className="h-4 w-4" />
         <AlertTitle>Workflow Overview</AlertTitle>
         <AlertDescription className="text-xs space-y-1">
-            <p>1. Select the "Active Photographer" and "Target Event" in HIVE to set the context for this ingestion job.</p>
-            <p>2. Enter the conceptual Source, Working, and Backup paths for the local agent to use. These are for reference and will be sent to the agent.</p>
-            <p>3. Click "Start Ingestion Job". HIVE will send these details to your local desktop agent.</p>
-            <p>4. **The local agent will then present its own UI** for you to confirm/select the actual file paths and start the ingestion.</p>
-            <p>5. Once the local agent starts, it will return a Job ID to HIVE, and HIVE will begin monitoring the job status.</p>
+            <p>1. Use your **Local Desktop Ingestion Utility** to select media, destinations, and start the ingestion process.</p>
+            <p>2. The Local Utility will analyze media metadata (camera serials, timestamps) to determine the Photographer and Event context (it may query HIVE APIs for roster/schedules or prompt you if needed).</p>
+            <p>3. After starting the job, the Local Utility will **provide you with a unique Job ID**.</p>
+            <p>4. Enter that Job ID below and click "Monitor This Job" for HIVE to track its progress and update relevant shot statuses upon completion.</p>
         </AlertDescription>
       </Alert>
       
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Ingestion Job Setup</CardTitle>
+          <CardTitle>Monitor Ingestion Job</CardTitle>
           <CardDescription>
-            Select context in HIVE. The local agent will handle actual path selection and job execution.
+            Enter the Job ID provided by your local desktop utility to monitor its status.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="photographerSelect">Active Photographer (from HIVE)</Label>
-                    <Select value={selectedPhotographerId} onValueChange={setSelectedPhotographerId} disabled={isStartingJob || isMonitoring || availablePhotographers.length === 0}>
-                        <SelectTrigger id="photographerSelect">
-                            <SelectValue placeholder="Select photographer..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {availablePhotographers.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                            {availablePhotographers.length === 0 && <p className="p-2 text-xs text-muted-foreground">No photographers with camera serials found.</p>}
-                        </SelectContent>
-                    </Select>
-                    {selectedPhotographerDetails && (
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <ScanLine className="h-3.5 w-3.5" /> 
-                            HIVE Camera S/N(s): {(selectedPhotographerDetails.cameraSerials || []).join(', ') || "Not specified"}
-                        </p>
-                    )}
+            <div className="flex items-end gap-2">
+                <div className="flex-grow space-y-1.5">
+                    <Label htmlFor="jobIdInput">Job ID from Local Agent</Label>
+                    <Input 
+                        id="jobIdInput" 
+                        value={jobIdToMonitorInput} 
+                        onChange={(e) => setJobIdToMonitorInput(e.target.value)} 
+                        placeholder="Enter Job ID here..." 
+                        disabled={isMonitoring}
+                    />
                 </div>
-                <div>
-                    <Label htmlFor="eventSelect">Target Event (from HIVE)</Label>
-                    <Select value={selectedEventId} onValueChange={setSelectedEventId} disabled={isStartingJob || isMonitoring || availableEvents.length === 0 || !selectedProject}>
-                        <SelectTrigger id="eventSelect">
-                            <SelectValue placeholder={!selectedProject ? "Select a project first" : "Select event..."} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {availableEvents.map(e => <SelectItem key={e.id} value={e.id}>{e.name} ({e.date})</SelectItem>)}
-                            {selectedProject && availableEvents.length === 0 && <p className="p-2 text-xs text-muted-foreground">No covered events for selected project.</p>}
-                        </SelectContent>
-                    </Select>
-                </div>
+                <Button 
+                  onClick={startMonitoringJob} 
+                  disabled={isMonitoring || !jobIdToMonitorInput.trim() || agentConnectionStatus !== 'connected'}
+                  className="h-10"
+                >
+                 {isMonitoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
+                 {isMonitoring ? `Monitoring: ${currentJobId}` : "Monitor This Job"}
+                </Button>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="sourcePath1">Source Path 1 (Conceptual - for Local Agent)</Label>
-              <div className="flex items-center gap-2">
-                <FolderInput className="h-5 w-5 text-muted-foreground" />
-                <Input id="sourcePath1" value={sourcePath1} onChange={(e) => setSourcePath1(e.target.value)} placeholder="e.g., /Volumes/SD_Card_1" disabled={isStartingJob || isMonitoring} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sourcePath2">Source Path 2 (Optional)</Label>
-               <div className="flex items-center gap-2">
-                <FolderInput className="h-5 w-5 text-muted-foreground" />
-                <Input id="sourcePath2" value={sourcePath2} onChange={(e) => setSourcePath2(e.target.value)} placeholder="e.g., /Volumes/SD_Card_2" disabled={isStartingJob || isMonitoring} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workingPath">Working Destination Path (Conceptual)</Label>
-              <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-muted-foreground" />
-                <Input id="workingPath" value={workingPath} onChange={(e) => setWorkingPath(e.target.value)} placeholder="e.g., /Volumes/RAID/Project_Working" disabled={isStartingJob || isMonitoring} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="backupPath">Backup Destination Path (Optional)</Label>
-               <div className="flex items-center gap-2">
-                <HardDrive className="h-5 w-5 text-muted-foreground" />
-                <Input id="backupPath" value={backupPath} onChange={(e) => setBackupPath(e.target.value)} placeholder="e.g., //NAS/Project_Backup" disabled={isStartingJob || isMonitoring} />
-              </div>
-            </div>
-             <p className="text-xs text-muted-foreground mt-1">The local agent will use these paths as suggestions but will typically present its own UI for final path selection.</p>
         </CardContent>
-        <CardFooter>
-            <Button 
-              onClick={handleStartIngestion} 
-              disabled={isStartingJob || isMonitoring || agentConnectionStatus !== 'connected' || !selectedPhotographerId || !selectedEventId || !sourcePath1.trim() || !workingPath.trim()}
-            >
-             {(isStartingJob || isMonitoring) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ListChecks className="mr-2 h-4 w-4" />}
-             {isStartingJob ? "Initiating with Agent..." : (isMonitoring ? `Monitoring Job: ${currentJobId}` : "Start Ingestion Job")}
-            </Button>
-        </CardFooter>
       </Card>
 
       {isMonitoring && currentJobId && (
@@ -451,8 +345,20 @@ export default function IngestionUtilityPage() {
             <span>Actively polling local agent for Job ID: <span className="font-semibold text-foreground">{currentJobId}</span>.</span>
         </div>
       )}
+      
+      {currentJobId && monitoredJobDetails && (
+        <Card className="shadow-sm">
+            <CardHeader>
+                <CardTitle className="text-base">Monitored Job Context (from Agent)</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-1">
+                <p><strong>Photographer:</strong> {monitoredJobDetails.photographerName || "N/A"}</p>
+                <p><strong>Event:</strong> {monitoredJobDetails.eventName || "N/A"}</p>
+            </CardContent>
+        </Card>
+      )}
 
-      {(ingestionLog.length > 0) && (
+      {(ingestionLog.length > 0 && currentJobId) && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Local Agent Communication Log</CardTitle>
@@ -469,7 +375,7 @@ export default function IngestionUtilityPage() {
         </Card>
       )}
 
-      {ingestionSummary && (
+      {ingestionSummary && currentJobId && (
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Ingestion Summary Report</CardTitle>
@@ -502,10 +408,10 @@ export default function IngestionUtilityPage() {
                     </ul>
                 </div>
             )}
-             <p className="text-xs text-muted-foreground pt-2">HIVE Shot Requests Updated: {ingestionSummary.status === 'completed' && selectedEventId && selectedPhotographerId ? (ingestionSummary.filesMatchedToEvents ?? ingestionSummary.filesProcessed ?? 0) : "0 (pending agent completion or HIVE context)"}</p>
+             <p className="text-xs text-muted-foreground pt-2">HIVE Shot Requests Updated: {ingestionSummary.status === 'completed' && monitoredJobDetails?.eventId && monitoredJobDetails?.photographerId ? (ingestionSummary.filesMatchedToEvents ?? ingestionSummary.filesProcessed ?? 0) : "0 (pending agent completion or HIVE context not determined by agent)"}</p>
           </CardContent>
            <CardFooter>
-            <p className="text-xs text-muted-foreground">This report is based on the latest status from the local agent. HIVE updates its internal shot statuses based on the agent&apos;s report for files matched to the event context set in HIVE.</p>
+            <p className="text-xs text-muted-foreground">This report is based on the latest status from the local agent. HIVE updates its internal shot statuses based on the agent&apos;s report for files matched to the event context determined by the agent.</p>
           </CardFooter>
         </Card>
       )}
@@ -513,11 +419,11 @@ export default function IngestionUtilityPage() {
       <div className="space-y-4">
         <Card className="shadow-sm">
             <CardHeader>
-                <CardTitle className="text-base">Expected Folder Structure (Reference for Local Agent)</CardTitle>
+                <CardTitle className="text-base">Expected Folder Structure (Reference)</CardTitle>
             </CardHeader>
             <CardContent>
                 <p className="text-xs text-muted-foreground font-mono break-all">{expectedFolderPath}</p>
-                <p className="text-xs text-muted-foreground mt-1">Your local agent should be configured to create a folder structure similar to this, using the Photographer and Event context selected in HIVE, and the destination path chosen in the local agent's UI.</p>
+                <p className="text-xs text-muted-foreground mt-1">Your local agent should be configured to create a folder structure similar to this, using the Photographer and Event context it determines.</p>
             </CardContent>
         </Card>
        </div>
@@ -525,10 +431,9 @@ export default function IngestionUtilityPage() {
         <Info className="h-4 w-4" />
         <AlertTitle>Local Desktop Agent Required</AlertTitle>
         <AlertDescription className="text-xs">
-          This HIVE page sends instructions to and monitors your **separate local desktop agent application**. The local agent handles all file selection (using its own UI), path specification, copying, checksums, metadata parsing, and folder creation. HIVE updates its records based on the agent&apos;s reports.
+          This HIVE page monitors jobs initiated by your **separate local desktop agent application**. The local agent handles all file selection, path specification, copying, checksums, metadata parsing, and folder creation, and should provide you with a Job ID to enter above. It also determines photographer/event context by reading media and querying HIVE APIs.
         </AlertDescription>
       </Alert>
     </div>
   );
 }
-
