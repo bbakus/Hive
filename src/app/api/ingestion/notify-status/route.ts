@@ -1,4 +1,8 @@
+
 // src/app/api/ingestion/notify-status/route.ts
+// This route is now superseded by /api/ingest-status
+// It can be deprecated or removed if the local utility uses /api/ingest-status for all status POSTs.
+// For now, let's keep it as a simple logger if it's still called by an older utility version.
 import { NextResponse } from 'next/server';
 import type { IngestJobStatus } from '@/services/localUtility';
 
@@ -6,22 +10,17 @@ export async function POST(request: Request) {
   try {
     const jobStatusUpdate: IngestJobStatus = await request.json();
     
-    console.log("/api/ingestion/notify-status POST request received with data:", jobStatusUpdate);
+    console.log("DEPRECATED /api/ingestion/notify-status POST request received:", jobStatusUpdate);
+    console.log("Please use POST /api/ingest-status for status updates from local utility.");
     
-    // In a real application, HIVE would:
-    // 1. Validate the jobStatusUpdate data.
-    // 2. Authenticate the request.
-    // 3. Update its internal database record for this job ID with the new status.
-    // 4. Potentially use WebSockets or Server-Sent Events to broadcast this status update
-    //    to any HIVE web clients currently monitoring this job.
+    // TODO: Implement authentication and authorization
+    // TODO: Store this status update in HIVE's database
+    // TODO: Potentially broadcast this status update to connected HIVE clients
 
-    // For now, we'll just log it and return a success response.
-    // HIVE's frontend would then need to be updated to react to this backend change.
-
-    return NextResponse.json({ message: "HIVE received job status update.", receivedJobId: jobStatusUpdate.jobId });
+    return NextResponse.json({ message: "HIVE received job status update (deprecated endpoint).", receivedJobId: jobStatusUpdate.jobId });
 
   } catch (error) {
     console.error("Error in /api/ingestion/notify-status:", error);
-    return NextResponse.json({ error: "Failed to process job status update." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to process job status update (deprecated endpoint)." }, { status: 500 });
   }
 }
