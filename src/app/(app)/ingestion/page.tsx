@@ -20,7 +20,20 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
-type DriveInfo = { path: string; [key: string]: any };
+interface DriveInfo {
+  path: string;
+  [key: string]: any; // To accommodate other potential properties like available, freeSpace etc.
+}
+
+// New interface based on local utility specifications
+interface PhotographerInfo {
+    id: string;
+    name: string;
+    email?: string;
+    cameraSerials?: string[]; // Array of serials
+    preferredRawFormat?: string; // Assuming RawFormat is a string type for now
+    notes?: string;
+}
 
 export default function IngestionUtilityPage() {
   const { selectedProject } = useProjectContext();
@@ -37,7 +50,7 @@ export default function IngestionUtilityPage() {
   const [backupPath, setBackupPath] = useState<string>("");
 
   const [ingestionLog, setIngestionLog] = useState<string[]>([]);
-  const [isIngesting, setIsIngesting] = useState(false); // Renamed from isMonitoring
+  const [isIngesting, setIsIngesting] = useState(false);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [pollingIntervalId, setPollingIntervalId] = useState<NodeJS.Timeout | null>(null);
 
@@ -56,7 +69,7 @@ export default function IngestionUtilityPage() {
 
   const availablePhotographers = useMemo(() => {
     return initialPersonnelMock.filter(
-      p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial
+      p => PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role === "Photographer" && p.cameraSerial // Keep filtering by single cameraSerial for dropdown simplicity
     );
   }, []);
 
@@ -72,15 +85,6 @@ export default function IngestionUtilityPage() {
   const selectedEventDetails = useMemo(() => {
     return relevantEvents.find(e => e.id === selectedEventId);
   }, [selectedEventId, relevantEvents]);
-
-  const expectedFolderPath = useMemo(() => {
-    if (!selectedEventDetails || !selectedPhotographerDetails) return "[Select Event & Photographer]";
-    const eventDate = selectedEventDetails.date ? format(new Date(selectedEventDetails.date.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
-    const eventName = selectedEventDetails.name.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
-    const photographerInitials = selectedPhotographerDetails.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'PHOTOG';
-    return `[Your_Root_Destination_Path]/HIVE_Ingest/${eventName}_${eventDate}/${photographerInitials}/`;
-  }, [selectedEventDetails, selectedPhotographerDetails]);
-
 
   const logMessage = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
     const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : 'INFO: ';
@@ -107,17 +111,18 @@ export default function IngestionUtilityPage() {
 
   useEffect(() => {
     verifyAgentConnection();
+    // Cleanup polling interval on component unmount
     return () => {
       if (pollingIntervalId) {
         clearInterval(pollingIntervalId);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Run once on mount
+
 
   const handleStartIngestion = async () => {
-    const isConnected = await verifyAgentConnection();
-    if (!isConnected) {
+    if (!await verifyAgentConnection()) {
       toast({ title: 'Agent Not Connected', description: 'Cannot initiate. Please ensure the local agent is running and accessible.', variant: 'destructive'});
       return;
     }
@@ -134,20 +139,36 @@ export default function IngestionUtilityPage() {
     setIsIngesting(true);
     setIngestionLog([]);
     setIngestionSummary(null);
-    setCurrentJobId(null); // Clear previous job ID
+    setCurrentJobId(null); 
 
+    const photographerForAgent: PhotographerInfo | undefined = selectedPhotographerDetails ? {
+        id: selectedPhotographerDetails.id,
+        name: selectedPhotographerDetails.name,
+        // email: selectedPhotographerDetails.email, // Assuming Personnel type has email
+        cameraSerials: selectedPhotographerDetails.cameraSerial ? [selectedPhotographerDetails.cameraSerial] : [],
+        // preferredRawFormat: selectedPhotographerDetails.preferredRawFormat, // Assuming Personnel type has this
+        // notes: selectedPhotographerDetails.notes // Assuming Personnel type has this
+    } : undefined;
+
+    if (!photographerForAgent) {
+        logMessage("Selected photographer details not found. Cannot start ingestion.", "error");
+        toast({ title: "Photographer Error", description: "Could not retrieve details for the selected photographer.", variant: "destructive" });
+        setIsIngesting(false);
+        return;
+    }
+    
     const jobData = {
-      photographerId: selectedPhotographerId,
-      photographerCameraSerial: selectedPhotographerDetails?.cameraSerial || undefined,
+      photographer: photographerForAgent,
+      photographerCameraSerial: photographerForAgent.cameraSerials?.[0] || undefined, // Send the first serial if available
       eventId: selectedEventId,
-      sourcePaths: [sourcePath1.trim(), sourcePath2.trim()].filter(p => p), // Only include non-empty paths
+      sourcePaths: [sourcePath1.trim(), sourcePath2.trim()].filter(p => p),
       workingPath: workingPath.trim(),
       backupPath: backupPath.trim(),
     };
 
-    logMessage(`Sending job request to local agent for Photographer: ${selectedPhotographerDetails?.name}, Event: ${selectedEventDetails?.name}.`);
+    logMessage(`Sending job request to local agent for Photographer: ${photographerForAgent.name}, Event: ${selectedEventDetails?.name}.`);
     logMessage(`Job Details: ${JSON.stringify(jobData, null, 2)}`);
-    logMessage("Please check your local agent's UI to confirm paths and start the file operations.");
+    logMessage("The local agent should now prompt for path confirmation and start file operations.");
 
 
     try {
@@ -192,7 +213,7 @@ export default function IngestionUtilityPage() {
               const shotsForEvent = getShotRequestsForEvent(selectedEventId);
               const updatableShots = shotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
               
-              const filesToConsiderForShotUpdate = statusResult.filesProcessed || 0;
+              const filesToConsiderForShotUpdate = statusResult.filesProcessed || 0; // Use filesProcessed from agent
               const shotsToUpdateCount = Math.min(updatableShots.length, filesToConsiderForShotUpdate);
 
               if (shotsToUpdateCount > 0) {
@@ -226,13 +247,13 @@ export default function IngestionUtilityPage() {
           }
         } catch (statusError: any) {
           logMessage(`Error polling job status for ${newJobId}: ${statusError.message || String(statusError)}`, 'error');
-          if(pollingIntervalId) clearInterval(pollingIntervalId);
+          if(pollingIntervalId) clearInterval(pollingIntervalId); // ensure interval is cleared from the outer scope
           setPollingIntervalId(null);
           setIsIngesting(false);
-          setCurrentJobId(null);
+          setCurrentJobId(null); // Reset currentJobId as polling failed
           toast({ title: 'Polling Error', description: `Could not get status for job ${newJobId}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
         }
-      }, 5000);
+      }, 5000); // Poll every 5 seconds
       setPollingIntervalId(interval);
 
     } catch (error: any) {
@@ -248,6 +269,7 @@ export default function IngestionUtilityPage() {
     try {
       const drives = await localUtility.getAvailableDrives();
       if (drives && drives.locations) {
+        // Ensure locations are treated as DriveInfo[]
         setAvailableDrives(drives.locations.map(loc => typeof loc === 'string' ? { path: loc } : loc));
         logMessage(`Available drives/locations received: ${drives.locations.map(l => (typeof l === 'string' ? l : l.path)).join(', ')}`, "success");
         toast({ title: "Drives Fetched", description: "Drive information received from local agent." });
@@ -263,15 +285,24 @@ export default function IngestionUtilityPage() {
   };
 
   useEffect(() => {
-    if (pollingIntervalId && (!selectedPhotographerId || !selectedEventId)) {
+    // Clear job monitoring if photographer or event changes
+    if (pollingIntervalId) {
       clearInterval(pollingIntervalId);
       setPollingIntervalId(null);
-      setCurrentJobId(null);
-      setIsIngesting(false);
+      setCurrentJobId(null); // Also clear job ID as it's no longer relevant
+      setIsIngesting(false); // Stop ingesting state
       logMessage("Photographer or Event selection changed. Monitoring stopped if active.", "info");
     }
-  }, [selectedPhotographerId, selectedEventId, pollingIntervalId, logMessage]);
+  }, [selectedPhotographerId, selectedEventId, pollingIntervalId, logMessage]); // Added pollingIntervalId and logMessage to dependencies
 
+
+  const expectedFolderPath = useMemo(() => {
+    if (!selectedEventDetails || !selectedPhotographerDetails) return "[Select Event & Photographer]";
+    const eventDate = selectedEventDetails.date ? format(new Date(selectedEventDetails.date.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
+    const eventName = selectedEventDetails.name.replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 30);
+    const photographerInitials = selectedPhotographerDetails.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'PHOTOG';
+    return `[Your_Root_Destination_Path]/HIVE_Ingest/${eventName}_${eventDate}/${photographerInitials}/`;
+  }, [selectedEventDetails, selectedPhotographerDetails]);
 
   if (isLoadingSettings || isLoadingEvents) {
     return <div>Loading ingestion utility settings...</div>;
@@ -353,15 +384,14 @@ export default function IngestionUtilityPage() {
         <AgentStatusIndicator />
       </div>
        <p className="text-muted-foreground -mt-6">
-          Select context in HIVE. The local agent will handle path selection & file operations. HIVE will monitor progress.
+          HIVE provides context to your local desktop agent, which handles path selection & file operations. HIVE then monitors progress.
       </p>
 
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Ingestion Job Setup</CardTitle>
           <CardDescription>
-            Select Photographer and Event context in HIVE. Your local desktop agent will prompt for actual file paths.
-            HIVE will then receive a Job ID from the agent to monitor progress and update shot statuses.
+            Select Photographer and Event context in HIVE. Your local desktop agent will prompt for actual file paths and start the job. HIVE will then receive a Job ID from the agent to monitor progress and update shot statuses.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-x-8 gap-y-6">
@@ -406,7 +436,7 @@ export default function IngestionUtilityPage() {
                 </SelectContent>
               </Select>
             </div>
-             <div className="space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="sourcePath1">Source Path 1 (Conceptual - for Local Agent)</Label>
               <div className="flex items-center gap-2">
                   <FolderInput className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -474,7 +504,7 @@ export default function IngestionUtilityPage() {
               <p className="text-xs text-muted-foreground mt-1">Your local agent should be configured to create a similar structure within the chosen working/backup destinations.</p>
             </div>
              <Button variant="outline" size="sm" onClick={handleFetchAvailableDrives} disabled={isIngesting || agentConnectionStatus !== 'connected'}>
-              Fetch Drive Info (Conceptual)
+              Fetch Drive Info (for Agent Connection Test)
             </Button>
             {availableDrives.length > 0 && (
                 <div className="mt-2 text-xs p-2 border rounded-md bg-muted/30">
@@ -553,9 +583,12 @@ export default function IngestionUtilityPage() {
         <Info className="h-4 w-4" />
         <AlertTitle>Local Desktop Agent Required for File Operations</AlertTitle>
         <AlertDescription>
-          This HIVE utility page helps set context (Photographer, Event, conceptual paths) and then sends these details to a separate **local HIVE desktop agent application** running on your computer. The local agent is responsible for prompting you for actual file/folder paths, performing all file copying, checksums, and folder creation. HIVE then monitors the Job ID returned by the agent and updates shot statuses based on the agent's reports. Ensure your local agent is running and configured to communicate with HIVE.
+          This HIVE utility page sends contextual information (Photographer, Event, conceptual paths) to a separate **local HIVE desktop agent application** running on your computer. The local agent is responsible for prompting you for actual file/folder paths via its own UI, performing all file copying, checksums, and folder creation. HIVE then receives a Job ID from the agent to monitor progress and updates its internal shot statuses based on the agent's reports. Ensure your local agent is running, configured to communicate with HIVE, and is prepared to handle the job data described.
         </AlertDescription>
       </Alert>
     </div>
   );
 }
+
+
+    
