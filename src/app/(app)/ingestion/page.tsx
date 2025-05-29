@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, FolderInput, HardDrive, Power, PowerOff, Briefcase, CalendarDays } from 'lucide-react';
+import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, FolderInput, HardDrive, Power, PowerOff, Briefcase, CalendarDays, KeySquare, HelpCircle } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useEventContext, type Event } from '@/contexts/EventContext';
+import { useEventContext, type Event, type ShotRequest } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
 import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from '@/app/(app)/personnel/page';
 import { useToast } from '@/hooks/use-toast';
@@ -133,12 +133,23 @@ export default function IngestionUtilityPage() {
   }, [selectedEventId, availableEvents]);
 
 
+  // Ref to keep track of isMonitoring state inside interval
+  const isMonitoringRef = useRef(isMonitoring);
+  useEffect(() => {
+    isMonitoringRef.current = isMonitoring;
+  }, [isMonitoring]);
+  
+  const currentJobIdRef = useRef(currentJobId);
+  useEffect(() => {
+    currentJobIdRef.current = currentJobId;
+  }, [currentJobId]);
+
   const handleStartIngestion = async () => {
     if (!selectedPhotographerId || !selectedEventId || !sourcePath1.trim() || !workingPath.trim()) {
       toast({ title: "Missing Information", description: "Please select a photographer, event, and specify at least Source Path 1 and Working Destination Path.", variant: "destructive" });
       return;
     }
-    if (!(await verifyAgentConnection())) {
+    if (!(await verifyAgentConnection(true))) { // Pass true to show toast on explicit action
       toast({ title: 'Agent Not Connected', description: 'Cannot start job. Please ensure the local agent is running and HIVE is connected.', variant: 'destructive'});
       return;
     }
@@ -151,23 +162,30 @@ export default function IngestionUtilityPage() {
     setIngestionLog([]);
     logMessage("Preparing job request for local agent...");
 
+    const photographerDetails = initialPersonnelMock.find(p => p.id === selectedPhotographerId);
+    if (!photographerDetails) {
+        toast({ title: "Error", description: "Selected photographer details not found.", variant: "destructive" });
+        setIsStartingJob(false);
+        return;
+    }
     const photographerForAgent: PhotographerInfoForAgent = {
-      id: selectedPhotographerDetails!.id,
-      name: selectedPhotographerDetails!.name,
-      cameraSerials: selectedPhotographerDetails!.cameraSerials || [],
+      id: photographerDetails.id,
+      name: photographerDetails.name,
+      cameraSerials: photographerDetails.cameraSerials || [],
+      // email, preferredRawFormat, notes can be added if available in HIVE's personnel model
     };
     
     const jobData: IngestJobRequest = {
       photographer: photographerForAgent,
-      photographerCameraSerial: selectedPhotographerDetails!.cameraSerials?.[0] || undefined,
+      photographerCameraSerial: photographerForAgent.cameraSerials?.[0] || undefined, // Send first serial as primary
       eventId: selectedEventId,
       sourcePaths: [sourcePath1.trim(), ...(sourcePath2.trim() ? [sourcePath2.trim()] : [])],
       workingPath: workingPath.trim(),
       backupPath: backupPath.trim() || undefined, // Send undefined if empty
     };
 
-    logMessage(`Sending job request to local agent for Event: ${selectedEventDetails?.name}, Photographer: ${selectedPhotographerDetails?.name}.`);
-    logMessage(`Job Details: ${JSON.stringify(jobData, null, 2)}`);
+    logMessage(`Sending job request to local agent for Event: ${selectedEventDetails?.name}, Photographer: ${photographerDetails?.name}.`);
+    logMessage(`Conceptual Job Details Sent: ${JSON.stringify(jobData, null, 2)}`);
     logMessage("Waiting for local agent to confirm job start (this may take a moment if agent shows its own UI for path confirmation)...");
 
 
@@ -176,15 +194,14 @@ export default function IngestionUtilityPage() {
       if (result && result.jobId) {
         logMessage(`Local agent responded. Job ID: ${result.jobId}. ${result.message || ''}`, 'success');
         setCurrentJobId(result.jobId);
-        setIsMonitoring(true);
+        setIsMonitoring(true); // Start monitoring state
 
         const newIntervalId = setInterval(async () => {
-          // Check ref to ensure we are still monitoring *this* job.
           if (!isMonitoringRef.current || currentJobIdRef.current !== result.jobId) {
             logMessage(`Polling stopped for ${result.jobId} as monitoring state or job ID changed.`);
             clearInterval(newIntervalId);
             setPollingIntervalId(null);
-            setIsMonitoring(false);
+            setIsMonitoring(false); 
             return;
           }
           try {
@@ -196,33 +213,39 @@ export default function IngestionUtilityPage() {
             if (statusResult.status === 'completed' || statusResult.status === 'failed' || statusResult.status === 'cancelled') {
               clearInterval(newIntervalId);
               setPollingIntervalId(null);
-              setIsMonitoring(false);
+              setIsMonitoring(false); 
               logMessage(`Ingestion job ${result.jobId} ${statusResult.status}. ${statusResult.message || ''}`, statusResult.status === 'completed' ? 'success' : 'error');
               
               if (statusResult.status === 'completed' && selectedEventId && selectedPhotographerId) {
                 const shotsToUpdateCount = statusResult.filesMatchedToEvents ?? statusResult.filesProcessed ?? 0;
-                if (shotsToUpdateCount > 0) {
-                  logMessage(`Updating up to ${shotsToUpdateCount} shot requests in HIVE for event "${selectedEventDetails?.name}" by ${selectedPhotographerDetails?.name}...`);
-                  const allShotsForEvent = getShotRequestsForEvent(selectedEventId) || [];
+                const eventIdForUpdate = statusResult.determinedEventId || selectedEventId; // Prefer agent determined event
+                const photographerIdForUpdate = statusResult.determinedPhotographerId || selectedPhotographerId; // Prefer agent determined photographer
+
+                if (shotsToUpdateCount > 0 && eventIdForUpdate && photographerIdForUpdate) {
+                  const eventNameForLog = getEventById(eventIdForUpdate)?.name || eventIdForUpdate;
+                  const photographerNameForLog = initialPersonnelMock.find(p=>p.id === photographerIdForUpdate)?.name || photographerIdForUpdate;
+
+                  logMessage(`Updating up to ${shotsToUpdateCount} shot requests in HIVE for event "${eventNameForLog}" by ${photographerNameForLog}...`);
+                  const allShotsForEvent = getShotRequestsForEvent(eventIdForUpdate) || [];
                   const unassignedOrAssignedShots = allShotsForEvent.filter(s => s.status === 'Unassigned' || s.status === 'Assigned');
                   
                   let shotsActuallyUpdatedCount = 0;
                   for (let i = 0; i < Math.min(unassignedOrAssignedShots.length, shotsToUpdateCount); i++) {
                     const shotToUpdate = unassignedOrAssignedShots[i];
                     if (shotToUpdate && shotToUpdate.id) {
-                      updateShotRequest(selectedEventId, shotToUpdate.id, {
+                      updateShotRequest(eventIdForUpdate, shotToUpdate.id, {
                         status: 'Captured',
-                        initialCapturerId: selectedPhotographerId,
-                        lastStatusModifierId: selectedPhotographerId,
+                        initialCapturerId: photographerIdForUpdate,
+                        lastStatusModifierId: photographerIdForUpdate,
                         lastStatusModifiedAt: new Date().toISOString(),
                       });
-                      logMessage(`HIVE status updated for shot: "${shotToUpdate.description.substring(0,30)}..." to Captured by ${selectedPhotographerDetails?.name}.`);
+                      logMessage(`HIVE status updated for shot: "${shotToUpdate.description.substring(0,30)}..." to Captured by ${photographerNameForLog}.`);
                       shotsActuallyUpdatedCount++;
                     }
                   }
                   setIngestionSummary(prev => prev ? {...prev, filesMatchedToEvents: shotsActuallyUpdatedCount } : { jobId: result.jobId, status: 'completed', filesMatchedToEvents: shotsActuallyUpdatedCount });
                   if (shotsActuallyUpdatedCount > 0) {
-                      toast({ title: "HIVE Shot Statuses Updated", description: `${shotsActuallyUpdatedCount} shot requests for event "${selectedEventDetails?.name}" marked as 'Captured'.`});
+                      toast({ title: "HIVE Shot Statuses Updated", description: `${shotsActuallyUpdatedCount} shot requests for event "${eventNameForLog}" marked as 'Captured'.`});
                   } else {
                       logMessage("No uncaptured shot requests were available in HIVE to update for this event, or agent reported 0 files processed/matched.");
                   }
@@ -233,9 +256,9 @@ export default function IngestionUtilityPage() {
             }
           } catch (statusError: any) {
             logMessage(`Error polling job status for ${result.jobId} from local agent: ${statusError.message || String(statusError)}`, 'error');
-            clearInterval(newIntervalId);
+            if (newIntervalId) clearInterval(newIntervalId);
             setPollingIntervalId(null);
-            setIsMonitoring(false);
+            setIsMonitoring(false); 
             toast({ title: 'Polling Error', description: `Could not get status for job ${result.jobId}. ${statusError.message || String(statusError)}`, variant: 'destructive' });
           }
         }, 5000);
@@ -253,37 +276,30 @@ export default function IngestionUtilityPage() {
     }
   };
   
-  const isMonitoringRef = useRef(isMonitoring);
-  useEffect(() => { isMonitoringRef.current = isMonitoring; }, [isMonitoring]);
-  
-  const currentJobIdRef = useRef(currentJobId);
-  useEffect(() => { currentJobIdRef.current = currentJobId; }, [currentJobId]);
-
-
   const AgentStatusIndicator = () => {
-    let IconComponent = HelpCircle;
+    let IconComponent = HelpCircle; // Default Icon
     let textColor = "text-muted-foreground";
-    let iconColor = "text-muted-foreground";
+    let iconColor = "text-muted-foreground"; // For the icon color
     let statusText = "Unknown";
 
     switch (agentConnectionStatus) {
       case 'connected':
         IconComponent = Power;
         textColor = "text-green-600 dark:text-green-400";
+        iconColor = textColor; // Green icon
         statusText = "Connected";
-        iconColor = textColor;
         break;
       case 'disconnected':
         IconComponent = PowerOff;
         textColor = "text-red-600 dark:text-red-400";
+        iconColor = textColor; // Red icon
         statusText = "Disconnected";
-        iconColor = textColor;
         break;
       case 'checking':
         IconComponent = Loader2;
         textColor = "text-yellow-600 dark:text-yellow-400";
+        iconColor = textColor; // Yellow icon
         statusText = "Checking...";
-        iconColor = textColor;
         break;
     }
 
@@ -299,7 +315,7 @@ export default function IngestionUtilityPage() {
   };
   
   const expectedFolderPath = useMemo(() => {
-    if (!selectedEventDetails || !selectedPhotographerDetails) return "[Select Photographer & Event in HIVE to see example structure]";
+    if (!selectedEventDetails || !selectedPhotographerDetails) return "[Select Event & Photographer in HIVE to see example structure]";
     
     const eventDateFormatted = selectedEventDetails.date ? format(new Date(selectedEventDetails.date.replace(/-/g, '/')), 'yyyyMMdd') : 'EVENT_DATE';
     const eventNameSanitized = selectedEventDetails.name.replace(/[^a-zA-Z0-9_.-]/g, '_').substring(0, 30);
@@ -370,7 +386,7 @@ export default function IngestionUtilityPage() {
                     {selectedPhotographerDetails && (
                         <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                             <ScanLine className="h-3.5 w-3.5" /> 
-                            HIVE Camera S/N(s): {selectedPhotographerDetails.cameraSerials?.join(', ') || "Not specified"}
+                            HIVE Camera S/N(s): {(selectedPhotographerDetails.cameraSerials || []).join(', ') || "Not specified"}
                         </p>
                     )}
                 </div>
@@ -460,7 +476,7 @@ export default function IngestionUtilityPage() {
              {ingestionSummary.jobId && <CardDescription>Job ID: <span className="font-mono">{ingestionSummary.jobId}</span></CardDescription>}
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p>Overall Agent Status: <span className={cn("font-semibold", ingestionSummary.status === 'failed' ? 'text-destructive' : ingestionSummary.status === 'completed' ? 'text-green-600' : '')}>{ingestionSummary.status}</span></p>
+            <p>Overall Agent Status: <span className={cn("font-semibold", ingestionSummary.status === 'failed' || ingestionSummary.status === 'cancelled' ? 'text-destructive' : ingestionSummary.status === 'completed' ? 'text-green-600' : '')}>{ingestionSummary.status}</span></p>
             <p>Agent Message: <span className="italic text-muted-foreground">{ingestionSummary.message || "N/A"}</span></p>
             <p>Agent - Total Files Detected by Agent: <span className="font-semibold">{ingestionSummary.totalFiles ?? "N/A"}</span></p>
             <p>Agent - Files Processed by Agent: <span className="font-semibold">{ingestionSummary.filesProcessed ?? "N/A"}</span></p>
@@ -515,3 +531,4 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
+
