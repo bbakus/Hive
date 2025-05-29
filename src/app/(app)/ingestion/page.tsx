@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, FolderInput, HardDrive, Power, PowerOff, Briefcase, CalendarDays, HelpCircle, List, KeySquare } from 'lucide-react';
+import { UploadCloud, Loader2, CheckCircle, XCircle, Info, ScanLine, RefreshCw, ListChecks, List, KeySquare, HelpCircle, Power, PowerOff, Briefcase, CalendarDays } from 'lucide-react';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequest } from '@/contexts/EventContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -36,7 +35,7 @@ export default function IngestionUtilityPage() {
 
   const [ingestionJobs, setIngestionJobs] = useState<IngestJobStatus[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
-  const [ingestionLog, setIngestionLog] = useState<string[]>([]); // For specific job actions if any
+  const [ingestionLog, setIngestionLog] = useState<string[]>([]); // For HIVE's own actions or errors
   
   const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
   
@@ -61,7 +60,7 @@ export default function IngestionUtilityPage() {
     setAgentConnectionStatus('checking');
     logMessage("Verifying HIVE connection to local agent (http://localhost:8765/available-drives)...");
     try {
-      await localUtility.getAvailableDrivesFromLocalAgent(); 
+      await localUtility.getAvailableDrives(); // Call to local agent for connection check
       setAgentConnectionStatus('connected');
       logMessage("HIVE successfully connected to local agent.", 'success');
       if (showToast) {
@@ -105,7 +104,8 @@ export default function IngestionUtilityPage() {
   }, []); 
 
   const processJobCompletions = useCallback((jobs: IngestJobStatus[]) => {
-    jobs.forEach(job => {
+    let shotsUpdatedCountOverall = 0;
+    const updatedJobs = jobs.map(job => {
       if (job.status === 'completed' && !job.hiveProcessedCompletion && job.determinedEventId && job.determinedPhotographerId) {
         const shotsToUpdateCount = job.filesMatchedToEvents ?? job.filesProcessed ?? 0;
         if (shotsToUpdateCount > 0) {
@@ -128,15 +128,18 @@ export default function IngestionUtilityPage() {
           }
           logMessage(`HIVE updated ${shotsActuallyUpdatedCount} shot statuses for Job ID: ${job.jobId}.`);
           if (shotsActuallyUpdatedCount > 0) {
-            toast({ title: "HIVE Shot Statuses Updated", description: `${shotsActuallyUpdatedCount} shot requests for event "${getEventName(job.determinedEventId)}" marked as 'Captured' for Job ID ${job.jobId}.`});
+            shotsUpdatedCountOverall += shotsActuallyUpdatedCount;
           }
         }
-        // Mark as processed client-side to avoid reprocessing on next fetch
-        setIngestionJobs(prevJobs => prevJobs.map(prevJob => 
-            prevJob.jobId === job.jobId ? { ...prevJob, hiveProcessedCompletion: true } : prevJob
-        ));
+        return { ...job, hiveProcessedCompletion: true };
       }
+      return job;
     });
+
+    if (shotsUpdatedCountOverall > 0) {
+      toast({ title: "HIVE Shot Statuses Updated", description: `${shotsUpdatedCountOverall} shot requests across completed jobs were marked as 'Captured'.`});
+    }
+    return updatedJobs;
   }, [logMessage, getEventName, getPersonnelName, getShotRequestsForEvent, updateShotRequest, toast]);
 
   const handleFetchIngestionJobs = async () => {
@@ -144,10 +147,10 @@ export default function IngestionUtilityPage() {
     logMessage("Fetching ingestion job list from HIVE backend...");
     try {
       const fetchedJobs = await localUtility.getIngestionJobsFromHIVE();
-      setIngestionJobs(fetchedJobs);
+      const processedJobs = processJobCompletions(fetchedJobs);
+      setIngestionJobs(processedJobs);
       logMessage(`Successfully fetched ${fetchedJobs.length} ingestion jobs.`, 'success');
       toast({ title: "Ingestion Jobs Fetched", description: `Retrieved ${fetchedJobs.length} jobs.` });
-      processJobCompletions(fetchedJobs);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logMessage(`Error fetching ingestion jobs: ${errorMessage}`, 'error');
@@ -200,13 +203,13 @@ export default function IngestionUtilityPage() {
   if (isLoadingContexts && agentConnectionStatus === 'unknown') {
     return <div className="p-4">Loading HIVE context...</div>;
   }
-   if (!useDemoData && !isLoadingSettings) { // Keep this check if demo data drives some initial state
+   if (!useDemoData && !isLoadingSettings) { 
      return (
       <Alert variant="default" className="mt-4">
         <Info className="h-4 w-4" />
         <AlertTitle>Demo Data Disabled</AlertTitle>
         <AlertDescription>
-          Some features of the Ingestion Monitor might rely on demo data for context (events, personnel). Enable "Load Demo Data" in Settings for full UI demonstration.
+          The Ingestion Job Monitor relies on demo data for context (events, personnel) if not connected to a live backend. Enable "Load Demo Data" in Settings for full UI demonstration.
         </AlertDescription>
       </Alert>
     );
@@ -329,4 +332,3 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
-
