@@ -18,22 +18,31 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useEffect } from "react";
-import type { Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
+import type { Personnel as PersonnelType, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; // Renamed to avoid conflict
+import { Textarea } from "@/components/ui/textarea";
 
+// Schema uses a string for input, which is then processed
 export const personnelFormSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters." }),
   role: z.string().min(2, { message: "Role must be at least 2 characters." }) as z.ZodType<typeof PHOTOGRAPHY_ROLES[number]>,
   avatar: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   status: z.enum(["Available", "Assigned", "On Leave"]),
-  cameraSerial: z.string().optional(),
+  cameraSerialsInput: z.string().optional(), // String for comma-separated input
 });
 
-export type PersonnelFormDialogData = z.infer<typeof personnelFormSchema>;
+// This type is for the form data itself before processing cameraSerials
+export type PersonnelFormInputData = z.infer<typeof personnelFormSchema>;
+
+// This type represents what the onSubmit prop expects (with cameraSerials as array)
+export type PersonnelFormDialogData = Omit<PersonnelFormInputData, 'cameraSerialsInput'> & {
+  cameraSerials?: string[];
+};
+
 
 interface PersonnelFormDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  editingPersonnel: Personnel | null;
+  editingPersonnel: PersonnelType | null;
   onSubmit: (data: PersonnelFormDialogData) => void;
 }
 
@@ -49,35 +58,47 @@ export function PersonnelFormDialog({
     reset,
     control,
     formState: { errors },
-  } = useForm<PersonnelFormDialogData>({
+  } = useForm<PersonnelFormInputData>({ // Use input type for form
     resolver: zodResolver(personnelFormSchema),
     defaultValues: {
       name: "",
       role: "Photographer",
       avatar: "",
       status: "Available",
-      cameraSerial: "",
+      cameraSerialsInput: "",
     },
   });
 
   useEffect(() => {
     if (isOpen) {
       if (editingPersonnel) {
-        reset(editingPersonnel);
+        reset({
+          name: editingPersonnel.name,
+          role: editingPersonnel.role,
+          avatar: editingPersonnel.avatar || "",
+          status: editingPersonnel.status,
+          cameraSerialsInput: editingPersonnel.cameraSerials?.join(', ') || "",
+        });
       } else {
         reset({
           name: "",
           role: "Photographer",
           avatar: "",
           status: "Available",
-          cameraSerial: "",
+          cameraSerialsInput: "",
         });
       }
     }
   }, [editingPersonnel, reset, isOpen]);
 
-  const internalOnSubmit: SubmitHandler<PersonnelFormDialogData> = (data) => {
-    onSubmit(data);
+  const internalOnSubmit: SubmitHandler<PersonnelFormInputData> = (data) => {
+    const processedData: PersonnelFormDialogData = {
+      ...data,
+      cameraSerials: data.cameraSerialsInput
+        ? data.cameraSerialsInput.split(',').map(s => s.trim()).filter(s => s !== '')
+        : [],
+    };
+    onSubmit(processedData);
   };
 
   return (
@@ -126,11 +147,18 @@ export function PersonnelFormDialog({
               {errors.avatar && <p className="text-xs text-destructive mt-1">{errors.avatar.message}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cameraSerial" className="text-right">Camera S/N</Label>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="cameraSerialsInput" className="text-right pt-2">Camera S/Ns</Label>
             <div className="col-span-3">
-              <Input id="cameraSerial" {...register("cameraSerial")} placeholder="Optional camera serial number" className={errors.cameraSerial ? "border-destructive" : ""} />
-              {errors.cameraSerial && <p className="text-xs text-destructive mt-1">{errors.cameraSerial.message}</p>}
+              <Textarea 
+                id="cameraSerialsInput" 
+                {...register("cameraSerialsInput")} 
+                placeholder="e.g., SN123, SN456 (comma-separated)" 
+                className={errors.cameraSerialsInput ? "border-destructive" : ""} 
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Enter multiple serial numbers separated by commas.</p>
+              {errors.cameraSerialsInput && <p className="text-xs text-destructive mt-1">{errors.cameraSerialsInput.message}</p>}
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -166,5 +194,3 @@ export function PersonnelFormDialog({
     </Dialog>
   );
 }
-
-    

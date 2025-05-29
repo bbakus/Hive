@@ -32,9 +32,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useEventContext, type Event } from "@/contexts/EventContext"; 
@@ -44,17 +41,18 @@ import { PersonnelFormDialog, type PersonnelFormDialogData } from "@/components/
 
 export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client"] as const;
 
-export type Personnel = z.infer<typeof import("@/components/modals/PersonnelFormDialog").personnelFormSchema> & {
+export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
   id: string;
+  cameraSerials?: string[]; // Changed from cameraSerial to cameraSerials array
 };
 
 export const initialPersonnelMock: Personnel[] = [
-  { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN12345A" },
-  { id: "user002", name: "Bob The Builder", role: "Photographer", status: "Assigned", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN98765E"},
-  { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN67890B" },
-  { id: "user004", name: "Diana Prince", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerial: "SN11223F" },
-  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", cameraSerial: "SN24680C" },
-  { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", cameraSerial: "SN13579D" },
+  { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN12345A", "SN123XYZ"] },
+  { id: "user002", name: "Bob The Builder", role: "Photographer", status: "Assigned", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN98765E"]},
+  { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png" },
+  { id: "user004", name: "Diana Prince", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN11223F"] },
+  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned" },
+  { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", cameraSerials: ["SN13579D", "SN24680G"] },
   { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
 ];
 
@@ -97,7 +95,7 @@ export default function PersonnelPage() {
   const handlePersonnelSubmit = (data: PersonnelFormDialogData) => {
     if (editingPersonnel) {
       setPersonnelList(prevList => 
-        prevList.map(p => p.id === editingPersonnel.id ? { ...editingPersonnel, ...data } : p)
+        prevList.map(p => p.id === editingPersonnel.id ? { ...editingPersonnel, ...data, cameraSerials: data.cameraSerials || [] } : p)
       );
       toast({
         title: "Team Member Updated",
@@ -107,6 +105,7 @@ export default function PersonnelPage() {
       const newPersonnelMember: Personnel = {
         ...data,
         id: `user${String(personnelList.length + initialPersonnelMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        cameraSerials: data.cameraSerials || [],
       };
       setPersonnelList((prevList) => [...prevList, newPersonnelMember]);
       toast({
@@ -166,7 +165,7 @@ export default function PersonnelPage() {
     return personnelList.filter(member =>
       member.name.toLowerCase().includes(filterText.toLowerCase()) ||
       member.role.toLowerCase().includes(filterText.toLowerCase()) ||
-      (member.cameraSerial && member.cameraSerial.toLowerCase().includes(filterText.toLowerCase()))
+      (member.cameraSerials && member.cameraSerials.join(', ').toLowerCase().includes(filterText.toLowerCase()))
     );
   }, [personnelList, filterText]);
 
@@ -311,7 +310,7 @@ export default function PersonnelPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Camera S/N</TableHead>
+                  <TableHead>Camera S/Ns</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -330,9 +329,9 @@ export default function PersonnelPage() {
                     </TableCell>
                     <TableCell>{member.role}</TableCell>
                     <TableCell>
-                      {member.cameraSerial ? (
+                      {member.cameraSerials && member.cameraSerials.length > 0 ? (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Camera className="h-3.5 w-3.5" /> {member.cameraSerial}
+                          <Camera className="h-3.5 w-3.5" /> {member.cameraSerials.join(', ')}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground italic">N/A</span>
@@ -448,7 +447,8 @@ export default function PersonnelPage() {
             <ScrollArea className="h-[26rem]">
               <div className="space-y-4">
                 {personnelList.filter(p => p.role !== "Client").map(person => {
-                  const assignments = allEvents.filter(event => event.assignedPersonnelIds?.includes(person.id))
+                  const assignments = allEvents
+                                      .filter(event => event.assignedPersonnelIds?.includes(person.id))
                                       .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                   return (
                     <div key={`schedule-vis-${person.id}`}>
@@ -475,5 +475,3 @@ export default function PersonnelPage() {
     </div>
   );
 }
-
-    
