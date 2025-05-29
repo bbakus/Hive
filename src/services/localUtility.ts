@@ -1,4 +1,3 @@
-
 // src/services/localUtility.ts
 
 export interface PhotographerInfoForAgent {
@@ -6,7 +5,6 @@ export interface PhotographerInfoForAgent {
     name: string;
     email?: string;
     cameraSerials?: string[];
-    // preferredRawFormat?: RawFormat; // Assuming RawFormat is defined if used
     notes?: string;
 }
 
@@ -16,7 +14,7 @@ export interface IngestJobRequest {
     eventId: string;
     sourcePaths: string[];
     workingPath: string;
-    backupPath?: string; // Made optional
+    backupPath?: string; 
 }
 
 export interface IngestJobStatus {
@@ -33,7 +31,9 @@ export interface IngestJobStatus {
   errors?: string[];
   reportUrl?: string;             
   determinedPhotographerId?: string; 
-  determinedEventId?: string;      
+  determinedEventId?: string; 
+  // Client-side flag, not part of API contract with local agent
+  hiveProcessedCompletion?: boolean; 
 }
 
 export interface DriveInfo {
@@ -48,24 +48,60 @@ interface AvailableDrivesResponse {
 }
 
 class LocalUtilityService {
-  private baseUrl = 'http://localhost:8765';
+  private localAgentBaseUrl = 'http://localhost:8765';
+  private hiveApiBaseUrl = '/api'; // HIVE's own API routes
 
-  async getAvailableDrives(): Promise<AvailableDrivesResponse> {
-    const response = await fetch(`${this.baseUrl}/available-drives`);
+  async getAvailableDrivesFromLocalAgent(): Promise<AvailableDrivesResponse> {
+    const response = await fetch(`${this.localAgentBaseUrl}/available-drives`);
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('LocalUtilityService getAvailableDrives error response:', errorText);
+      console.error('LocalUtilityService getAvailableDrivesFromLocalAgent error response:', errorText);
       let errorData: { error?: string } = { error: `HTTP error! status: ${response.status}` };
       try {
         errorData = JSON.parse(errorText || '{}');
       } catch (e) { /* ignore parsing error if response is not JSON */ }
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(errorData.error || `HTTP error! status: ${response.status} from local agent`);
     }
     return await response.json() as AvailableDrivesResponse;
   }
 
-  async startIngest(request: IngestJobRequest): Promise<{ jobId: string, message?: string }> {
-    const response = await fetch(`${this.baseUrl}/ingest`, {
+  // This function would be called by HIVE to get the list of jobs (that local agent has pushed to HIVE's backend)
+  async getIngestionJobsFromHIVE(): Promise<IngestJobStatus[]> {
+    const response = await fetch(`${this.hiveApiBaseUrl}/ingest-jobs`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('LocalUtilityService getIngestionJobsFromHIVE error:', errorText);
+        throw new Error(`Failed to fetch ingestion jobs from HIVE API: ${response.status}`);
+    }
+    return await response.json();
+  }
+
+  // This function is still relevant if HIVE wants to poll a specific job's LATEST status from the local agent,
+  // even if the local agent is also pushing to HIVE's backend. Or it could be deprecated.
+  // For now, let's assume HIVE fetches the list from its own backend, and might not need to poll individual jobs on local agent.
+  async getJobStatusFromLocalAgent(jobId: string): Promise<IngestJobStatus> {
+    if (!jobId || jobId.trim() === "") {
+        throw new Error("Job ID cannot be empty when checking status with local agent.");
+    }
+    const response = await fetch(`${this.localAgentBaseUrl}/ingest-status/${jobId}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`LocalUtilityService getJobStatusFromLocalAgent for ${jobId} error response:`, errorText);
+      let errorData: { error?: string } = { error: `HTTP error! status: ${response.status}` };
+      try {
+        errorData = JSON.parse(errorText || '{}');
+      } catch (e) { /* ignore parsing error if response is not JSON */ }
+      throw new Error(errorData.error || `HTTP error! status: ${response.status} from local agent`);
+    }
+    return await response.json();
+  }
+
+
+  // Conceptual: HIVE might not directly "start" an ingest on the local agent anymore if the local agent has its own UI.
+  // However, HIVE might "signal" or pass context if the local agent supports it.
+  // For now, this remains as a placeholder for what HIVE *could* send if it were initiating.
+  async _conceptual_startIngestOnLocalAgent(request: IngestJobRequest): Promise<{ jobId: string, message?: string }> {
+    const response = await fetch(`${this.localAgentBaseUrl}/ingest`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -74,56 +110,25 @@ class LocalUtilityService {
     });
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('LocalUtilityService startIngest error response:', errorText);
+      console.error('LocalUtilityService _conceptual_startIngestOnLocalAgent error response:', errorText);
       let errorData: { error?: string } = { error: `HTTP error! status: ${response.status}` };
       try {
         errorData = JSON.parse(errorText || '{}');
       } catch (e) { /* ignore parsing error if response is not JSON */ }
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(errorData.error || `HTTP error! status: ${response.status} from local agent`);
     }
     return await response.json();
   }
   
 
-  async getJobStatus(jobId: string): Promise<IngestJobStatus> {
-    if (!jobId || jobId.trim() === "") {
-        throw new Error("Job ID cannot be empty when checking status.");
-    }
-    const response = await fetch(`${this.baseUrl}/ingest-status/${jobId}`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`LocalUtilityService getJobStatus for ${jobId} error response:`, errorText);
-      let errorData: { error?: string } = { error: `HTTP error! status: ${response.status}` };
-      try {
-        errorData = JSON.parse(errorText || '{}');
-      } catch (e) { /* ignore parsing error if response is not JSON */ }
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  }
+  // ----- API Calls from Local Agent TO HIVE (These would be called by the local agent) -----
+  // HIVE needs API routes to receive these. Example:
+  // POST /api/ingest-status (Local agent pushes status updates here)
+  // POST /api/ingest-report (Local agent pushes final report here)
 
-  // --- Conceptual Local Agent Endpoints HIVE might use in a more advanced setup ---
-  // async listPhotographersFromHIVEAgent(): Promise<PhotographerInfoForAgent[]> {
-  //   const response = await fetch(`${this.baseUrl}/photographers`);
-  //   // ... error handling ...
-  //   return await response.json();
-  // }
-
-  // async getUnrecognizedSerialsFromHIVEAgent(): Promise<string[]> {
-  //   const response = await fetch(`${this.baseUrl}/photographers/unrecognized-serials`);
-  //   // ... error handling ...
-  //   return await response.json();
-  // }
-
-  // async registerCameraSerialWithHIVEAgent(photographerId: string, serial: string): Promise<any> {
-  //   const response = await fetch(`${this.baseUrl}/photographers/${photographerId}/camera-serial`, {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json' },
-  //     body: JSON.stringify({ serial: serial })
-  //   });
-  //   // ... error handling ...
-  //   return await response.json();
-  // }
+  // ----- HIVE API Calls (HIVE Frontend calls its own backend) -----
+  // GET /api/photographers/by-serial/{serial} // HIVE frontend calls this.
+  // GET /api/events/schedule // HIVE frontend calls this if needed by some UI part.
 }
 
 export const localUtility = new LocalUtilityService();
