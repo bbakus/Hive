@@ -5,15 +5,13 @@ import { useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Activity, 
   BarChart3, 
-  CheckCircle, 
   Users, 
   Package, 
   CalendarClock,
   FolderKanban,
   ArrowRight
-} from "lucide-react";
+} from "lucide-react"; // Removed Activity, CheckCircle
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell } from "recharts";
 import { 
   ChartContainer, 
@@ -22,7 +20,7 @@ import {
   type ChartConfig
 } from "@/components/ui/chart";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import { useSettingsContext } from "@/contexts/SettingsContext"; // Import
+import { useSettingsContext } from "@/contexts/SettingsContext";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -142,7 +140,7 @@ export default function DashboardPage() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {overviewItems.map((item) => (
-          <Card key={item.title} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <Card key={item.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
               <item.icon className="h-5 w-5 text-muted-foreground" />
@@ -156,9 +154,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><BarChart3 className="h-6 w-6 text-accent" /> Event Coverage</CardTitle>
+            <CardTitle className="flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" /> Event Coverage</CardTitle> {/* Use primary for icon color */}
             <CardDescription>
               {selectedProject ? `Event coverage for ${selectedProject.name}` : "Overview of event coverage status."}
             </CardDescription>
@@ -179,7 +177,7 @@ export default function DashboardPage() {
                     cursor={false}
                     content={<ChartTooltipContent indicator="dashed" />}
                   />
-                  <Bar dataKey="coverage" radius={4}>
+                  <Bar dataKey="coverage" radius={0}> {/* radius 0 for sharp bars */}
                     {eventCoverageData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
@@ -193,9 +191,9 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        <Card className="shadow-lg flex flex-col">
+        <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CheckCircle className="h-6 w-6 text-accent" /> Deliverables Status</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Package className="h-6 w-6 text-primary" /> Deliverables Status</CardTitle> {/* Use primary for icon color */}
             <CardDescription>
               {selectedProject ? `Deliverable progress for ${selectedProject.name}` : "Summary of current deliverable progress."}
             </CardDescription>
@@ -205,7 +203,7 @@ export default function DashboardPage() {
               <ScrollArea className="h-[300px]">
                 <div className="space-y-3">
                   {filteredDeliverables.map((deliverable) => (
-                    <div key={deliverable.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md hover:bg-muted/60 transition-colors">
+                    <div key={deliverable.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-none hover:bg-secondary/80 transition-colors">
                       <div>
                         <p className="font-medium text-sm">{deliverable.name}</p>
                         <p className="text-xs text-muted-foreground">Event: {deliverable.event}</p>
@@ -228,7 +226,7 @@ export default function DashboardPage() {
           </CardContent>
            {filteredDeliverables.length > 0 && (
             <CardContent className="pt-2 pb-4 border-t">
-               <Button variant="link" asChild className="p-0 h-auto text-sm text-accent hover:text-accent/90">
+               <Button variant="link" asChild className="p-0 h-auto text-sm text-primary hover:text-primary/90">
                 <Link href="/deliverables">
                   View All Deliverables <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
