@@ -32,7 +32,7 @@ export default function ShotPlannerPage() {
     shotRequestsByEventId,
     getShotRequestsForEvent, 
     addShotRequest,
-    deleteShotRequest, // Added deleteShotRequest
+    deleteShotRequest,
   } = useEventContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { toast } = useToast();
@@ -43,6 +43,7 @@ export default function ShotPlannerPage() {
   const [newShotDescriptionInputValues, setNewShotDescriptionInputValues] = useState<Record<string, string>>({});
   
   const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
+  const [shotLists, setShotLists] = useState<Record<string, ShotRequest[]>>({});
 
   const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -62,10 +63,21 @@ export default function ShotPlannerPage() {
     if (eventIdFromQuery && eventsForSelectedProjectAndOrg.some(e => e.id === eventIdFromQuery)) {
       if (activeAccordionItem !== eventIdFromQuery) {
         setActiveAccordionItem(eventIdFromQuery);
+        if (!shotLists[eventIdFromQuery]) {
+            const shots = getShotRequestsForEvent(eventIdFromQuery);
+            setShotLists(prev => ({ ...prev, [eventIdFromQuery]: shots }));
+        }
       }
     } else if (!eventIdFromQuery && eventsForSelectedProjectAndOrg.length > 0 && !activeAccordionItem) {
-      // Optionally open the first event if no specific event is queried
-      // setActiveAccordionItem(eventsForSelectedProjectAndOrg[0].id);
+      // Optionally open the first event if no specific event is queried and none is active
+      // const firstEventId = eventsForSelectedProjectAndOrg[0].id;
+      // setActiveAccordionItem(firstEventId);
+      // if (!shotLists[firstEventId]) {
+      //    const shots = getShotRequestsForEvent(firstEventId);
+      //    setShotLists(prev => ({ ...prev, [firstEventId]: shots }));
+      // }
+    } else if (eventsForSelectedProjectAndOrg.length === 0) {
+        setActiveAccordionItem(undefined); // Clear active item if no events
     }
   }, [
     eventIdFromQuery, 
@@ -73,7 +85,9 @@ export default function ShotPlannerPage() {
     isLoadingEvents, 
     isLoadingSettings,
     isLoadingProjects,
-    activeAccordionItem
+    activeAccordionItem,
+    getShotRequestsForEvent,
+    shotLists 
   ]);
 
   const handleAddShot = (e: FormEvent<HTMLFormElement>, eventId: string) => {
@@ -106,8 +120,14 @@ export default function ShotPlannerPage() {
   };
   
   const handleDeleteShot = (eventId: string, shotId: string) => {
-    const shot = (shotRequestsByEventId[eventId] || []).find(s => s.id === shotId);
+    const eventShots = shotLists[eventId] || [];
+    const shot = eventShots.find(s => s.id === shotId);
     deleteShotRequest(eventId, shotId);
+    // Update local shotLists state immediately for UI responsiveness
+    setShotLists(prev => ({
+        ...prev,
+        [eventId]: (prev[eventId] || []).filter(s => s.id !== shotId)
+    }));
     toast({ 
         title: "Shot Deleted", 
         description: `Shot "${shot?.title || shot?.description.substring(0,30)}..." deleted.`,
@@ -115,8 +135,13 @@ export default function ShotPlannerPage() {
     });
   };
 
-  const onAccordionValueChange = (value: string) => {
+  const onAccordionValueChange = (value: string | undefined) => {
     setActiveAccordionItem(value);
+    if (value && !shotLists[value]) {
+        // Fetch shots if not already loaded for this event
+        const shots = getShotRequestsForEvent(value);
+        setShotLists(prev => ({ ...prev, [value]: shots }));
+    }
   };
 
 
@@ -158,7 +183,7 @@ export default function ShotPlannerPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>No Events Found</AlertTitle>
           <AlertDescription>
-            The selected project <span className="font-semibold">"{selectedProject?.name}"</span> has no events. Please add events on the "Events Setup" page first or ensure filters allow events to be shown.
+            The selected project <span className="font-semibold">"{selectedProject?.name}"</span> has no events. Please add events on the "Events Setup" page first.
           </AlertDescription>
         </Alert>
       </div>
@@ -172,14 +197,16 @@ export default function ShotPlannerPage() {
           <ListChecks className="h-8 w-8 text-accent" /> Shot Planner
         </h1>
         <p className="text-muted-foreground">
-          {selectedProject ? `Planning shots for events in ${selectedProject.name}. Expand an event to add and view its shots.` : "Select a project to begin planning shots."}
+          {selectedProject ? `Planning shots for events in ${selectedProject.name}. Expand an event to view its shot list and add new shots directly.` : "Select a project to begin planning shots."}
         </p>
       </div>
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
-          <CardTitle>Events & Shot Lists ({eventsForSelectedProjectAndOrg.length} events)</CardTitle>
-          <CardDescription>Expand an event to view its shot list and add new shots directly. Only one event can be expanded at a time.</CardDescription>
+          <CardTitle>Events &amp; Shot Lists ({eventsForSelectedProjectAndOrg.length} events)</CardTitle>
+          <CardDescription>
+            Expand an event to view its shot list and add new shots directly. Only one event can be expanded at a time.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {eventsForSelectedProjectAndOrg.length > 0 ? (
@@ -191,13 +218,16 @@ export default function ShotPlannerPage() {
               className="w-full space-y-2"
             >
               {eventsForSelectedProjectAndOrg.map((event) => {
-                const currentEventShots = shotRequestsByEventId[event.id] || [];
+                const currentEventShotsFromState = shotLists[event.id] || [];
                 return (
-                  <AccordionItem value={event.id} key={event.id} className={cn(
-                    "border rounded-none" 
-                    // Remove accent border from the entire item: 
-                    // activeAccordionItem === event.id && "border-accent" 
-                  )}>
+                  <AccordionItem 
+                    value={event.id} 
+                    key={event.id} 
+                    className={cn(
+                      "border rounded-none", // Base border for each item
+                      activeAccordionItem === event.id && "border-accent" // Accent border if active
+                    )}
+                  >
                     <AccordionTrigger 
                         className="p-3 hover:no-underline text-left" 
                     >
@@ -241,7 +271,7 @@ export default function ShotPlannerPage() {
                           </Button>
                         </form>
 
-                        {currentEventShots.length > 0 ? (
+                        {currentEventShotsFromState.length > 0 ? (
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -253,7 +283,7 @@ export default function ShotPlannerPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {currentEventShots.map((shot) => (
+                              {currentEventShotsFromState.map((shot) => (
                                 <TableRow key={shot.id}>
                                   <TableCell className="font-medium max-w-[150px]">
                                     <p className="truncate" title={shot.title || "No Title"}>{shot.title || <span className="italic text-muted-foreground">No Title</span>}</p>
