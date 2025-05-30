@@ -24,25 +24,26 @@ export default function ShotPlannerPage() {
   const searchParams = useSearchParams();
   const eventIdFromQuery = searchParams.get('eventId');
 
+  const { selectedProject, isLoadingProjects } = useProjectContext();
   const { 
-    getEventById, 
+    eventsForSelectedProjectAndOrg, 
+    isLoadingEvents,
+    getEventById,
+    shotRequestsByEventId,
     getShotRequestsForEvent, 
     addShotRequest,
-    deleteShotRequest,
-    isLoadingEvents,
-    eventsForSelectedProjectAndOrg,
-    shotRequestsByEventId,
+    deleteShotRequest, // Added deleteShotRequest
   } = useEventContext();
-  const { selectedProject, isLoadingProjects } = useProjectContext(); 
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { toast } = useToast();
 
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
-  const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
   
   const [newShotTitleInputValues, setNewShotTitleInputValues] = useState<Record<string, string>>({});
   const [newShotDescriptionInputValues, setNewShotDescriptionInputValues] = useState<Record<string, string>>({});
   
+  const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
+
   const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const getPersonnelNameById = useCallback((id?: string): string => {
@@ -63,7 +64,7 @@ export default function ShotPlannerPage() {
         setActiveAccordionItem(eventIdFromQuery);
       }
     } else if (!eventIdFromQuery && eventsForSelectedProjectAndOrg.length > 0 && !activeAccordionItem) {
-      // Optionally, open the first event if no specific event is queried
+      // Optionally open the first event if no specific event is queried
       // setActiveAccordionItem(eventsForSelectedProjectAndOrg[0].id);
     }
   }, [
@@ -86,7 +87,7 @@ export default function ShotPlannerPage() {
     }
 
     addShotRequest(eventId, {
-      title: title || undefined, // Send undefined if empty for optional field
+      title: title,
       description: description,
       priority: "Medium", 
       status: "Unassigned", 
@@ -98,13 +99,13 @@ export default function ShotPlannerPage() {
     
     setNewShotTitleInputValues(prev => ({ ...prev, [eventId]: '' }));
     setNewShotDescriptionInputValues(prev => ({ ...prev, [eventId]: '' }));
-
+    
     setTimeout(() => {
         titleInputRefs.current[eventId]?.focus();
     }, 0);
   };
   
-  const handleDeleteExistingShot = (eventId: string, shotId: string) => {
+  const handleDeleteShot = (eventId: string, shotId: string) => {
     const shot = (shotRequestsByEventId[eventId] || []).find(s => s.id === shotId);
     deleteShotRequest(eventId, shotId);
     toast({ 
@@ -114,11 +115,12 @@ export default function ShotPlannerPage() {
     });
   };
 
-  const onAccordionValueChange = (value: string) => { // Value is now a string for single type
+  const onAccordionValueChange = (value: string) => {
     setActiveAccordionItem(value);
   };
 
-  if (isLoadingPageData || isLoadingProjects || isLoadingEvents || isLoadingSettings) {
+
+  if (isLoadingPageData) {
     return (
       <div className="flex flex-col gap-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -182,8 +184,8 @@ export default function ShotPlannerPage() {
         <CardContent>
           {eventsForSelectedProjectAndOrg.length > 0 ? (
             <Accordion 
-              type="single" // Changed to single
-              collapsible // Allows closing the open item
+              type="single" 
+              collapsible
               value={activeAccordionItem}
               onValueChange={onAccordionValueChange}
               className="w-full space-y-2"
@@ -192,8 +194,9 @@ export default function ShotPlannerPage() {
                 const currentEventShots = shotRequestsByEventId[event.id] || [];
                 return (
                   <AccordionItem value={event.id} key={event.id} className={cn(
-                    "border rounded-none",
-                    activeAccordionItem === event.id && "border-accent" // Highlight active for input
+                    "border rounded-none" 
+                    // Remove accent border from the entire item: 
+                    // activeAccordionItem === event.id && "border-accent" 
                   )}>
                     <AccordionTrigger 
                         className="p-3 hover:no-underline text-left" 
@@ -202,7 +205,7 @@ export default function ShotPlannerPage() {
                         <div>
                           <p className={cn("font-medium")}>{event.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {format(parseISO(event.date), "PPP")} ({event.time}) - Shots: {event.shotRequests} {/* Use count from event object */}
+                            {format(parseISO(event.date), "PPP")} ({event.time}) - Shots: {event.shotRequests}
                           </p>
                         </div>
                       </div>
@@ -262,7 +265,7 @@ export default function ShotPlannerPage() {
                                         <CheckCircle className="h-3 w-3"/> Initially Captured by: {getPersonnelNameById(shot.initialCapturerId)}
                                       </p>
                                     )}
-                                    {shot.status === "Completed" && shot.lastStatusModifierId && (
+                                     {shot.status === "Completed" && shot.lastStatusModifierId && (
                                         <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">
                                             <UserCheck className="h-3 w-3" />
                                             Completed by: {getPersonnelNameById(shot.lastStatusModifierId)}
@@ -302,7 +305,7 @@ export default function ShotPlannerPage() {
                                     <Button variant="ghost" size="icon" className="hover:text-foreground/80 h-8 w-8" disabled>
                                       <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="hover:text-destructive h-8 w-8" onClick={() => handleDeleteExistingShot(event.id, shot.id)}>
+                                    <Button variant="ghost" size="icon" className="hover:text-destructive h-8 w-8" onClick={() => handleDeleteShot(event.id, shot.id)}>
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </TableCell>
