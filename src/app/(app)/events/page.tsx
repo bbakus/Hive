@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter as FilterIcon, Camera as CameraIconLucide, Video } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +26,12 @@ import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
 import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -74,7 +80,8 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), endHour, endMinute);
 
   if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
-    endDate.setDate(endDate.getDate() + 1);
+    // endDate.setDate(endDate.getDate() + 1);
+    endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1, endHour, endMinute);
   }
 
   return { start: startDate, end: endDate };
@@ -117,7 +124,7 @@ const getCoverageIcon = (isCovered?: boolean) => {
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-accent" />;
+  if (discipline === "Photography") return <CameraIconLucide className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-primary" />;
   return null;
 };
 
@@ -149,7 +156,7 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="mb-6 p-3 px-4">
+    <div className="p-3 px-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
@@ -281,7 +288,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
   return (
     <Card className="mt-4 border-0">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-primary" /> Daily Schedule Overview</CardTitle>
         <CardDescription>
           Visualizes events grouped by day. Events with potential time conflicts (overlapping time and shared personnel) are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
           {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
@@ -291,7 +298,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
         {groupedAndSortedEventsForDisplay.length > 0 ? (
           groupedAndSortedEventsForDisplay.map(([date, dayEvents]) => (
             <div key={date}>
-              <h3 className="text-xl font-semibold mb-3 pb-2">
+              <h3 className="text-xl font-semibold mb-3">
                 {format(parseISO(date), "EEEE, MMMM do, yyyy")}
               </h3>
               <div className="space-y-4">
@@ -304,7 +311,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                             <span className="truncate" title={event.name}>{event.name}</span>
                             {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                           </CardTitle>
-                          <div className="text-xs text-muted-foreground space-y-0.5">
+                           <div className="text-xs text-muted-foreground space-y-0.5">
                               <div className="flex items-center gap-1.5">
                                   <p>{event.time}</p>
                                   {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
@@ -333,8 +340,8 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                   Assigned: {event.assignedPersonnelIds.length}
                                   </p>
                               )}
-                              <Link href={`/shot-planner?eventId=${event.id}`} className="text-foreground hover:underline flex items-center gap-1 whitespace-nowrap">
-                                  <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-accent" />
+                              <Link href={`/shot-planner?eventId=${event.id}`} className="text-primary hover:underline flex items-center gap-1 whitespace-nowrap">
+                                  <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-primary" />
                                   Shot Requests: {event.shotRequests}
                               </Link>
                               {event.discipline && (
@@ -385,7 +392,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6 text-primary" /> Event List (Table View)</CardTitle>
         <CardDescription>
           {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
           ({displayableEvents.length} events found)
@@ -440,7 +447,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                       {event.assignedPersonnelIds?.length || 0}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/shot-planner?eventId=${event.id}`} className="text-foreground hover:underline">
+                      <Link href={`/shot-planner?eventId=${event.id}`} className="text-primary hover:underline">
                         {event.shotRequests}
                       </Link>
                     </TableCell>
@@ -500,6 +507,7 @@ function BlockScheduleTabContent({
       const dateObj = parseISO(sortedSelectedDates[0].replace(/\//g, '-'));
       return isValid(dateObj) ? dateObj : null;
     }
+     // Fallback: if no dates selected via filter, try to find the first date from displayableEvents
      if (displayableEvents.length > 0 && !selectedEventDates.length) {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         const dateObj = parseISO(sortedEvents[0].date.replace(/\//g, '-'));
@@ -510,7 +518,7 @@ function BlockScheduleTabContent({
 
   const eventsForBlockSchedule = useMemo(() => {
     if (!activeBlockScheduleDate) return [];
-    const dateKey = format(activeBlockScheduleDate, "yyyy-MM-dd");
+    const dateKey = format(activeBlockScheduleDate, "yyyy-MM-dd"); // Ensure consistent date format for comparison
     return displayableEvents.filter(event => event.date === dateKey);
   }, [activeBlockScheduleDate, displayableEvents]);
 
@@ -529,7 +537,7 @@ function BlockScheduleTabContent({
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-primary" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
           View events for the selected date(s) from the main filter, laid out on an hourly timeline by assigned photographer.
           {activeBlockScheduleDate ? ` Showing schedule for ${format(activeBlockScheduleDate, "PPP")}.` : " Select date(s) from the main filters to view schedule."}
@@ -576,7 +584,6 @@ export default function EventsPage() {
     updateEvent,
     deleteEvent,
     isLoadingEvents: isLoadingContextEvents,
-    addShotRequest,
   } = useEventContext();
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -776,28 +783,7 @@ export default function EventsPage() {
       });
     }
 
-    if (currentEventId && data.quickShotDescriptionsInput) {
-        const descriptions = data.quickShotDescriptionsInput
-            .split('\n')
-            .map(desc => desc.trim())
-            .filter(desc => desc.length > 0);
-
-        descriptions.forEach(desc => {
-            addShotRequest(currentEventId!, {
-                title: "",
-                description: desc,
-                priority: "Medium",
-                status: "Unassigned"
-            });
-        });
-        if (descriptions.length > 0) {
-             toast({
-                title: "Quick Shots Added",
-                description: `${descriptions.length} shot(s) added to "${data.name}".`,
-            });
-        }
-    }
-
+    // Quick Shot Descriptions are handled in EventFormDialog after event is created/updated
     setIsEventModalOpen(false);
     setEditingEvent(null);
   };
@@ -836,11 +822,12 @@ export default function EventsPage() {
         const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
         return sortedDates[0];
     }
+     // Fallback: if no dates selected via filter, try to find the first date from displayableEvents
      if (displayableEvents.length > 0 && !selectedEventDates.length) {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         return sortedEvents[0].date;
     }
-    return null;
+    return null; // Or today's date if preferred
   }, [selectedEventDates, displayableEvents]);
 
 
@@ -863,22 +850,35 @@ export default function EventsPage() {
         </Button>
       </div>
 
-       <EventFilters
-            filterQuickTurnaround={filterQuickTurnaround}
-            setFilterQuickTurnaround={setFilterQuickTurnaround}
-            filterTimeStatus={filterTimeStatus}
-            setFilterTimeStatus={setFilterTimeStatus}
-            filterAssignedMemberId={filterAssignedMemberId}
-            setFilterAssignedMemberId={setFilterAssignedMemberId}
-            assignedPersonnelForFilter={assignedPersonnelForFilter}
-            filterDiscipline={filterDiscipline}
-            setFilterDiscipline={setFilterDiscipline}
-            filterCoverageStatus={filterCoverageStatus}
-            setFilterCoverageStatus={setFilterCoverageStatus}
-            selectedEventDates={selectedEventDates}
-            setSelectedEventDates={setSelectedEventDates}
-            uniqueEventDatesForFilter={uniqueEventDatesForFilter}
-        />
+      <Accordion type="single" collapsible className="w-full mb-6">
+        <AccordionItem value="event-filters">
+          <AccordionTrigger>
+            <Button variant="outline" className="w-full justify-start font-normal text-sm">
+              <FilterIcon className="mr-2 h-4 w-4" />
+              Filters
+            </Button>
+          </AccordionTrigger>
+          <AccordionContent>
+            <EventFilters
+                filterQuickTurnaround={filterQuickTurnaround}
+                setFilterQuickTurnaround={setFilterQuickTurnaround}
+                filterTimeStatus={filterTimeStatus}
+                setFilterTimeStatus={setFilterTimeStatus}
+                filterAssignedMemberId={filterAssignedMemberId}
+                setFilterAssignedMemberId={setFilterAssignedMemberId}
+                assignedPersonnelForFilter={assignedPersonnelForFilter}
+                filterDiscipline={filterDiscipline}
+                setFilterDiscipline={setFilterDiscipline}
+                filterCoverageStatus={filterCoverageStatus}
+                setFilterCoverageStatus={setFilterCoverageStatus}
+                selectedEventDates={selectedEventDates}
+                setSelectedEventDates={setSelectedEventDates}
+                uniqueEventDatesForFilter={uniqueEventDatesForFilter}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
 
       <EventFormDialog
         isOpen={isEventModalOpen}
@@ -947,3 +947,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
+    
