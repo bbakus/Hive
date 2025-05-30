@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon } from "lucide-react";
@@ -48,14 +48,14 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   
   let baseDate;
   try {
-    baseDate = parseISO(dateStr.replace(/\//g, '-'));
+    // Ensure dateStr is in YYYY-MM-DD format for parseISO
+    baseDate = parseISO(dateStr.replace(/\//g, '-')); 
   } catch (e) {
-    console.error("Invalid date string for parseISO:", dateStr);
+    console.error("Invalid date string for parseISO:", dateStr, e);
     return null;
   }
 
   if (!isValid(baseDate)) {
-     console.error("Parsed baseDate is invalid:", dateStr, baseDate);
     return null;
   }
 
@@ -68,12 +68,14 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
   if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
 
-  let startDate = startOfDay(baseDate);
-  startDate.setHours(startHour, startMinute);
+  let startDate = startOfDay(baseDate); // Use startOfDay to avoid timezone issues from parseISO potentially setting time
+  startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), startHour, startMinute);
+
 
   let endDate = startOfDay(baseDate); 
-  endDate.setHours(endHour, endMinute);
+  endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), endHour, endMinute);
   
+  // Handle events that cross midnight
   if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
     endDate.setDate(endDate.getDate() + 1);
   }
@@ -93,12 +95,13 @@ const checkOverlap = (eventA: Event, eventB: Event): boolean => {
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
+  // Check for shared personnel only if both events have assigned personnel
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-  return false; 
+  return false; // No personnel overlap check if one or both have no assignments
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -119,7 +122,7 @@ const getCoverageIcon = (isCovered?: boolean) => {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-accent" />;
-  return null;
+  return null; // No icon for "" or other disciplines
 };
 
 type EventFiltersProps = {
@@ -280,7 +283,7 @@ type DailyOverviewTabContentProps = {
 
 function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedProject, useDemoData, openEditEventModal, organizations }: DailyOverviewTabContentProps) {
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 border-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
         <CardDescription>
@@ -303,24 +306,24 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                           <CardTitle className="text-lg flex items-center gap-1.5">
                             {getCoverageIcon(event.isCovered)}
                             <span className="truncate" title={event.name}>{event.name}</span>
-                            {event.isQuickTurnaround && <Zap className="h-5 w-5 text-accent ml-1.5" title="Quick Turnaround"/>}
+                             {event.isQuickTurnaround && <Zap className="h-5 w-5 text-accent ml-1.5" title="Quick Turnaround"/>}
                           </CardTitle>
-                           <div className="text-xs text-muted-foreground space-y-0.5">
-                                <div className="flex items-center gap-1.5">
-                                    <p>{event.time}</p>
-                                    {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
-                                    <Badge variant={
-                                    event.priority === "Critical" ? "destructive" :
-                                    event.priority === "High" ? "secondary" :
-                                    event.priority === "Medium" ? "outline" : "default"
-                                    } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
-                                </div>
-                                {(!selectedProject || organizations.length > 1) && event.project && (
-                                <p className="text-xs mt-0.5 truncate" title={event.project}>
-                                    Project: {event.project}
-                                </p>
-                                )}
-                          </div>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                  <p>{event.time}</p>
+                                  {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
+                                  <Badge variant={
+                                  event.priority === "Critical" ? "destructive" :
+                                  event.priority === "High" ? "secondary" :
+                                  event.priority === "Medium" ? "outline" : "default"
+                                  } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
+                              </div>
+                              {(!selectedProject || organizations.length > 1) && event.project && (
+                              <p className="text-xs mt-0.5 truncate" title={event.project}>
+                                  Project: {event.project}
+                              </p>
+                              )}
+                        </div>
 
                           <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                               {event.deadline && (
@@ -483,7 +486,7 @@ type BlockScheduleTabContentProps = {
   selectedProject: Project | null;
   useDemoData: boolean;
   allPersonnel: Personnel[];
-  selectedEventDates: string[];
+  selectedEventDates: string[]; // Dates from the main filter
 };
 
 function BlockScheduleTabContent({
@@ -497,17 +500,18 @@ function BlockScheduleTabContent({
   
   const activeBlockScheduleDate = useMemo(() => {
     if (selectedEventDates.length > 0) {
-      const sortedSelectedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
-      const dateObj = parseISO(sortedSelectedDates[0]);
+      // Sort selected dates and pick the first one
+      const sortedSelectedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
+      const dateObj = parseISO(sortedSelectedDates[0].replace(/\//g, '-'));
       return isValid(dateObj) ? dateObj : null;
     }
     // If no dates are selected in the main filter, try to find the earliest date from all displayable events
     if (displayableEvents.length > 0) {
-        const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        const dateObj = parseISO(sortedEvents[0].date);
+        const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
+        const dateObj = parseISO(sortedEvents[0].date.replace(/\//g, '-'));
         return isValid(dateObj) ? dateObj : null;
     }
-    return null;
+    return null; // Default to null if no specific date can be determined
   }, [selectedEventDates, displayableEvents]);
 
   const eventsForBlockSchedule = useMemo(() => {
@@ -526,6 +530,7 @@ function BlockScheduleTabContent({
         .filter(p => personnelIds.has(p.id) && PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client")
         .sort((a, b) => a.name.localeCompare(b.name));
   }, [activeBlockScheduleDate, eventsForBlockSchedule, allPersonnel]);
+
 
   return (
     <Card className="mt-4">
@@ -577,7 +582,7 @@ export default function EventsPage() {
     updateEvent,
     deleteEvent,
     isLoadingEvents: isLoadingContextEvents,
-    addShotRequest,
+    addShotRequest, // ensure this is available if used directly, or through context
   } = useEventContext();
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -633,9 +638,9 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+          filtered = filtered.filter(event => event.discipline === "Photography");
       } else if (filterDiscipline === "na_or_other") { 
-          filtered = filtered.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video"); // Include video if showing N/A or other
+          filtered = filtered.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video");
       }
     }
     if (selectedEventDates.length > 0) {
@@ -660,15 +665,15 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => {
-      const dateA = a.date ? parseISO(a.date.replace(/\//g, '-')).getTime() : 0;
-      const dateB = b.date ? parseISO(b.date.replace(/\//g, '-')).getTime() : 0;
-      if (dateA !== dateB) return dateA - dateB;
+      const dateAVal = a.date ? parseISO(a.date.replace(/\//g, '-')).getTime() : 0;
+      const dateBVal = b.date ? parseISO(b.date.replace(/\//g, '-')).getTime() : 0;
+      if (dateAVal !== dateBVal) return dateAVal - dateBVal;
       
       const timesA = parseEventTimes(a.date, a.time);
       const timesB = parseEventTimes(b.date, b.time);
-      const timeAVal = timesA ? timesA.start.getTime() : 0;
-      const timeBVal = timesB ? timesB.start.getTime() : 0;
-      return timeAVal - timeBVal;
+      const timeAStart = timesA ? timesA.start.getTime() : 0;
+      const timeBStart = timesB ? timesB.start.getTime() : 0;
+      return timeAStart - timeBStart;
     });
   }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline, selectedEventDates, filterCoverageStatus]);
 
@@ -724,7 +729,7 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
       } else if (filterDiscipline === "na_or_other") { 
           sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video");
       }
@@ -741,7 +746,7 @@ export default function EventsPage() {
       return;
     }
 
-    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string } = {
+    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'> = {
       name: data.name,
       projectId: data.projectId,
       date: data.date,
@@ -753,6 +758,7 @@ export default function EventsPage() {
       organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
+      personnelActivity: data.personnelActivity || {},
     };
     
     let currentEventId = existingEventId;
@@ -762,7 +768,6 @@ export default function EventsPage() {
         ...eventPayload,
         deliverables: editingEvent.deliverables, 
         shotRequests: editingEvent.shotRequests, 
-        personnelActivity: editingEvent.personnelActivity,
       };
       updateEvent(currentEventId, fullUpdatePayload);
       toast({
@@ -785,6 +790,7 @@ export default function EventsPage() {
         
         descriptions.forEach(desc => {
             addShotRequest(currentEventId!, {
+                title: "", // No title for quick shots initially
                 description: desc,
                 priority: "Medium", 
                 status: "Unassigned" 
@@ -832,15 +838,17 @@ export default function EventsPage() {
   };
 
   const firstSelectedDateForDialog = useMemo(() => {
+    // Use the first date from the main 'Specific Dates' filter, if any selected
     if (selectedEventDates.length > 0) {
         const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
         return sortedDates[0];
     }
+     // Fallback: if no dates selected in filter, but there are displayable events, use the earliest of those
      if (displayableEvents.length > 0 && !selectedEventDates.length) {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         return sortedEvents[0].date;
     }
-    return null;
+    return null; // No reasonable default otherwise
   }, [selectedEventDates, displayableEvents]);
 
 
@@ -947,5 +955,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-    
