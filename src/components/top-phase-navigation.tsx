@@ -2,30 +2,27 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { usePhaseContext, PHASES, type Phase } from "@/contexts/PhaseContext";
 import { cn } from "@/lib/utils";
 
 export function TopPhaseNavigation() {
-  const { activePhase, setActivePhase } = usePhaseContext();
+  const { activePhase } = usePhaseContext();
   const [mounted, setMounted] = React.useState(false);
-  const router = useRouter(); 
+  const router = useRouter();
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
   const handlePhaseClick = (phase: Phase) => {
-    // setActivePhase(phase); // REMOVED: Let AppLayoutInternal handle phase setting based on route
-    
-    // Navigate to a default route for the selected phase
     switch (phase) {
       case 'Dashboard':
         router.push('/dashboard');
         break;
       case 'Plan':
-        router.push('/projects'); 
+        router.push('/projects');
         break;
       case 'Shoot':
         router.push('/shoot');
@@ -37,9 +34,13 @@ export function TopPhaseNavigation() {
         router.push('/deliverables');
         break;
       default:
-        router.push('/dashboard'); 
+        router.push('/dashboard');
     }
   };
+
+  const baseButtonClass = "uppercase font-semibold tracking-wider !hover:bg-transparent focus-visible:!ring-0 focus-visible:!ring-offset-0 px-2.5 py-1.5 h-auto text-xs sm:text-sm";
+  const inactiveStyle = "text-muted-foreground hover:text-foreground";
+  const activeStyle = "text-accent";
 
   return (
     <nav className="flex items-center">
@@ -50,12 +51,10 @@ export function TopPhaseNavigation() {
             <Button
               key={phase}
               variant="ghost"
-              onClick={() => handlePhaseClick(phase)} 
+              onClick={() => handlePhaseClick(phase)}
               className={cn(
-                "uppercase font-semibold tracking-wider",
-                "!hover:bg-transparent focus-visible:!ring-0 focus-visible:!ring-offset-0",
-                "px-2.5 py-1.5 h-auto text-xs sm:text-sm", // Base styles for SSR and initial client render
-                mounted && (isActive ? "text-accent" : "text-muted-foreground hover:text-foreground") 
+                baseButtonClass,
+                mounted && (isActive ? activeStyle : inactiveStyle)
               )}
             >
               <span>{phase.toUpperCase()}</span>

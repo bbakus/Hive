@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -22,14 +22,22 @@ import { Progress } from "@/components/ui/progress";
 import { AddPersonnelToRosterDialog, type WizardAvailablePersonnel } from "@/components/modals/AddPersonnelToRosterDialog";
 import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; 
 
-const initialAvailablePersonnelList: WizardAvailablePersonnel[] = [
-  { id: "user001", name: "Alice Wonderland", capabilities: ["Photographer", "Editor"] },
-  { id: "user002", name: "Bob The Builder", capabilities: ["Photographer", "Editor"] },
-  { id: "user003", name: "Charlie Chaplin", capabilities: ["Project Manager"] },
-  { id: "user004", name: "Diana Prince", capabilities: ["Photographer"] },
-  { id: "user005", name: "Edward Scissorhands", capabilities: ["Editor"] },
-  { id: "user006", name: "Fiona Gallagher", capabilities: ["Photographer"] },
+// Simplified structure for available personnel in the wizard
+interface Step2AvailablePersonnel extends WizardAvailablePersonnel {
+  personnelId: string; // Ensure this matches KeyPersonnel.personnelId
+  projectRole: string; // Initialize, will be set by user
+}
+
+
+const initialAvailablePersonnelList: Step2AvailablePersonnel[] = [
+  { id: "user001", personnelId: "user001", name: "Alice Wonderland", capabilities: ["Photographer", "Editor"], projectRole: "" },
+  { id: "user002", personnelId: "user002", name: "Bob The Builder", capabilities: ["Photographer", "Editor"], projectRole: "" },
+  { id: "user003", personnelId: "user003", name: "Charlie Chaplin", capabilities: ["Project Manager"], projectRole: "" },
+  { id: "user004", personnelId: "user004", name: "Diana Prince", capabilities: ["Photographer"], projectRole: "" },
+  { id: "user005", personnelId: "user005", name: "Edward Scissorhands", capabilities: ["Editor"], projectRole: "" },
+  { id: "user006", personnelId: "user006", name: "Fiona Gallagher", capabilities: ["Photographer"], projectRole: "" },
 ];
+
 
 const keyPersonnelSchema = z.object({
   personnelId: z.string(),
@@ -67,7 +75,7 @@ export default function NewProjectWizardPage() {
   const locationInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
-  const [currentAvailablePersonnel, setCurrentAvailablePersonnel] = useState<WizardAvailablePersonnel[]>(initialAvailablePersonnelList);
+  const [currentAvailablePersonnel, setCurrentAvailablePersonnel] = useState<Step2AvailablePersonnel[]>(initialAvailablePersonnelList);
   const [isAddPersonnelDialogOpen, setIsAddPersonnelDialogOpen] = useState(false);
   const [notifyTeam, setNotifyTeam] = useState(true); 
 
@@ -97,6 +105,12 @@ export default function NewProjectWizardPage() {
       selectedPersonnelMap: {},
     },
   });
+  
+  const { fields: keyPersonnelFields, append, remove, update } = useFieldArray({
+    control,
+    name: "keyPersonnel",
+    keyName: "fieldId" // Use a different key name than default 'id' to avoid conflict with personnel.id
+  });
 
   const selectedPersonnelMap = watch("selectedPersonnelMap", {});
   const watchedKeyPersonnel = watch("keyPersonnel", []);
@@ -110,29 +124,48 @@ export default function NewProjectWizardPage() {
     }
   }, [globalSelectedOrgId, getValues, setValue, organizations, isLoadingOrganizations]);
   
-  useEffect(() => {
-    const newKeyPersonnelArray: KeyPersonnel[] = [];
+ useEffect(() => {
     const currentFormKeyPersonnel = getValues("keyPersonnel") || [];
+    const newKeyPersonnelArray: KeyPersonnel[] = [];
+    let changed = false;
 
+    // Add or update selected personnel
     Object.keys(selectedPersonnelMap).forEach(personId => {
-        if (selectedPersonnelMap[personId]) {
-            const personDetails = currentAvailablePersonnel.find(p => p.id === personId);
-            if (personDetails) {
-                const existingEntry = currentFormKeyPersonnel.find(kp => kp.personnelId === personId);
-                newKeyPersonnelArray.push({
-                    personnelId: personDetails.id,
-                    name: personDetails.name,
-                    projectRole: existingEntry?.projectRole || "", 
-                });
-            }
+      if (selectedPersonnelMap[personId]) {
+        const personDetails = currentAvailablePersonnel.find(p => p.id === personId);
+        if (personDetails) {
+          const existingEntryIndex = currentFormKeyPersonnel.findIndex(kp => kp.personnelId === personId);
+          if (existingEntryIndex > -1) {
+            newKeyPersonnelArray.push(currentFormKeyPersonnel[existingEntryIndex]); // Keep existing role
+          } else {
+            newKeyPersonnelArray.push({
+              personnelId: personDetails.id,
+              name: personDetails.name,
+              projectRole: "", // Default to empty, user will select
+            });
+            changed = true;
+          }
         }
+      }
     });
-    
-    const sortedNewKeyPersonnel = [...newKeyPersonnelArray].sort((a, b) => a.personnelId.localeCompare(b.personnelId));
-    const sortedCurrentKeyPersonnel = [...currentFormKeyPersonnel].sort((a, b) => a.personnelId.localeCompare(b.personnelId));
 
-    if (JSON.stringify(sortedNewKeyPersonnel) !== JSON.stringify(sortedCurrentKeyPersonnel)) {
-        setValue("keyPersonnel", sortedNewKeyPersonnel, { shouldValidate: true, shouldDirty: true });
+    // Check if anything was actually removed
+    if (newKeyPersonnelArray.length !== currentFormKeyPersonnel.length) {
+      changed = true;
+    } else {
+      // Check if content differs if lengths are same
+      for (let i = 0; i < newKeyPersonnelArray.length; i++) {
+        const newKp = newKeyPersonnelArray[i];
+        const currentKp = currentFormKeyPersonnel.find(kp => kp.personnelId === newKp.personnelId);
+        if (!currentKp || newKp.projectRole !== currentKp.projectRole) {
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    if (changed) {
+      setValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
     }
   }, [selectedPersonnelMap, currentAvailablePersonnel, getValues, setValue]);
 
@@ -153,9 +186,14 @@ export default function NewProjectWizardPage() {
   }, [currentStep, setValue]);
 
   const handleAddNewPersonnelToRosterDialog = (newPersonnel: WizardAvailablePersonnel) => {
-    setCurrentAvailablePersonnel(prev => [...prev, newPersonnel]);
+    const newPersonForStep2: Step2AvailablePersonnel = {
+        ...newPersonnel,
+        personnelId: newPersonnel.id, // Map id to personnelId for KeyPersonnel consistency
+        projectRole: "" // Initialize projectRole
+    };
+    setCurrentAvailablePersonnel(prev => [...prev, newPersonForStep2]);
     const currentMap = getValues("selectedPersonnelMap") || {};
-    currentMap[newPersonnel.id] = true;
+    currentMap[newPersonnel.id] = true; // Automatically select them
     setValue("selectedPersonnelMap", currentMap , { shouldValidate: true, shouldDirty: true });
   };
 
@@ -170,27 +208,25 @@ export default function NewProjectWizardPage() {
         return;
       }
     } else if (currentStep === 2) {
-        isValidStep = await trigger("keyPersonnel");
+        // Validation for keyPersonnel roles
         const keyPersonnelValues = getValues("keyPersonnel") || [];
-        let allRolesValid = true;
         if (keyPersonnelValues.length > 0) {
-            keyPersonnelValues.forEach((kp, index) => {
-                if (!kp.projectRole) {
-                    control.setError(`keyPersonnel.${index}.projectRole`, { type: "manual", message: "Role is required." });
-                    allRolesValid = false;
-                }
-            });
+            isValidStep = await trigger("keyPersonnel"); // This will use Zod schema
+            if (!isValidStep) {
+                 toast({
+                    title: "Missing Roles",
+                    description: "Please assign a project role to all selected key personnel.",
+                    variant: "destructive",
+                });
+                return; // Stop if roles are missing for selected personnel
+            }
+        } else {
+            isValidStep = true; // No personnel selected, so no roles to validate
+             trigger("keyPersonnel"); // Clear any previous errors if list is now empty
         }
-        if (!allRolesValid) {
-            toast({
-                title: "Missing Roles",
-                description: "Please assign a project role to all selected key personnel.",
-                variant: "destructive",
-            });
-            isValidStep = false; 
-        }
+
     } else if (currentStep === 3) {
-      isValidStep = await trigger("location");
+      isValidStep = await trigger("location"); // Zod schema will validate if it's optional or not
     } else {
       isValidStep = true;
     }
@@ -382,7 +418,7 @@ export default function NewProjectWizardPage() {
                               control={control}
                               defaultValue=""
                               render={({ field }) => (
-                                <Select onValueChange={field.onChange} value={field.value || ""}>
+                                <Select onValueChange={field.onChange} value={field.value || ""} disabled={!person.capabilities || person.capabilities.length === 0}>
                                   <SelectTrigger className={errors.keyPersonnel?.[keyPersonnelEntryIndex]?.projectRole ? "border-destructive h-9" : "h-9"}>
                                     <SelectValue placeholder="Select role..." />
                                   </SelectTrigger>
@@ -394,7 +430,7 @@ export default function NewProjectWizardPage() {
                                         </SelectItem>
                                       ))
                                     ) : (
-                                      <SelectItem value="" disabled>No capabilities</SelectItem>
+                                      <SelectItem value="" disabled>No capabilities defined</SelectItem>
                                     )}
                                   </SelectContent>
                                 </Select>
@@ -408,7 +444,7 @@ export default function NewProjectWizardPage() {
                           </div>
                         )}
                          {isSelected && keyPersonnelEntryIndex === -1 && ( 
-                            <p className="text-xs text-muted-foreground italic w-full text-center sm:text-left sm:w-60 sm:ml-auto">Loading role...</p>
+                            <p className="text-xs text-muted-foreground italic w-full text-center sm:text-left sm:w-60 sm:ml-auto">Processing selection...</p>
                          )}
                       </div>
                     );
@@ -439,7 +475,7 @@ export default function NewProjectWizardPage() {
                   />
                   {errors.location && <p className="text-xs text-destructive mt-1">{errors.location.message}</p>}
                    <p className="text-xs text-muted-foreground mt-1">
-                    Start typing for address suggestions. Note: Google Maps Autocomplete requires an API key setup and the script loaded in `layout.tsx` for full functionality.
+                    Start typing for address suggestions. Google Maps Autocomplete integration is symbolic and requires API key setup.
                   </p>
                 </div>
               </CardContent>
@@ -522,13 +558,13 @@ export default function NewProjectWizardPage() {
             {currentStep === 1 && <div />} 
 
             {currentStep < TOTAL_STEPS && (
-              <Button type="button" onClick={handleNextStep}>
+              <Button type="button" variant="accent" onClick={handleNextStep}>
                 Next <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             )}
 
             {currentStep === TOTAL_STEPS && (
-              <Button type="submit" disabled={!isFormOverallValid}>
+              <Button type="submit" variant="accent" disabled={!isFormOverallValid}>
                 <CheckCircle className="mr-2 h-4 w-4" /> Create Project
               </Button>
             )}

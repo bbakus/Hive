@@ -3,7 +3,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useOrganizationContext, type Organization } from "@/contexts/OrganizationContext"; 
+import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; 
 import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay, addHours } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,7 +37,6 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
 import { EventFormDialog, type EventFormDialogData, eventFormSchema } from "@/components/modals/EventFormDialog";
 
 import { BlockScheduleView } from "@/components/block-schedule-view";
@@ -110,7 +109,7 @@ const getCoverageIcon = (isCovered?: boolean) => {
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />;
+  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-accent" />;
   return null;
 };
 
@@ -149,7 +148,6 @@ function EventFilters({
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-            className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
           />
           <Label htmlFor="filter-quick-turnaround" className="font-normal whitespace-nowrap">Quick Turnaround Only</Label>
         </div>
@@ -274,7 +272,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6" /> Daily Schedule Overview</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
         <CardDescription>
           Visualizes events grouped by day. Events with potential time conflicts (overlapping time and shared personnel) are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
           {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
@@ -295,7 +293,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                           <CardTitle className="text-lg flex items-center gap-1.5">
                             {getCoverageIcon(event.isCovered)}
                             <span className="truncate" title={event.name}>{event.name}</span>
-                             {event.isQuickTurnaround && <Zap className="h-5 w-5 text-red-500 ml-1.5" title="Quick Turnaround"/>}
+                            {event.isQuickTurnaround && <Zap className="h-5 w-5 text-accent ml-1.5" title="Quick Turnaround"/>}
                           </CardTitle>
                           <div className="text-xs text-muted-foreground space-y-0.5">
                             <p className="flex items-center gap-1">
@@ -344,7 +342,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                             <Eye className="mr-2 h-4 w-4" /> Manage Shots
                           </Link>
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
+                        <Button variant="accent" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
                           <Edit className="mr-2 h-4 w-4" /> Edit Event
                         </Button>
                        </div>
@@ -377,7 +375,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6" /> Event List (Table View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
         <CardDescription>
           {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
           ({displayableEvents.length} events found)
@@ -407,7 +405,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                     <TableCell className="font-medium flex items-center gap-1.5">
                       {getCoverageIcon(event.isCovered)}
                       {event.name}
-                      {event.isQuickTurnaround && <Zap className="h-4 w-4 text-red-500 ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
+                      {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                     </TableCell>
                     {!selectedProject && organizations.length > 1 && <TableCell>{event.project}</TableCell>}
                     <TableCell className="flex items-center">
@@ -515,7 +513,7 @@ function BlockScheduleTabContent({
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6" /> Block Schedule (Timeline View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
           View events for the selected date(s) from the main filter, laid out on an hourly timeline by assigned photographer.
           {activeBlockScheduleDate ? ` Showing schedule for ${format(activeBlockScheduleDate, "PPP")}.` : " Select date(s) from the main filters to view schedule."}
@@ -809,12 +807,12 @@ export default function EventsPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Events Setup</h1>
+          <p className="text-3xl font-bold tracking-tight">Events Setup</p>
           <p className="text-muted-foreground">
             {selectedProject ? `Events for ${selectedProject.name}` : "Manage all events, shot requests, timings, and priorities."}
           </p>
         </div>
-        <Button onClick={openAddEventModal}>
+        <Button onClick={openAddEventModal} variant="accent">
           <PlusCircle className="mr-2 h-5 w-5" />
           Add New Event
         </Button>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, type FormEvent, useEffect, useMemo } from "react";
+import { useState, type FormEvent, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,7 +108,7 @@ export default function SchedulerPage() {
 
   const [selectedDateString, setSelectedDateString] = useState<string | undefined>(undefined);
   const [location, setLocation] = useState("");
-  const [selectedPersonnelNames, setSelectedPersonnelNames] = useState<string[]>([]);
+  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
   const [eventType, setEventType] = useState("");
   const [additionalCriteria, setAdditionalCriteria] = useState("Ensure regular breaks for all personnel. Prioritize main assignments if applicable.");
 
@@ -128,7 +128,7 @@ export default function SchedulerPage() {
       setProjectEventDates([]);
       setProjectPersonnel([]);
       setSelectedDateString(undefined);
-      setSelectedPersonnelNames([]);
+      setSelectedPersonnelIds([]);
       setScheduleOutput(null);
       setParsedSchedule([]);
       setIsScheduleApplied(false);
@@ -160,12 +160,12 @@ export default function SchedulerPage() {
     );
     setProjectPersonnel(filteredPersonnel);
     
-    setSelectedPersonnelNames(prev => prev.filter(name => filteredPersonnel.some(p => p.name === name)));
+    setSelectedPersonnelIds(prev => prev.filter(id => filteredPersonnel.some(p => p.id === id)));
     setScheduleOutput(null);
     setParsedSchedule([]);
     setIsScheduleApplied(false);
 
-  }, [selectedProjectId, useDemoData, isLoadingSettings, eventsForSelectedProjectAndOrg, isLoadingContextEvents, selectedDateString]); // Added selectedDateString to re-evaluate personnel if date changes
+  }, [selectedProjectId, useDemoData, isLoadingSettings, eventsForSelectedProjectAndOrg, isLoadingContextEvents, selectedDateString]); 
 
 
   const eventsForSelectedDate = useMemo(() => {
@@ -174,9 +174,9 @@ export default function SchedulerPage() {
   }, [selectedDateString, currentProjectEvents]);
 
 
-  const handlePersonnelChange = (personnelName: string, checked: boolean) => {
-    setSelectedPersonnelNames(prev =>
-      checked ? [...prev, personnelName] : prev.filter(name => name !== personnelName)
+  const handlePersonnelChange = (personnelId: string, checked: boolean) => {
+    setSelectedPersonnelIds(prev =>
+      checked ? [...prev, personnelId] : prev.filter(id => id !== personnelId)
     );
   };
 
@@ -186,7 +186,7 @@ export default function SchedulerPage() {
       toast({ title: "Error", description: "Please select a date.", variant: "destructive" });
       return;
     }
-    if (selectedPersonnelNames.length === 0) {
+    if (selectedPersonnelIds.length === 0) {
       toast({ title: "Error", description: "Please select at least one personnel member.", variant: "destructive" });
       return;
     }
@@ -201,11 +201,17 @@ export default function SchedulerPage() {
     setIsScheduleApplied(false);
 
     const projectEventsForDateInput = eventsForSelectedDate
-      .filter(event => event.isCovered)
+      .filter(event => event.isCovered) // Ensure we only send covered events
       .map(event => ({
         name: event.name,
         time: event.time,
       }));
+      
+    const selectedPersonnelNames = selectedPersonnelIds.map(id => {
+      const person = projectPersonnel.find(p => p.id === id);
+      return person ? person.name : "Unknown";
+    }).filter(name => name !== "Unknown");
+
 
     const input: GenerateScheduleInput = {
       date: selectedDateString,
@@ -288,7 +294,7 @@ export default function SchedulerPage() {
     if (uniqueAssignmentsMade > 0) {
         toast({
             title: "Schedule Applied (Event Data Updated)",
-            description: `${uniqueAssignmentsMade} new assignment(s) applied to shared Event data based on the AI schedule.`,
+            description: `${uniqueAssignmentsMade} new assignment(s) applied to shared Event data based on the AI schedule. These changes persist in the current session.`,
             duration: 7000,
         });
     } else {
@@ -316,7 +322,7 @@ export default function SchedulerPage() {
     <div className="flex flex-col gap-8">
       <div>
         <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Cpu className="h-8 w-8" /> Smart Schedule Generator 
+          <Cpu className="h-8 w-8 text-accent" /> Smart Schedule Generator 
         </p>
         <p className="text-muted-foreground">
           {selectedProject ? `Generating schedule for ${selectedProject.name}. ` : "Select a project to begin. "}
@@ -375,7 +381,7 @@ export default function SchedulerPage() {
               <div>
                 <Label htmlFor="eventType">Event Type (Optional)</Label>
                 <Input id="eventType" value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="e.g., Music Festival Main Day, Corporate Headshots" disabled={isSchedulerFormDisabled}/>
-                <p className="text-xs text-muted-foreground mt-1">Optional. Describe the type of event (e.g., "Full Day Conference Coverage", "Product Launch Photography") to help the AI understand typical activities and phases. If left blank, the AI will generate a general schedule based on listed events for the day.</p>
+                <p className="text-xs text-muted-foreground mt-1">Optional. Describe the type of event to help the AI understand typical activities (e.g., "Full Day Conference", "Product Launch Photography"). If blank, AI generates a general schedule based on listed events.</p>
               </div>
             </div>
 
@@ -388,8 +394,8 @@ export default function SchedulerPage() {
                       <div key={person.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`sched-person-${person.id}`}
-                          checked={selectedPersonnelNames.includes(person.name)}
-                          onCheckedChange={(checked) => handlePersonnelChange(person.name, !!checked)}
+                          checked={selectedPersonnelIds.includes(person.id)}
+                          onCheckedChange={(checked) => handlePersonnelChange(person.id, !!checked)}
                         />
                         <Label htmlFor={`sched-person-${person.id}`} className="font-normal">
                           {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
@@ -425,7 +431,7 @@ export default function SchedulerPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoading || isSchedulerFormDisabled || selectedPersonnelNames.length === 0 || !selectedDateString }>
+            <Button type="submit" variant="accent" disabled={isLoading || isSchedulerFormDisabled || selectedPersonnelIds.length === 0 || !selectedDateString }>
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
               Generate Schedule
             </Button>
@@ -442,7 +448,7 @@ export default function SchedulerPage() {
                 For {selectedProject?.name || "Selected Project"}, {selectedDateString ? format(parseISO(selectedDateString), "PPP") : "the selected date"}
                 {location.trim() ? ` at ${location.trim()}` : ""}
                 {eventType.trim() ? `. Type: ${eventType.trim()}` : ""}
-                . Personnel: {selectedPersonnelNames.join(", ") || "N/A"}.
+                . Personnel: {selectedPersonnelIds.map(id => projectPersonnel.find(p=>p.id===id)?.name).join(", ") || "N/A"}.
               </div>
             </div>
             <div className="flex gap-2">
@@ -490,7 +496,7 @@ export default function SchedulerPage() {
                               {eventForTask && shotsForTaskEvent.length > 0 && (
                                 <div className="mt-1.5 pl-4 sm:pl-[calc(10rem+0.5rem)] text-xs">
                                   <p className="font-medium text-muted-foreground flex items-center gap-1.5">
-                                    <ListChecks className="h-3.5 w-3.5" />
+                                    <ListChecks className="h-3.5 w-3.5 text-accent" />
                                     Shot Requests for "{eventForTask.name}":
                                   </p>
                                   <ul className="list-disc list-inside pl-2 mt-0.5 space-y-0.5">

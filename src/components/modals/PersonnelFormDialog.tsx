@@ -187,7 +187,7 @@ export function PersonnelFormDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             </DialogClose>
-            <Button type="submit">{editingPersonnel ? "Save Changes" : "Add Member"}</Button>
+            <Button type="submit" variant="accent">{editingPersonnel ? "Save Changes" : "Add Member"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

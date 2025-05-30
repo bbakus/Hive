@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link"; 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +21,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectContext, type Project, type KeyPersonnel } from "@/contexts/ProjectContext";
+import { useProjectContext, type Project, type KeyPersonnel, type ProjectFormData as ProjectContextFormData } from "@/contexts/ProjectContext";
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; 
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button";
 import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/modals/ProjectFormDialog";
 
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
@@ -110,7 +109,7 @@ export default function ProjectsPage() {
             Manage your event timelines and project setups.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild variant="accent">
           <Link href="/projects/new">
             <PlusCircle className="mr-2 h-5 w-5" />
             Add New Project (Wizard)
@@ -137,7 +136,7 @@ export default function ProjectsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setProjectToDeleteId(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className={cn(buttonVariants({variant: "destructive"}))}>Delete Project</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className={cn(buttonVariants({variant: "destructive"}))}>Continue</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

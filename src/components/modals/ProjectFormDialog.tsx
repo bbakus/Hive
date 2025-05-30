@@ -23,15 +23,7 @@ import { z } from "zod";
 import type { Project, KeyPersonnel, ProjectFormData } from "@/contexts/ProjectContext";
 import type { Organization } from "@/contexts/OrganizationContext";
 import { useEffect } from "react";
-
-const availablePersonnelListForEdit: { id: string; name: string; capabilities: string[] }[] = [
-  { id: "user001", name: "Alice Wonderland", capabilities: ["Photographer", "Editor"] },
-  { id: "user002", name: "Bob The Builder", capabilities: ["Photographer", "Editor"] },
-  { id: "user003", name: "Charlie Chaplin", capabilities: ["Project Manager"] },
-  { id: "user004", name: "Diana Prince", capabilities: ["Photographer"] },
-  { id: "user005", name: "Edward Scissorhands", capabilities: ["Editor"] },
-  { id: "user006", name: "Fiona Gallagher", capabilities: ["Photographer"] },
-];
+import { initialPersonnelMock } from "@/app/(app)/personnel/page"; // Using this as the source of available personnel
 
 const keyPersonnelEditSchema = z.object({
   personnelId: z.string(),
@@ -63,6 +55,15 @@ interface ProjectFormDialogProps {
   organizations: Organization[];
   isLoadingOrganizations: boolean;
 }
+
+// Adapt initialPersonnelMock to WizardAvailablePersonnel structure for consistency
+const availablePersonnelListForEdit: { id: string; name: string; capabilities: string[] }[] = 
+  initialPersonnelMock.map(p => ({
+    id: p.id,
+    name: p.name,
+    capabilities: [p.role] // Simplified for this context, or use actual PHOTOGRAPHY_ROLES if defined
+  }));
+
 
 export function ProjectFormDialog({
   isOpen,
@@ -99,14 +100,15 @@ export function ProjectFormDialog({
   const { fields: keyPersonnelFields } = useFieldArray({
     control,
     name: "keyPersonnel",
+    keyName: "fieldId"
   });
 
-  const selectedPersonnelMapEdit = watch("selectedPersonnelMap");
+  const selectedPersonnelMapEdit = watch("selectedPersonnelMap", {});
 
   useEffect(() => {
     if (editingProject && isOpen) {
       const initialSelectedMap: Record<string, boolean> = {};
-      editingProject.keyPersonnel?.forEach(kp => {
+      (editingProject.keyPersonnel || []).forEach(kp => {
         initialSelectedMap[kp.personnelId] = true;
       });
       reset({
@@ -121,7 +123,7 @@ export function ProjectFormDialog({
         selectedPersonnelMap: initialSelectedMap,
       });
     } else if (!editingProject && isOpen) {
-        reset({ // Default values for a new project form if needed, though wizard handles new
+        reset({ 
             name: "", startDate: new Date().toISOString().split('T')[0], 
             endDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0], 
             description: "", status: "Planning", 
@@ -136,6 +138,7 @@ export function ProjectFormDialog({
 
     const currentKeyPersonnelValues = getValues("keyPersonnel") || [];
     const newKeyPersonnelArray: KeyPersonnel[] = [];
+    let changed = false;
     
     availablePersonnelListForEdit.forEach(person => {
         if (selectedPersonnelMapEdit[person.id]) {
@@ -145,14 +148,25 @@ export function ProjectFormDialog({
                 name: person.name,
                 projectRole: existingEntry?.projectRole || "", 
             });
+             if (!existingEntry) changed = true; // New person added
         }
     });
     
-    const currentKpString = JSON.stringify((currentKeyPersonnelValues || []).map(k=>({p:k.personnelId, r:k.projectRole})).sort((a,b)=>a.p.localeCompare(b.p)));
-    const newKpString = JSON.stringify(newKeyPersonnelArray.map(k=>({p:k.personnelId, r:k.projectRole})).sort((a,b)=>a.p.localeCompare(b.p)));
-
-    if (newKpString !== currentKpString) {
-        setValue("keyPersonnel", newKeyPersonnelArray, { shouldValidate: true, shouldDirty: true });
+    // Check if array length or content changed
+    if (newKeyPersonnelArray.length !== currentKeyPersonnelValues.length) {
+        changed = true;
+    } else {
+      for(let i = 0; i < newKeyPersonnelArray.length; i++) {
+        if(newKeyPersonnelArray[i].personnelId !== currentKeyPersonnelValues[i].personnelId ||
+           newKeyPersonnelArray[i].projectRole !== currentKeyPersonnelValues[i].projectRole) {
+          changed = true;
+          break;
+        }
+      }
+    }
+    
+    if (changed) {
+        setValue("keyPersonnel", newKeyPersonnelArray.sort((a,b) => a.personnelId.localeCompare(b.personnelId)), { shouldValidate: true, shouldDirty: true });
     }
 
   }, [selectedPersonnelMapEdit, isOpen, setValue, getValues]);
@@ -254,7 +268,7 @@ export function ProjectFormDialog({
             </div>
             <div className="space-y-2">
                 <Label>Key Personnel & Roles</Label>
-                <ScrollArea className="h-40 w-full rounded-md border p-2 mb-2">
+                <ScrollArea className="h-40 w-full rounded-none border p-2 mb-2">
                     {availablePersonnelListForEdit.map((person) => (
                       <div key={`edit-person-select-${person.id}`} className="flex items-center space-x-2 mb-1 py-1">
                         <Checkbox
@@ -268,18 +282,19 @@ export function ProjectFormDialog({
                       </div>
                     ))}
                 </ScrollArea>
-                <ScrollArea className="h-48 w-full space-y-2.5 border p-2 rounded-md">
-                    {keyPersonnelFields.map((field, index) => {
-                      const personDetails = availablePersonnelListForEdit.find(p => p.id === field.personnelId);
-                      return selectedPersonnelMapEdit?.[field.personnelId] && personDetails && (
-                        <div key={field.id} className="grid grid-cols-5 items-center gap-2">
-                          <Label htmlFor={`edit-keyPersonnel.${index}.projectRole`} className="col-span-2 text-xs truncate" title={field.name}>
-                            {field.name}
+                <ScrollArea className="h-48 w-full space-y-2.5 border p-2 rounded-none">
+                    {keyPersonnelFields.map((kpField, index) => {
+                      const personDetails = availablePersonnelListForEdit.find(p => p.id === kpField.personnelId);
+                      return personDetails && (
+                        <div key={kpField.fieldId} className="grid grid-cols-5 items-center gap-2">
+                          <Label htmlFor={`edit-keyPersonnel.${index}.projectRole`} className="col-span-2 text-xs truncate" title={kpField.name}>
+                            {kpField.name}
                           </Label>
                           <div className="col-span-3">
                              <Controller
                               name={`keyPersonnel.${index}.projectRole`}
                               control={control}
+                              defaultValue={kpField.projectRole || ""}
                               render={({ field: selectField }) => (
                                 <Select onValueChange={selectField.onChange} value={selectField.value || ""}>
                                   <SelectTrigger className={`h-8 text-xs ${errors.keyPersonnel?.[index]?.projectRole ? "border-destructive" : ""}`}>
@@ -301,6 +316,7 @@ export function ProjectFormDialog({
                         </div>
                       )
                     })}
+                     {keyPersonnelFields.length === 0 && <p className="text-center text-xs text-muted-foreground py-2">Select personnel to assign roles.</p>}
                 </ScrollArea>
             </div>
           </div>
@@ -308,12 +324,10 @@ export function ProjectFormDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             </DialogClose>
-            <Button type="submit">{editingProject ? "Save Changes" : "Add Project"}</Button>
+            <Button type="submit" variant="accent">{editingProject ? "Save Changes" : "Add Project"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-    

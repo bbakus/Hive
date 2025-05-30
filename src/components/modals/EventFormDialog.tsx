@@ -27,8 +27,7 @@ import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Event } from "@/contexts/EventContext";
 import type { Project } from "@/contexts/ProjectContext";
-import type { Personnel } from "@/app/(app)/personnel/page";
-import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; // Added import
+import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 
 export const eventFormSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -332,7 +331,7 @@ export function EventFormDialog({
 
             <div className="space-y-2">
               <Label>Assign Personnel</Label>
-              <ScrollArea className="h-60 w-full rounded-md border p-4">
+              <ScrollArea className="h-60 w-full rounded-none border p-4">
                 <Controller
                   name="assignedPersonnelIds"
                   control={control}
@@ -367,16 +366,14 @@ export function EventFormDialog({
               {errors.assignedPersonnelIds && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelIds.message}</p>}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <DialogClose asChild>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             </DialogClose>
-            <Button type="submit">{editingEvent ? "Save Changes" : "Add Event"}</Button>
+            <Button type="submit" variant="accent">{editingEvent ? "Save Changes" : "Add Event"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-    

@@ -29,15 +29,18 @@ body {
     --muted:  0 0% 90%; /* Light mode: Lighter Gray */
     --muted-foreground: 0 0% 45.1%; /* Light mode: Mid Gray */
 
-    --accent: 0 0% 9%; /* Light mode: Near Black (no strong visual accent) */
-    --accent-foreground: 0 0% 100%; /* Light mode: White */
+    /* --accent: 0 0% 9%; Light mode: Near Black (no strong visual accent) */
+    /* --accent-foreground: 0 0% 100%; Light mode: White */
+    --accent: 40 100% 50%; /* Dark Yellow/Orange #FFB300 */
+    --accent-foreground: 0 0% 9%; /* Near Black for text on accent */
 
-    --destructive: 0 84.2% 60.2%; /* Keep red for destructive, maybe less saturated */
+
+    --destructive: 0 84.2% 60.2%; /* Keep red for destructive */
     --destructive-foreground: 0 0% 98%;
 
     --border: 0 0% 80%; /* A slightly more visible gray border for definition */
     --input: 0 0% 100%; /* White input background, border defines it */
-    --ring: 0 0% 60%; /* Muted gray for focus rings */
+    --ring: 40 100% 50%; /* Accent color for focus rings */
 
     --chart-1: 0 0% 20%;
     --chart-2: 0 0% 35%;
@@ -50,42 +53,44 @@ body {
     /* Sidebar specific vars for light mode */
     --sidebar-background: 0 0% 98%; /* Very light gray */
     --sidebar-foreground: 0 0% 9%;   /* Near black text */
-    --sidebar-primary: 0 0% 9%;      /* Active item text color - black */
-    --sidebar-primary-foreground: 0 0% 100%; /* Text on active item if it had a solid bg (not used much in this theme) */
+    --sidebar-primary: 40 100% 50%;  /* Active item text color - accent */
+    --sidebar-primary-foreground: 0 0% 9%; /* Text on active item if it had a solid bg - accent foreground */
     --sidebar-accent: 0 0% 92%;      /* Hover/active background for sidebar items */
     --sidebar-accent-foreground: 0 0% 9%; /* Dark text on hover */
     --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 0 0% 60%;
+    --sidebar-ring: 40 100% 50%; /* Accent for sidebar focus */
   }
 
   .dark {
-    --background: 0 0% 9%; /* Dark mode: Near Black */
+    --background: 0 0% 11.5%; /* #1E1E1E - Even Darker Gray */
     --foreground: 0 0% 98%; /* Dark mode: Off White */
 
-    --card: 0 0% 12%; /* Darker card background */
+    --card: 0 0% 15%; /* Darker card background #262626 */
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 12%;
+    --popover: 0 0% 15%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 0% 98%; /* Dark mode: Off White (for primary actions/text) */
-    --primary-foreground: 0 0% 9%; /* Dark mode: Near Black (text on primary elements) */
+    --primary: 0 0% 20%; /* #333333 - Dark Gray for primary elements */
+    --primary-foreground: 0 0% 98%; /* Off White for text on primary */
 
-    --secondary: 0 0% 15%; /* Dark mode: Dark Gray */
+    --secondary: 0 0% 25%; /* Dark mode: Dark Gray */
     --secondary-foreground: 0 0% 98%;
 
-    --muted:  0 0% 25%; /* Dark mode: Mid-Dark Gray */
+    --muted:  0 0% 30%; /* Dark mode: Mid-Dark Gray */
     --muted-foreground: 0 0% 65%; /* Dark mode: Lighter Mid Gray */
 
-    --accent: 0 0% 98%; /* Dark mode: Off White (no strong visual accent) */
-    --accent-foreground: 0 0% 9%; /* Dark mode: Near Black */
+    /* --accent: 0 0% 98%; Dark mode: Off White (no strong visual accent) */
+    /* --accent-foreground: 0 0% 9%; Dark mode: Near Black */
+    --accent: 40 100% 50%; /* Dark Yellow/Orange #FFB300 */
+    --accent-foreground: 0 0% 9%; /* Near Black for text on accent */
     
     --destructive: 0 72.2% 50.6%; 
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 20%; /* Darker border for dark mode */
-    --input: 0 0% 12%; /* Dark input background, border defines */
-    --ring: 0 0% 50%; 
+    --border: 0 0% 25%; /* Darker border for dark mode #404040 */
+    --input: 0 0% 15%; /* Dark input background #262626 */
+    --ring: 40 100% 50%; /* Accent for focus rings */
     
     --chart-1: 0 0% 80%;
     --chart-2: 0 0% 65%;
@@ -94,14 +99,14 @@ body {
     --chart-5: 0 0% 20%;
 
     /* Sidebar specific vars for dark mode */
-    --sidebar-background: 0 0% 11%; 
+    --sidebar-background: 0 0% 13%; /* #212121 */
     --sidebar-foreground: 0 0% 98%;   
-    --sidebar-primary: 0 0% 98%;      
+    --sidebar-primary: 40 100% 50%;      
     --sidebar-primary-foreground: 0 0% 9%; 
-    --sidebar-accent: 0 0% 20%;      
+    --sidebar-accent: 0 0% 22%; /* #383838 - hover/active bg */
     --sidebar-accent-foreground: 0 0% 98%; 
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 0 0% 50%;
+    --sidebar-border: 0 0% 18%; /* #2E2E2E */
+    --sidebar-ring: 40 100% 50%; /* Accent for sidebar focus */
   }
 }
 
@@ -114,7 +119,8 @@ body {
   }
 }
 
-/* Remove icon glow effect */
+/* Remove icon glow effect, keep only if you want the accent glow */
 .icon-glow {
+  /* filter: drop-shadow(0 0 3px hsl(var(--accent) / 0.7)); */
   filter: none;
 }

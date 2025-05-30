@@ -8,15 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { UserPlus, CalendarDays, Eye, Edit, Trash2, Filter as FilterIcon, Users, Workflow, GanttChartSquare, Camera, ListChecks } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +30,8 @@ import { useEventContext, type Event } from "@/contexts/EventContext";
 import { useProjectContext } from "@/contexts/ProjectContext"; 
 import { format, parseISO } from "date-fns";
 import { PersonnelFormDialog, type PersonnelFormDialogData } from "@/components/modals/PersonnelFormDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+
 
 export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client"] as const;
 
@@ -46,14 +40,14 @@ export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
   cameraSerials?: string[];
 };
 
-export const initialPersonnelMock: Personnel[] = [
+export let initialPersonnelMock: Personnel[] = [
   { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN12345A", "SN123XYZ"] },
   { id: "user002", name: "Bob The Builder", role: "Photographer", status: "Assigned", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN98765E"]},
   { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png" },
   { id: "user004", name: "Diana Prince", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN11223F"] },
-  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned" },
-  { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", cameraSerials: ["SN13579D", "SN24680G"] },
-  { id: "user008", name: "Client Representative", role: "Client", status: "Available" },
+  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
+  { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN13579D", "SN24680G"] },
+  { id: "user008", name: "Client Representative", role: "Client", status: "Available", avatar: "https://placehold.co/40x40.png" },
 ];
 
 export default function PersonnelPage() {
@@ -206,7 +200,7 @@ export default function PersonnelPage() {
           <p className="text-3xl font-bold tracking-tight">Personnel Management</p>
           <p className="text-muted-foreground">Assign team members to events and visualize schedules.</p>
         </div>
-        <Button onClick={openAddPersonnelModal}>
+        <Button onClick={openAddPersonnelModal} variant="accent">
             <UserPlus className="mr-2 h-5 w-5" />
             Add Team Member
         </Button>
@@ -285,7 +279,7 @@ export default function PersonnelPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <p className="text-lg font-semibold">Team Roster</p> 
+              <p className="text-lg font-semibold flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Team Roster</p> 
               <div className="text-sm text-muted-foreground"> 
                 List of all team members and their current status. 
                 (Showing {filteredPersonnelList.length} of {personnelList.length} members)
@@ -331,7 +325,7 @@ export default function PersonnelPage() {
                     <TableCell>
                       {member.cameraSerials && member.cameraSerials.length > 0 ? (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Camera className="h-3.5 w-3.5" /> {member.cameraSerials.join(', ')}
+                          <Camera className="h-3.5 w-3.5 text-accent" /> {member.cameraSerials.join(', ')}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground italic">N/A</span>
@@ -373,7 +367,7 @@ export default function PersonnelPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <p className="text-lg font-semibold flex items-center gap-2"><Workflow className="h-5 w-5" />Personnel Assignment</p> 
+            <p className="text-lg font-semibold flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment</p> 
             <div className="text-sm text-muted-foreground"> 
               {selectedProject ? `Assign personnel to events for ${selectedProject.name}.` : "Select a project to assign personnel to its events."}
             </div>
@@ -439,7 +433,7 @@ export default function PersonnelPage() {
 
         <Card>
           <CardHeader>
-            <p className="text-lg font-semibold flex items-center gap-2"><GanttChartSquare className="h-5 w-5" />Team Schedule Visualization</p> 
+            <p className="text-lg font-semibold flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</p> 
             <div className="text-sm text-muted-foreground">View team member schedules and event commitments across all projects. Sorted by date.</div> 
           </CardHeader>
           <CardContent>

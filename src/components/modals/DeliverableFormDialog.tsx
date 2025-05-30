@@ -214,12 +214,10 @@ export function DeliverableFormDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             </DialogClose>
-            <Button type="submit">{editingDeliverable ? "Save Changes" : "Add Deliverable"}</Button>
+            <Button type="submit" variant="accent">{editingDeliverable ? "Save Changes" : "Add Deliverable"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-    

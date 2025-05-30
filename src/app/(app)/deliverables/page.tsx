@@ -186,7 +186,7 @@ export default function DeliverablesPage() {
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
           </p>
         </div>
-        <Button onClick={openAddDeliverableModal}>
+        <Button onClick={openAddDeliverableModal} variant="accent">
           <PlusCircle className="mr-2 h-5 w-5" />
           Add New Deliverable
         </Button>
@@ -218,7 +218,7 @@ export default function DeliverablesPage() {
 
       <Card>
         <CardHeader>
-          <p className="text-lg font-semibold flex items-center gap-2"><FileText className="h-6 w-6" /> Deliverables List</p> 
+          <p className="text-lg font-semibold flex items-center gap-2"><FileText className="h-6 w-6 text-accent" /> Deliverables List</p> 
           <div className="text-sm text-muted-foreground"> 
             {selectedProject ? `Deliverables associated with ${selectedProject.name}.` : "Centralized list of all project deliverables."}
             ({filteredDeliverables.length} items)
@@ -282,7 +282,7 @@ export default function DeliverablesPage() {
 
       <Card>
         <CardHeader>
-          <p className="text-lg font-semibold flex items-center gap-2"><Sparkles className="h-6 w-6" /> AI Deliverable Summary</p> 
+          <p className="text-lg font-semibold flex items-center gap-2"><Sparkles className="h-6 w-6 text-accent" /> AI Deliverable Summary</p> 
           <div className="text-sm text-muted-foreground">Generate an AI-powered summary of deliverable statuses {selectedProject ? `for ${selectedProject.name}`: "for all projects"}.</div> 
         </CardHeader>
         <form onSubmit={handleGenerateSummary}>
@@ -300,7 +300,7 @@ export default function DeliverablesPage() {
             <p className="text-sm text-muted-foreground">Using current deliverable data for the specified scope to generate summary.</p>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isLoadingSummary || filteredDeliverables.length === 0}>
+            <Button type="submit" variant="accent" disabled={isLoadingSummary || filteredDeliverables.length === 0}>
               {isLoadingSummary ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Generate Summary
             </Button>
