@@ -109,7 +109,7 @@ export default function ProjectsPage() {
             Manage your event timelines and project setups.
           </p>
         </div>
-        <Button asChild variant="accent">
+        <Button asChild variant="outline" className="px-3 py-2 h-9">
           <Link href="/projects/new">
             <PlusCircle className="mr-2 h-5 w-5" />
             Add New Project (Wizard)
@@ -141,7 +141,7 @@ export default function ProjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-grow">

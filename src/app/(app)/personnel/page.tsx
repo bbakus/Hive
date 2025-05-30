@@ -275,7 +275,7 @@ export default function PersonnelPage() {
       )}
 
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -365,7 +365,7 @@ export default function PersonnelPage() {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="border-0">
           <CardHeader>
             <p className="text-lg font-semibold flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment</p> 
             <div className="text-sm text-muted-foreground"> 
@@ -431,7 +431,7 @@ export default function PersonnelPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0">
           <CardHeader>
             <p className="text-lg font-semibold flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</p> 
             <div className="text-sm text-muted-foreground">View team member schedules and event commitments across all projects. Sorted by date.</div> 

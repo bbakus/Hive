@@ -12,7 +12,7 @@ export default function SupportPage() {
         <p className="text-muted-foreground">Get help and support for HIVE.</p>
       </div>
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <p className="text-lg font-semibold">Help & Documentation</p> 
           <div className="text-sm text-muted-foreground">Find answers to your questions.</div> 

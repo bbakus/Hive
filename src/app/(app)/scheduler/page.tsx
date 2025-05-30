@@ -97,7 +97,7 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[], getS
 
 export default function SchedulerPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { selectedProjectId, selectedProject } = useProjectContext();
+  const { selectedProject, isLoadingProjects } = useProjectContext();
   const {
     eventsForSelectedProjectAndOrg,
     isLoadingEvents: isLoadingContextEvents,
@@ -123,7 +123,7 @@ export default function SchedulerPage() {
 
 
   useEffect(() => {
-    if (isLoadingSettings || isLoadingContextEvents || !selectedProjectId) {
+    if (isLoadingSettings || isLoadingContextEvents || isLoadingProjects) {
       setCurrentProjectEvents([]);
       setProjectEventDates([]);
       setProjectPersonnel([]);
@@ -135,10 +135,10 @@ export default function SchedulerPage() {
       return;
     }
     
-    const relevantEvents = (eventsForSelectedProjectAndOrg || []).filter(event => event.isCovered);
-    setCurrentProjectEvents(relevantEvents);
+    const relevantProjectEvents = (eventsForSelectedProjectAndOrg || []).filter(event => event.isCovered);
+    setCurrentProjectEvents(relevantProjectEvents);
 
-    const uniqueDates = Array.from(new Set(relevantEvents.map(event => event.date))).sort();
+    const uniqueDates = Array.from(new Set(relevantProjectEvents.map(event => event.date))).sort();
     setProjectEventDates(uniqueDates);
 
     if (uniqueDates.length > 0) {
@@ -150,7 +150,7 @@ export default function SchedulerPage() {
     }
 
     const personnelIdsInProjectEvents = new Set<string>();
-    relevantEvents.forEach(event => {
+    relevantProjectEvents.forEach(event => {
       event.assignedPersonnelIds?.forEach(id => personnelIdsInProjectEvents.add(id));
     });
     
@@ -161,11 +161,13 @@ export default function SchedulerPage() {
     setProjectPersonnel(filteredPersonnel);
     
     setSelectedPersonnelIds(prev => prev.filter(id => filteredPersonnel.some(p => p.id === id)));
-    setScheduleOutput(null);
-    setParsedSchedule([]);
-    setIsScheduleApplied(false);
+    if (scheduleOutput || parsedSchedule.length > 0) { // Clear previous schedule if context changes
+        setScheduleOutput(null);
+        setParsedSchedule([]);
+        setIsScheduleApplied(false);
+    }
 
-  }, [selectedProjectId, useDemoData, isLoadingSettings, eventsForSelectedProjectAndOrg, isLoadingContextEvents, selectedDateString]); 
+  }, [selectedProject, useDemoData, isLoadingSettings, eventsForSelectedProjectAndOrg, isLoadingContextEvents, isLoadingProjects, selectedDateString]); 
 
 
   const eventsForSelectedDate = useMemo(() => {
@@ -311,11 +313,13 @@ export default function SchedulerPage() {
     window.print();
   };
 
-  if (isLoadingSettings || isLoadingContextEvents) {
-    return <div className="p-4">Loading scheduler settings and event data...</div>;
+  const isLoadingAllContexts = isLoadingSettings || isLoadingContextEvents || isLoadingProjects;
+  
+  if (isLoadingAllContexts) {
+    return <div className="p-4">Loading scheduler settings, event data, and project context...</div>;
   }
 
-  const isSchedulerFormDisabled = !selectedProjectId || (!useDemoData && currentProjectEvents.length === 0 && !isLoadingContextEvents);
+  const isSchedulerFormDisabled = !selectedProject || (!useDemoData && currentProjectEvents.length === 0 && !isLoadingContextEvents);
 
 
   return (
@@ -342,7 +346,7 @@ export default function SchedulerPage() {
         </Alert>
       )}
 
-      <Card className={cn(isSchedulerFormDisabled && "opacity-50 pointer-events-none")}>
+      <Card className={cn("border-0", isSchedulerFormDisabled && "opacity-50 pointer-events-none")}>
         <CardHeader>
           <p className="text-lg font-semibold">Generate New Schedule</p> 
           <div className="text-sm text-muted-foreground"> 
@@ -440,7 +444,7 @@ export default function SchedulerPage() {
       </Card>
 
       {scheduleOutput && !isSchedulerFormDisabled && (
-        <Card id="schedule-preview">
+        <Card id="schedule-preview" className="border-0">
           <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
             <div>
               <p className="text-lg font-semibold">Formatted Schedule Preview</p> 
@@ -470,7 +474,6 @@ export default function SchedulerPage() {
                     <AlertDescription>
                         Personnel assignments based on this schedule have been applied to the shared Event data.
                         These changes should reflect on other pages like the Events page.
-                        (Note: This is a client-side update; no backend persistence is implemented.)
                     </AlertDescription>
                 </Alert>
             )}
@@ -501,7 +504,7 @@ export default function SchedulerPage() {
                                   </p>
                                   <ul className="list-disc list-inside pl-2 mt-0.5 space-y-0.5">
                                     {shotsForTaskEvent.map(shot => (
-                                      <li key={shot.id} className="text-muted-foreground/80">{shot.description} (Prio: {shot.priority})</li>
+                                      <li key={shot.id} className="text-muted-foreground/80">{shot.title ? `${shot.title}: ` : ''}{shot.description} (Prio: {shot.priority})</li>
                                     ))}
                                   </ul>
                                 </div>
@@ -530,7 +533,7 @@ export default function SchedulerPage() {
               <AlertTitle>Exporting & Applying Schedule</AlertTitle>
               <AlertDescription>
                 To export this schedule as a PDF, please use your browser's "Print" function (Ctrl/Cmd + P) and choose "Save as PDF" as the destination.
-                The "Apply Schedule" button updates personnel assignments for events in the shared Event data based on the AI-generated schedule. This is a client-side update.
+                The "Apply Schedule" button attempts to update personnel assignments for events in the shared Event data based on the AI-generated schedule. This is currently a client-side update and may not perfectly reflect complex assignments without manual review.
               </AlertDescription>
             </Alert>
           </CardContent>

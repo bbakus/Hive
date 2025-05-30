@@ -68,14 +68,15 @@ export default function ShotPlannerPage() {
             setShotLists(prev => ({ ...prev, [eventIdFromQuery]: shots }));
         }
       }
-    } else if (!eventIdFromQuery && eventsForSelectedProjectAndOrg.length > 0 && !activeAccordionItem) {
-      // Optionally open the first event if no specific event is queried and none is active
-      // const firstEventId = eventsForSelectedProjectAndOrg[0].id;
-      // setActiveAccordionItem(firstEventId);
-      // if (!shotLists[firstEventId]) {
-      //    const shots = getShotRequestsForEvent(firstEventId);
-      //    setShotLists(prev => ({ ...prev, [firstEventId]: shots }));
-      // }
+    } else if (eventsForSelectedProjectAndOrg.length > 0 && !activeAccordionItem) {
+      // Default to opening the first event if no specific event is queried and none is active
+      // This logic might need adjustment if you prefer no event to be open by default
+      const firstEventId = eventsForSelectedProjectAndOrg[0].id;
+      setActiveAccordionItem(firstEventId);
+      if (!shotLists[firstEventId]) {
+         const shots = getShotRequestsForEvent(firstEventId);
+         setShotLists(prev => ({ ...prev, [firstEventId]: shots }));
+      }
     } else if (eventsForSelectedProjectAndOrg.length === 0) {
         setActiveAccordionItem(undefined); // Clear active item if no events
     }
@@ -218,18 +219,19 @@ export default function ShotPlannerPage() {
               className="w-full space-y-2"
             >
               {eventsForSelectedProjectAndOrg.map((event) => {
-                const currentEventShotsFromState = shotLists[event.id] || [];
+                const currentEventShotsFromState = shotLists[event.id] || getShotRequestsForEvent(event.id); // Ensure fallback
                 return (
                   <AccordionItem 
                     value={event.id} 
                     key={event.id} 
                     className={cn(
-                      "border rounded-none", // Base border for each item
-                      activeAccordionItem === event.id && "border-accent" // Accent border if active
+                      "border-0" // Removed border from AccordionItem
                     )}
                   >
                     <AccordionTrigger 
-                        className="p-3 hover:no-underline text-left" 
+                        className="p-3 hover:no-underline text-left border rounded-none"  // Added border to trigger
+                        // Visual indication if activeAccordionItem matches event.id can be done here if needed
+                        // style={activeAccordionItem === event.id ? { borderColor: 'hsl(var(--accent))' } : {}}
                     >
                       <div className="flex justify-between items-center w-full">
                         <div>
@@ -240,8 +242,8 @@ export default function ShotPlannerPage() {
                         </div>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="p-0">
-                      <div className="border-t p-3 space-y-3">
+                    <AccordionContent className="p-0 border border-t-0 rounded-none rounded-b-md"> {/* Added border to content */}
+                      <div className="p-3 space-y-3">
                         <form onSubmit={(e) => handleAddShot(e, event.id)} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] items-end gap-2">
                           <div className="w-full">
                             <Label htmlFor={`newShotTitle-${event.id}`} className="text-xs text-muted-foreground">Shot Title (Optional)</Label>
@@ -363,4 +365,3 @@ export default function ShotPlannerPage() {
     </div>
   );
 }
-

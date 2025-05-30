@@ -22,7 +22,7 @@ export default function SettingsPage() {
           </p>
           <p className="text-muted-foreground">Manage your application settings and preferences.</p>
         </div>
-        <Card>
+        <Card className="border-0">
           <CardHeader>
             <p className="text-lg font-semibold">Application Preferences</p> 
           </CardHeader>
@@ -43,7 +43,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">Manage your application settings and preferences.</p>
       </div>
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <p className="text-lg font-semibold">Application Preferences</p> 
           <div className="text-sm text-muted-foreground">Customize HIVE to your needs.</div> 

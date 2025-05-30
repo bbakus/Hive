@@ -216,7 +216,7 @@ export default function DeliverablesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <p className="text-lg font-semibold flex items-center gap-2"><FileText className="h-6 w-6 text-accent" /> Deliverables List</p> 
           <div className="text-sm text-muted-foreground"> 
@@ -280,7 +280,7 @@ export default function DeliverablesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-0">
         <CardHeader>
           <p className="text-lg font-semibold flex items-center gap-2"><Sparkles className="h-6 w-6 text-accent" /> AI Deliverable Summary</p> 
           <div className="text-sm text-muted-foreground">Generate an AI-powered summary of deliverable statuses {selectedProject ? `for ${selectedProject.name}`: "for all projects"}.</div> 

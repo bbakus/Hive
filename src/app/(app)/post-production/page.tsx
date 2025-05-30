@@ -12,7 +12,7 @@ export default function PostProductionPage() {
         <p className="text-muted-foreground">Manage photo editing tasks, versions, and reviews.</p>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="border-0">
         <CardHeader>
           <CardTitle>Photo Editing Workflow</CardTitle>
           <CardDescription>Features for the editing and review phase of your photography projects.</CardDescription>

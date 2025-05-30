@@ -4,10 +4,10 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter as FilterIcon, Camera as CameraIconLucide, Video as VideoIcon } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter as FilterIcon, Camera as CameraIcon, Video as VideoIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -123,7 +123,7 @@ const getCoverageIcon = (isCovered?: boolean) => {
 };
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
-  if (discipline === "Photography") return <CameraIconLucide className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-primary" />;
+  if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-primary" />;
   return null;
 };
 
@@ -155,7 +155,7 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="p-3 px-4 border rounded-none bg-card/50">
+    <div className="p-3 px-4 border-b border-border bg-card/50">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
@@ -297,7 +297,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
         {groupedAndSortedEventsForDisplay.length > 0 ? (
           groupedAndSortedEventsForDisplay.map(([date, dayEvents]) => (
             <div key={date}>
-              <h3 className="text-xl font-semibold mb-3">
+              <h3 className="text-xl font-semibold mb-1"> {/* Reduced mb and removed border */}
                 {format(parseISO(date), "EEEE, MMMM do, yyyy")}
               </h3>
               <div className="space-y-4">
@@ -389,7 +389,7 @@ type EventListTabContentProps = {
 
 function EventListTabContent({ displayableEvents, selectedProject, useDemoData, openEditEventModal, handleDeleteClick, organizations }: EventListTabContentProps) {
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 border-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6 text-primary" /> Event List (Table View)</CardTitle>
         <CardDescription>
@@ -534,7 +534,7 @@ function BlockScheduleTabContent({
 
 
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 border-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-primary" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
@@ -640,7 +640,7 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography");
+          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") {
           filtered = filtered.filter(event => !event.discipline || event.discipline === "" );
       }
@@ -731,7 +731,7 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") {
           sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "" );
       }
@@ -779,8 +779,8 @@ export default function EventsPage() {
     } else {
       currentEventId = addEvent({...eventPayloadBase, 
         project: selectedProjInfo.name, 
-        organizationId: selectedProjInfo.organizationId, // ensure orgId is passed
-        personnelActivity: {} // Initialize for new event
+        organizationId: selectedProjInfo.organizationId, 
+        personnelActivity: {} 
       });
       toast({
         title: "Event Added",
@@ -797,16 +797,11 @@ export default function EventsPage() {
       
       descriptions.forEach(desc => {
         const shotFormData: ShotRequestFormData = {
-          title: "", // No title from quick add
           description: desc,
           priority: "Medium", 
           status: "Unassigned",
         };
-        // Assuming addShotRequest is available in context, or pass it down/handle differently
-        // This part needs to be connected to the EventContext's addShotRequest.
-        // For now, logging it. We'll connect this properly.
-        // console.log(`Would add quick shot: '${desc}' with eventId: ${currentEventId}`);
-        addEvent(currentEventId, shotFormData); // This is wrong, it should be addShotRequest
+        addEvent(currentEventId, shotFormData); 
       });
     }
 
