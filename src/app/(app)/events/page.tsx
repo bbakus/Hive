@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarIcon as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video as VideoIconLucide } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,8 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; 
-import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay, addHours } from "date-fns";
-import type { DateRange } from "react-day-picker";
+import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -38,9 +37,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { EventFormDialog, type EventFormDialogData } from "@/components/modals/EventFormDialog";
-
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event, type ShotRequestFormData } from "@/contexts/EventContext"; // Updated to use Event from EventContext
+import { useEventContext, type Event } from "@/contexts/EventContext"; 
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -50,7 +48,6 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   
   let baseDate;
   try {
-    // Handle YYYY-MM-DD or YYYY/MM/DD by replacing / with -
     baseDate = parseISO(dateStr.replace(/\//g, '-'));
   } catch (e) {
     console.error("Invalid date string for parseISO:", dateStr);
@@ -74,14 +71,11 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let startDate = startOfDay(baseDate);
   startDate.setHours(startHour, startMinute);
 
-  let endDate = startOfDay(baseDate); // Start with the same day for end date
+  let endDate = startOfDay(baseDate); 
   endDate.setHours(endHour, endMinute);
   
-  // Handle events that cross midnight
-  // If end time is numerically less than start time (e.g. 22:00 - 02:00)
-  // OR if end time is 00:00 (and start time is not 00:00), assume it's next day.
   if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
-    endDate = addHours(endDate, 24); // Add 24 hours to push it to the next day
+    endDate.setDate(endDate.getDate() + 1);
   }
   
   return { start: startDate, end: endDate };
@@ -89,24 +83,22 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.id === eventB.id) return false; // Don't compare an event with itself
+  if (eventA.id === eventB.id) return false; 
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; // If parsing fails for either, no overlap
+  if (!timesA || !timesB) return false; 
 
-  // Check for time overlap: (StartA < EndB) and (EndA > StartB)
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  // If there's time overlap, check for shared personnel (only if both events have assigned personnel)
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-  return false; // Time overlap but no personnel assigned to one or both, or no shared personnel
+  return false; 
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -158,13 +150,14 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="mb-6 p-4">
+    <div className="mb-6 p-3 px-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
             id="filter-quick-turnaround"
             checked={filterQuickTurnaround}
             onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+            className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
           />
           <Label htmlFor="filter-quick-turnaround" className="font-normal whitespace-nowrap">Quick Turnaround Only</Label>
         </div>
@@ -312,22 +305,23 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                             <span className="truncate" title={event.name}>{event.name}</span>
                             {event.isQuickTurnaround && <Zap className="h-5 w-5 text-accent ml-1.5" title="Quick Turnaround"/>}
                           </CardTitle>
-                          <div className="text-xs text-muted-foreground space-y-0.5">
-                             <div className="flex items-center gap-1.5">
-                                <p>{event.time}</p>
-                                {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
-                                <Badge variant={
-                                event.priority === "Critical" ? "destructive" :
-                                event.priority === "High" ? "secondary" :
-                                event.priority === "Medium" ? "outline" : "default"
-                                } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
-                            </div>
-                             {!selectedProject && organizations.length > 1 && event.project && (
-                              <p className="text-xs mt-0.5 truncate" title={event.project}>
-                                  Project: {event.project}
-                              </p>
-                            )}
+                           <div className="text-xs text-muted-foreground space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                    <p>{event.time}</p>
+                                    {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
+                                    <Badge variant={
+                                    event.priority === "Critical" ? "destructive" :
+                                    event.priority === "High" ? "secondary" :
+                                    event.priority === "Medium" ? "outline" : "default"
+                                    } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
+                                </div>
+                                {(!selectedProject || organizations.length > 1) && event.project && (
+                                <p className="text-xs mt-0.5 truncate" title={event.project}>
+                                    Project: {event.project}
+                                </p>
+                                )}
                           </div>
+
                           <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                               {event.deadline && (
                                   <p className="text-foreground/80 whitespace-nowrap">
@@ -340,8 +334,8 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                   Assigned: {event.assignedPersonnelIds.length}
                                   </p>
                               )}
-                              <Link href={`/events/${event.id}/shots`} className="text-foreground hover:underline flex items-center gap-1 whitespace-nowrap">
-                                  <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
+                              <Link href={`/shot-planner?eventId=${event.id}`} className="text-foreground hover:underline flex items-center gap-1 whitespace-nowrap">
+                                  <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-accent" />
                                   Shot Requests: {event.shotRequests}
                               </Link>
                               {event.discipline && (
@@ -355,7 +349,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                        </div>
                        <div className="flex flex-col gap-2 items-end flex-shrink-0">
                         <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
-                          <Link href={`/events/${event.id}/shots`}>
+                          <Link href={`/shot-planner?eventId=${event.id}`}>
                             <Eye className="mr-2 h-4 w-4" /> Manage Shots
                           </Link>
                         </Button>
@@ -405,7 +399,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
               <TableHeader className="sticky top-0 z-10 bg-card">
                 <TableRow>
                   <TableHead>Event Name</TableHead>
-                  {!selectedProject && organizations.length > 1 && <TableHead>Project</TableHead>}
+                  {(!selectedProject || organizations.length > 1) && <TableHead>Project</TableHead>}
                   <TableHead>Date & Time</TableHead>
                   <TableHead>Deadline</TableHead>
                   <TableHead>Discipline</TableHead>
@@ -424,7 +418,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                       {event.name}
                       {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                     </TableCell>
-                    {!selectedProject && organizations.length > 1 && <TableCell>{event.project}</TableCell>}
+                    {(!selectedProject || organizations.length > 1) && <TableCell>{event.project}</TableCell>}
                     <TableCell className="flex items-center">
                       {event.date ? format(parseISO(event.date), "PPP") : 'N/A'} <span className="text-muted-foreground ml-1">({event.time})</span>
                       {event.hasOverlap && <AlertTriangle className="ml-2 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)"/>}
@@ -447,14 +441,14 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                       {event.assignedPersonnelIds?.length || 0}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/events/${event.id}/shots`} className="text-foreground hover:underline">
+                      <Link href={`/shot-planner?eventId=${event.id}`} className="text-foreground hover:underline">
                         {event.shotRequests}
                       </Link>
                     </TableCell>
                     <TableCell>{event.deliverables}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" className="hover:text-foreground/80" asChild>
-                        <Link href={`/events/${event.id}/shots`}>
+                        <Link href={`/shot-planner?eventId=${event.id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View/Manage Shots</span>
                         </Link>
@@ -485,20 +479,20 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
 
 type BlockScheduleTabContentProps = {
   displayableEvents: Event[];
-  selectedEventDates: string[];
   openEditEventModal: (event: Event) => void;
   selectedProject: Project | null;
   useDemoData: boolean;
   allPersonnel: Personnel[];
+  selectedEventDates: string[];
 };
 
 function BlockScheduleTabContent({
   displayableEvents,
-  selectedEventDates,
   openEditEventModal,
   selectedProject,
   useDemoData,
-  allPersonnel
+  allPersonnel,
+  selectedEventDates
 }: BlockScheduleTabContentProps) {
   
   const activeBlockScheduleDate = useMemo(() => {
@@ -583,7 +577,7 @@ export default function EventsPage() {
     updateEvent,
     deleteEvent,
     isLoadingEvents: isLoadingContextEvents,
-    addShotRequest, // For quick shot entry
+    addShotRequest,
   } = useEventContext();
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -639,9 +633,9 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography");
+          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
-          filtered = filtered.filter(event => !event.discipline || event.discipline === "");
+          filtered = filtered.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video"); // Include video if showing N/A or other
       }
     }
     if (selectedEventDates.length > 0) {
@@ -730,9 +724,9 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography" || event.discipline === "Both");
       } else if (filterDiscipline === "na_or_other") { 
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "");
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video");
       }
     }
     const dates = new Set(sourceForDateFiltering.map(event => event.date));
@@ -783,7 +777,6 @@ export default function EventsPage() {
       });
     }
     
-    // Process quick shot descriptions
     if (currentEventId && data.quickShotDescriptionsInput) {
         const descriptions = data.quickShotDescriptionsInput
             .split('\n')
@@ -793,8 +786,8 @@ export default function EventsPage() {
         descriptions.forEach(desc => {
             addShotRequest(currentEventId!, {
                 description: desc,
-                priority: "Medium", // Default
-                status: "Unassigned" // Default
+                priority: "Medium", 
+                status: "Unassigned" 
             });
         });
         if (descriptions.length > 0) {
@@ -943,11 +936,11 @@ export default function EventsPage() {
         <TabsContent value="block-schedule">
             <BlockScheduleTabContent
                 displayableEvents={displayableEvents} 
-                selectedEventDates={selectedEventDates} 
                 openEditEventModal={openEditEventModal}
                 selectedProject={selectedProject}
                 useDemoData={useDemoData}
                 allPersonnel={initialPersonnelMock} 
+                selectedEventDates={selectedEventDates}
             />
         </TabsContent>
       </Tabs>

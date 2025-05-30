@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { formatDeadline } from "@/app/(app)/events/page";
-import { ListChecks, Zap, LogIn, LogOut, Camera as CameraIcon, AlertTriangle, CheckSquare } from "lucide-react";
+import { ListChecks, Zap, LogIn, LogOut, Camera as CameraIcon, AlertTriangle, CheckSquare, User, UserCheck, Info } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +56,7 @@ export function EventShootAccordionItem({
     <AccordionItem
       value={event.id}
       key={event.id}
-      className="bg-card rounded-lg shadow-md hover:shadow-lg transition-shadow border"
+      className="bg-card rounded-none shadow-none hover:shadow-none transition-shadow border"
     >
       <AccordionTrigger className="p-4 hover:no-underline">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full gap-2 sm:gap-4">
@@ -65,7 +65,7 @@ export function EventShootAccordionItem({
               {event.name}
               {event.isQuickTurnaround && (
                 <Zap
-                  className="h-5 w-5 text-red-500 ml-1.5 flex-shrink-0"
+                  className="h-5 w-5 text-accent ml-1.5 flex-shrink-0"
                   title="Quick Turnaround"
                 />
               )}
@@ -112,7 +112,7 @@ export function EventShootAccordionItem({
           return (
             <div
               key={personnelId}
-              className="mb-4 p-3 border rounded-md bg-muted/30"
+              className="mb-4 p-3 border rounded-none bg-muted/30"
             >
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
                 <div className="mb-2 sm:mb-0">
@@ -122,20 +122,20 @@ export function EventShootAccordionItem({
                       ({person.role})
                     </span>
                   </p>
-                  {person.cameraSerial && (
+                  {person.cameraSerials && person.cameraSerials.length > 0 && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CameraIcon className="h-3 w-3" /> S/N:{" "}
-                      {person.cameraSerial}
+                      <CameraIcon className="h-3 w-3" /> S/N(s):{" "}
+                      {person.cameraSerials.join(', ')}
                     </p>
                   )}
                 </div>
-                <div className="flex flex-col xs:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onCheckIn(event.id, personnelId)}
                     disabled={isCheckedIn || hasCheckedOut}
-                    className="w-full xs:w-auto"
+                    className="w-full sm:w-auto"
                   >
                     <LogIn className="mr-2 h-4 w-4" /> Check In
                   </Button>
@@ -144,7 +144,7 @@ export function EventShootAccordionItem({
                     size="sm"
                     onClick={() => onCheckOut(event.id, personnelId)}
                     disabled={!isCheckedIn || hasCheckedOut}
-                    className="w-full xs:w-auto"
+                    className="w-full sm:w-auto"
                   >
                     <LogOut className="mr-2 h-4 w-4" /> Check Out
                   </Button>
@@ -152,7 +152,7 @@ export function EventShootAccordionItem({
               </div>
               {isCheckedIn && activity?.checkInTime && (
                 <Badge variant="secondary" className="text-xs mb-1">
-                  <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500" />
+                  <CheckSquare className="mr-1.5 h-3.5 w-3.5 text-green-500 dark:text-green-400" />
                   Checked In at {format(parseISO(activity.checkInTime), "p")}
                 </Badge>
               )}
@@ -186,7 +186,7 @@ export function EventShootAccordionItem({
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-medium">Shot Checklist:</h4>
             <Button variant="default" size="sm" asChild>
-              <Link href={`/events/${event.id}/shots`}>
+              <Link href={`/shot-planner?eventId=${event.id}`}>
                 <ListChecks className="mr-2 h-4 w-4" /> Full Shot List & Edit
               </Link>
             </Button>
@@ -196,22 +196,22 @@ export function EventShootAccordionItem({
               {shotRequests.map((shot) => (
                 <div
                   key={shot.id}
-                  className="flex items-center gap-2 sm:gap-3 p-2.5 rounded-md border bg-background/50 hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-2 sm:gap-3 p-2.5 rounded-none border bg-background/50 hover:bg-muted/50 transition-colors"
                 >
-                  <Badge
+                   <Badge
                     variant={
-                      shot.status === "Captured" ? "default" :
-                      shot.status === "Completed" ? "default" :
-                      shot.status === "Unassigned" ? "outline" :
-                      shot.status === "Assigned" ? "secondary" :
-                      shot.status === "Blocked" ? "destructive" :
-                      shot.status === "Request More" ? "destructive" :
-                      "outline"
+                        shot.status === "Captured" ? "default" :
+                        shot.status === "Completed" ? "default" :
+                        shot.status === "Unassigned" ? "outline" :
+                        shot.status === "Assigned" ? "secondary" :
+                        shot.status === "Blocked" ? "destructive" :
+                        shot.status === "Request More" ? "destructive" : 
+                        "outline"
                     }
                     className="text-xs whitespace-nowrap px-2 py-0.5 w-[120px] justify-center flex-shrink-0"
-                  >
+                    >
                     {shot.status}
-                  </Badge>
+                    </Badge>
                   <p
                     className="flex-1 text-sm text-foreground truncate"
                     title={shot.description}
@@ -221,10 +221,10 @@ export function EventShootAccordionItem({
                   <div className="flex flex-row gap-1.5 items-center flex-shrink-0">
                     <Button
                       variant={cn(
-                        "h-auto text-xs px-2 py-1",
+                        "h-auto text-xs px-2 py-1 flex-grow-0",
                         (shot.status === "Captured" ||
                           shot.status === "Completed") &&
-                          "bg-green-600 hover:bg-green-700 text-white"
+                          "bg-green-600 hover:bg-green-700 text-white dark:bg-green-500 dark:hover:bg-green-600 dark:text-foreground"
                       )}
                       size="sm"
                       onClick={() =>
@@ -238,7 +238,7 @@ export function EventShootAccordionItem({
                     </Button>
                     <Button
                       variant={cn(
-                        "h-auto text-xs px-2 py-1",
+                        "h-auto text-xs px-2 py-1 flex-grow-0",
                         shot.status === "Blocked" && "destructive"
                       )}
                       size="sm"
