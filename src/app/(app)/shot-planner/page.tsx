@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PlusCircle, Edit, Trash2, ListChecks, Film, Info, CheckCircle, AlertTriangle, User } from 'lucide-react';
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from '@/contexts/EventContext';
+import { useEventContext, type Event, type ShotRequest } from '@/contexts/EventContext';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { initialPersonnelMock } from '@/app/(app)/personnel/page';
 
 export default function ShotPlannerPage() {
   const searchParams = useSearchParams();
@@ -30,73 +31,60 @@ export default function ShotPlannerPage() {
     updateShotRequest, 
     deleteShotRequest, 
     isLoadingEvents,
-    eventsForSelectedProjectAndOrg, // Get all events for the current project/org
+    eventsForSelectedProjectAndOrg,
+    shotRequestsByEventId,
   } = useEventContext();
   const { selectedProject } = useProjectContext(); 
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { toast } = useToast();
 
-  const [activeEventForInput, setActiveEventForInput] = useState<Event | null>(null);
-  const [shotLists, setShotLists] = useState<Record<string, ShotRequest[]>>({});
-  const [newShotDescription, setNewShotDescription] = useState('');
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [expandedAccordionItems, setExpandedAccordionItems] = useState<string[]>([]);
+  
+  // State for new shot input values, keyed by eventId
+  const [newShotInputValues, setNewShotInputValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setIsDataLoading(isLoadingSettings || isLoadingEvents);
     if (!isLoadingSettings && !isLoadingEvents && eventIdFromQuery) {
       const eventFromQuery = eventsForSelectedProjectAndOrg.find(e => e.id === eventIdFromQuery);
       if (eventFromQuery) {
-        setActiveEventForInput(eventFromQuery);
-        // Pre-expand the accordion for the event from query
         setExpandedAccordionItems(prev => prev.includes(eventIdFromQuery) ? prev : [...prev, eventIdFromQuery]);
-        // Pre-load its shot list
-        if (!shotLists[eventIdFromQuery]) {
-          const shots = getShotRequestsForEvent(eventIdFromQuery);
-          setShotLists(prev => ({ ...prev, [eventIdFromQuery]: shots }));
-        }
       }
-    } else if (!isLoadingSettings && !isLoadingEvents && !activeEventForInput && eventsForSelectedProjectAndOrg.length > 0) {
-        // Default to first event if no query param and nothing active
-        // setActiveEventForInput(eventsForSelectedProjectAndOrg[0]);
     }
   }, [
     eventIdFromQuery, 
     isLoadingEvents, 
     isLoadingSettings, 
-    getEventById, 
-    getShotRequestsForEvent, 
-    eventsForSelectedProjectAndOrg,
-    activeEventForInput, // Added to prevent resetting if already set
-    shotLists // Added to re-evaluate if shotLists state changes externally (though unlikely here)
+    eventsForSelectedProjectAndOrg
   ]);
 
-  const handleAddShot = (e?: FormEvent<HTMLFormElement>) => {
-    if (e) e.preventDefault();
-    if (!activeEventForInput || !newShotDescription.trim()) {
-      if (!activeEventForInput) {
-        toast({ title: "No Event Selected", description: "Please select an event to add shots to.", variant: "destructive" });
-      } else if (!newShotDescription.trim()) {
-        toast({ title: "Error", description: "Shot description cannot be empty.", variant: "destructive" });
-      }
+  const getPersonnelNameById = useCallback((id?: string): string => {
+    if (!id) return "Unknown";
+    const person = initialPersonnelMock.find(p => p.id === id);
+    return person ? person.name : "Unknown User";
+  }, []);
+
+
+  const handleAddShot = (e: FormEvent<HTMLFormElement>, eventId: string) => {
+    e.preventDefault();
+    const description = newShotInputValues[eventId]?.trim();
+
+    if (!description) {
+      toast({ title: "Error", description: "Shot description cannot be empty.", variant: "destructive" });
       return;
     }
 
-    const shotData: Pick<ShotRequestFormData, 'description' | 'priority' | 'status'> & Partial<ShotRequestFormData> = {
-      description: newShotDescription.trim(),
+    addShotRequest(eventId, {
+      description: description,
       priority: "Medium", 
       status: "Unassigned", 
-    };
-
-    addShotRequest(activeEventForInput.id, shotData);
+    });
     toast({
       title: "Shot Added",
-      description: `"${newShotDescription.trim().substring(0,30)}..." added to ${activeEventForInput.name}.`,
+      description: `"${description.substring(0,30)}..." added.`,
     });
-    // setNewShotDescription(''); // DO NOT CLEAR for rapid fire input - User will clear/edit
-    // Refresh shot list for the active event
-    const updatedShots = getShotRequestsForEvent(activeEventForInput.id);
-    setShotLists(prev => ({ ...prev, [activeEventForInput!.id]: updatedShots }));
+    // Do NOT clear newShotInputValues[eventId] for rapid fire
   };
   
   const openEditShotModal = (shot: ShotRequest) => {
@@ -104,33 +92,14 @@ export default function ShotPlannerPage() {
   };
 
   const handleDeleteShot = (eventId: string, shotId: string) => {
-    // deleteShotRequest(eventId, shotId); // Assuming this function exists and works in context
-    // toast({ title: "Shot Deleted (Placeholder)", description: `Shot ID ${shotId} would be deleted.`});
-    // const updatedShots = getShotRequestsForEvent(eventId);
-    // setShotLists(prev => ({ ...prev, [eventId]: updatedShots }));
-    toast({ title: "Delete Feature Placeholder", description: "Deleting shots will be implemented here."});
+    deleteShotRequest(eventId, shotId);
+    toast({ title: "Shot Deleted", description: `Shot has been deleted.`});
   };
 
-  const handleAccordionToggle = (eventId: string) => {
-    setExpandedAccordionItems(prev => 
-      prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]
-    );
-    // Load shots if not already loaded
-    if (!shotLists[eventId]) {
-      const shots = getShotRequestsForEvent(eventId);
-      setShotLists(prev => ({ ...prev, [eventId]: shots }));
-    }
+  const onAccordionValueChange = (value: string[]) => {
+    setExpandedAccordionItems(value);
   };
 
-  const handleSelectEventForInput = (event: Event) => {
-    setActiveEventForInput(event);
-    if (!shotLists[event.id]) { // Pre-load shots if not already loaded
-      const shots = getShotRequestsForEvent(event.id);
-      setShotLists(prev => ({ ...prev, [event.id]: shots }));
-    }
-    // Optionally, expand the accordion for the newly selected event
-    setExpandedAccordionItems(prev => prev.includes(event.id) ? prev : [...prev, event.id]);
-  };
 
   if (isDataLoading) {
     return (
@@ -167,89 +136,58 @@ export default function ShotPlannerPage() {
           <ListChecks className="h-8 w-8 text-accent" /> Shot Planner
         </h1>
         <p className="text-muted-foreground">
-          {selectedProject ? `Quickly add and review shot requests for events in ${selectedProject.name}.` : "Select a project to begin planning shots."}
+          {selectedProject ? `Plan shots for events in ${selectedProject.name}. Expand an event to add and view its shots.` : "Select a project to begin planning shots."}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><PlusCircle className="h-6 w-6 text-accent" /> Add New Shot</CardTitle>
-          <CardDescription>
-            Select an event from the list below to target it for new shots. Input description and press Enter or click "Add Shot".
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3">
-            <Label htmlFor="active-event-display">Adding shots for:</Label>
-            <Input 
-              id="active-event-display" 
-              readOnly 
-              value={activeEventForInput ? `${activeEventForInput.name} (on ${format(parseISO(activeEventForInput.date), "MMM d")})` : "No event selected"}
-              className="bg-muted text-sm"
-            />
-          </div>
-          <form onSubmit={handleAddShot} className="flex items-end gap-3">
-            <div className="flex-grow">
-              <Label htmlFor="newShotDescription" className="sr-only">New Shot Description</Label>
-              <Input
-                id="newShotDescription"
-                type="text"
-                value={newShotDescription}
-                onChange={(e) => setNewShotDescription(e.target.value)}
-                placeholder="Enter shot description (e.g., Wide shot of main stage)"
-                className="text-base md:text-sm"
-                disabled={!activeEventForInput}
-              />
-            </div>
-            <Button type="submit" variant="accent" disabled={!activeEventForInput || !newShotDescription.trim()}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Shot
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Events & Their Shots ({eventsForSelectedProjectAndOrg.length} events)</CardTitle>
-          <CardDescription>Expand an event to view its shot list. Click "Set for Input" to target an event for adding new shots.</CardDescription>
+          <CardTitle>Events & Shot Lists ({eventsForSelectedProjectAndOrg.length} events)</CardTitle>
+          <CardDescription>Expand an event to view its shot list and add new shots directly.</CardDescription>
         </CardHeader>
         <CardContent>
           {eventsForSelectedProjectAndOrg.length > 0 ? (
             <Accordion 
               type="multiple" 
               value={expandedAccordionItems}
-              onValueChange={setExpandedAccordionItems} // Allows manual control of expanded items
+              onValueChange={onAccordionValueChange}
               className="w-full space-y-2"
             >
               {eventsForSelectedProjectAndOrg.map((event) => {
-                const currentEventShots = shotLists[event.id] || [];
-                const isSelectedForInput = activeEventForInput?.id === event.id;
-
+                const currentEventShots = shotRequestsByEventId[event.id] || [];
                 return (
-                  <AccordionItem value={event.id} key={event.id} className={cn("border rounded-none", isSelectedForInput && "border-accent ring-1 ring-accent")}>
+                  <AccordionItem value={event.id} key={event.id} className={cn("border rounded-none")}>
                     <AccordionTrigger 
                         className="p-3 hover:no-underline text-left" 
-                        onClick={() => handleAccordionToggle(event.id)} // Use custom toggle to load data
                     >
                       <div className="flex justify-between items-center w-full">
                         <div>
-                          <p className={cn("font-medium", isSelectedForInput && "text-accent")}>{event.name}</p>
+                          <p className={cn("font-medium")}>{event.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {format(parseISO(event.date), "PPP")} ({event.time}) - Shots: {currentEventShots.length}
                           </p>
                         </div>
-                        <Button 
-                            variant={isSelectedForInput ? "accent" : "outline"} 
-                            size="sm" 
-                            onClick={(e) => { e.stopPropagation(); handleSelectEventForInput(event); }}
-                            className="ml-4 h-auto py-1 px-2 text-xs"
-                        >
-                          {isSelectedForInput ? "Selected for Input" : "Set for Input"}
-                        </Button>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="p-0">
-                      <div className="border-t p-3">
+                      <div className="border-t p-3 space-y-3">
+                        <form onSubmit={(e) => handleAddShot(e, event.id)} className="flex items-end gap-2">
+                          <div className="flex-grow">
+                            <Label htmlFor={`newShot-${event.id}`} className="sr-only">New Shot for {event.name}</Label>
+                            <Input
+                              id={`newShot-${event.id}`}
+                              type="text"
+                              value={newShotInputValues[event.id] || ''}
+                              onChange={(e) => setNewShotInputValues(prev => ({ ...prev, [event.id]: e.target.value }))}
+                              placeholder="Enter new shot description and press Enter or Add"
+                              className="text-sm"
+                            />
+                          </div>
+                          <Button type="submit" variant="outline" size="sm" disabled={!(newShotInputValues[event.id]?.trim())}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add
+                          </Button>
+                        </form>
+
                         {currentEventShots.length > 0 ? (
                           <Table>
                             <TableHeader>
@@ -265,10 +203,25 @@ export default function ShotPlannerPage() {
                                 <TableRow key={shot.id}>
                                   <TableCell className="font-medium max-w-xs">
                                     <p className="truncate" title={shot.description}>{shot.description}</p>
-                                    {shot.initialCapturerId && (
+                                     {shot.initialCapturerId && (
                                       <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
-                                        <CheckCircle className="h-3 w-3"/> Captured
+                                        <CheckCircle className="h-3 w-3"/> Initially Captured by: {getPersonnelNameById(shot.initialCapturerId)}
                                       </p>
+                                    )}
+                                    {shot.status === "Completed" && shot.lastStatusModifierId && (
+                                        <p className="text-xs text-blue-500 dark:text-blue-400 mt-1 flex items-center gap-1">
+                                            <User className="h-3 w-3" /> {/* Changed to User for Completed By */}
+                                            Completed by: {getPersonnelNameById(shot.lastStatusModifierId)}
+                                            {shot.lastStatusModifiedAt ? ` on ${format(parseISO(shot.lastStatusModifiedAt), "MMM d, p")}` : ""}
+                                        </p>
+                                    )}
+                                     {shot.status !== "Completed" && shot.lastStatusModifierId && 
+                                        (shot.lastStatusModifierId !== shot.initialCapturerId || !shot.initialCapturerId) && (
+                                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                            <Info className="h-3.5 w-3.5" />
+                                            Last update: {getPersonnelNameById(shot.lastStatusModifierId)}
+                                            {shot.lastStatusModifiedAt ? ` on ${format(parseISO(shot.lastStatusModifiedAt), "MMM d, p")}`: ""}
+                                        </p>
                                     )}
                                     {shot.status === "Blocked" && shot.blockedReason && (
                                       <p className="text-xs text-destructive mt-1 flex items-center gap-1" title={shot.blockedReason}>
@@ -292,10 +245,10 @@ export default function ShotPlannerPage() {
                                     }>{shot.priority}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" className="hover:text-foreground/80 h-8 w-8" onClick={() => openEditShotModal(shot)} disabled>
+                                    <Button variant="ghost" size="icon" className="hover:text-foreground/80 h-8 w-8" onClick={() => openEditShotModal(shot)}>
                                       <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="hover:text-destructive h-8 w-8" onClick={() => handleDeleteShot(event.id, shot.id)} disabled>
+                                    <Button variant="ghost" size="icon" className="hover:text-destructive h-8 w-8" onClick={() => handleDeleteShot(event.id, shot.id)}>
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </TableCell>
@@ -304,7 +257,7 @@ export default function ShotPlannerPage() {
                             </TableBody>
                           </Table>
                         ) : (
-                          <p className="text-muted-foreground text-center py-4 text-sm">No shot requests for this event yet.</p>
+                          <p className="text-muted-foreground text-center py-4 text-sm">No shot requests for this event yet. Add some above!</p>
                         )}
                       </div>
                     </AccordionContent>
@@ -323,4 +276,6 @@ export default function ShotPlannerPage() {
     </div>
   );
 }
+    
+
     
