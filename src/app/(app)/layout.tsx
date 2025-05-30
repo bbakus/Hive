@@ -33,16 +33,20 @@ import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
 function AppSidebar() {
   const pathname = usePathname();
-  const { open } = useSidebar();
+  const { open, setOpen } = useSidebar(); // Get setOpen from context
   const { activePhase, getNavItemsForPhase, constantFooterNavItems } = usePhaseContext();
 
   const currentPhaseNavItems = getNavItemsForPhase(activePhase) || [];
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar 
+      collapsible="icon"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <SidebarHeader className={cn("h-16 border-b border-sidebar-border", open ? "p-4" : "p-2 justify-center")}>
         <Link href="/dashboard" className="flex items-center gap-2">
-          <Icons.HiveLogo className={cn("h-8 w-8 text-accent icon-glow", open ? "h-8 w-8" : "h-6 w-6")} />
+          <Icons.HiveLogo className={cn("h-8 w-8 text-accent", open ? "h-8 w-8" : "h-6 w-6")} />
           {open && <span className="text-xl font-semibold text-foreground">HIVE</span>}
         </Link>
       </SidebarHeader>
@@ -103,40 +107,50 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let newPhaseDetermination: Phase | null = null;
-    const currentPath = pathname.split('?')[0];
+    let determinedPhase: Phase | null = null;
+    const currentPath = pathname.split('?')[0]; // Ignore query params
 
-    // Determine phase based on top-level path segments
     if (currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')) {
-      newPhaseDetermination = 'Dashboard';
+      determinedPhase = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
-      newPhaseDetermination = 'Plan';
+      determinedPhase = 'Plan';
     } else if (currentPath === '/events' && !currentPath.includes('/shots')) { 
-      // Only set to 'Plan' if it's /events, not /events/.../shots
-      newPhaseDetermination = 'Plan';
+      determinedPhase = 'Plan';
+    } else if (currentPath.startsWith('/events/') && currentPath.includes('/shots')) {
+      // If we are on a shot list page, keep the current phase unless it's not set
+      // This is to allow "Shoot" phase to remain active when viewing shots from /shoot
+      if (activePhase === "Shoot") {
+        determinedPhase = "Shoot";
+      } else {
+        determinedPhase = "Plan"; // Default to Plan if accessed from elsewhere
+      }
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
-      newPhaseDetermination = 'Plan';
+      determinedPhase = 'Plan';
     } else if (currentPath === '/scheduler' || currentPath.startsWith('/scheduler/')) {
-      newPhaseDetermination = 'Plan';
+      determinedPhase = 'Plan';
     } else if (currentPath === '/shoot' || currentPath.startsWith('/shoot/')) {
-      newPhaseDetermination = 'Shoot';
+      determinedPhase = 'Shoot';
+    } else if (currentPath === '/ingestion' || currentPath.startsWith('/ingestion/')) {
+      determinedPhase = 'Shoot'; // Ingestion is part of Shoot phase
     } else if (currentPath === '/post-production' || currentPath.startsWith('/post-production/')) {
-      newPhaseDetermination = 'Edit';
+      determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
-      newPhaseDetermination = 'Deliver';
+      determinedPhase = 'Deliver';
+    } else if (currentPath === '/settings' || currentPath.startsWith('/settings/')) {
+      // Keep current phase for settings, or default if none sensible
+       determinedPhase = activePhase; // Or a default like 'Dashboard'
+    } else if (currentPath === '/support' || currentPath.startsWith('/support/')) {
+       determinedPhase = activePhase; // Or a default
     }
-    // For pages like /events/[eventId]/shots, /settings, /support, 
-    // newPhaseDetermination remains null here. This means if the user is on such a page, 
-    // the activePhase will NOT be changed by this effect if it was already set to a relevant phase.
-    // It will retain the phase from which they navigated to this detailed page.
 
-    if (newPhaseDetermination && availablePhases.includes(newPhaseDetermination) && newPhaseDetermination !== activePhase) {
-      setActivePhase(newPhaseDetermination);
+
+    if (determinedPhase && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
+      setActivePhase(determinedPhase);
     }
   }, [pathname, activePhase, setActivePhase, availablePhases]);
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={false}> {/* Changed defaultOpen to false */}
       <AppSidebar />
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:px-6">
