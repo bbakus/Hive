@@ -17,22 +17,18 @@ const mockProjectsForApi: Array<{ id: string, name: string, client: string, orga
 ];
 
 export async function GET(request: Request) {
-  // TODO: Implement authentication and authorization checks
+  // TODO: Implement actual authentication and authorization checks
   // TODO: Fetch projects from a database based on user context
 
-  console.log("GET /api/projects request received");
+  // In a production environment with multiple local utilities polling this endpoint,
+  // considerations for API rate limiting, database query optimization, and caching
+  // would be crucial for performance and stability.
+
+  console.log("GET /api/projects request received by HIVE placeholder API");
   // For now, return mock data
   // Simulate a delay
   await new Promise(resolve => setTimeout(resolve, 300));
   
-  // const url = new URL(request.url);
-  // const organizationId = url.searchParams.get('organizationId');
-  // let filteredProjects = mockProjectsForApi;
-  // if (organizationId) {
-  //   filteredProjects = mockProjectsForApi.filter(p => p.organizationId === organizationId);
-  // }
-
-  // Returning only id, name, client as per API contract
   const responseProjects = mockProjectsForApi.map(p => ({
     id: p.id,
     name: p.name,
@@ -41,3 +37,4 @@ export async function GET(request: Request) {
 
   return NextResponse.json(responseProjects);
 }
+
