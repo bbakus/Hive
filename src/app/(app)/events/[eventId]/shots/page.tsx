@@ -22,7 +22,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData, shotRequestSchemaInternal } from "@/contexts/EventContext";
 import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 import { format, parseISO } from "date-fns";
 import { usePhaseContext } from '@/contexts/PhaseContext';
@@ -32,6 +32,8 @@ const MOCK_CURRENT_USER_ID = "user_admin_ops";
 const MOCK_CURRENT_USER_NAME = "Ops Admin";
 
 const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
+const DEFAULT_SHOT_ASSIGNMENT_VALUE = "--NONE--";
+
 
 export default function ShotListPage() {
   const params = useParams();
@@ -45,7 +47,8 @@ export default function ShotListPage() {
     shotRequestsByEventId, 
     addShotRequest,
     updateShotRequest,
-    deleteShotRequest
+    deleteShotRequest,
+    getShotRequestsForEvent,
   } = useEventContext();
 
   const [event, setEvent] = useState<Event | null | undefined>(undefined);
@@ -59,6 +62,7 @@ export default function ShotListPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  // Effect to update local shot requests when context changes
   useEffect(() => {
     if (eventId && !isEventContextLoading && shotRequestsByEventId) {
       setCurrentShotRequests(shotRequestsByEventId[eventId] || []);
@@ -66,7 +70,8 @@ export default function ShotListPage() {
   }, [eventId, shotRequestsByEventId, isEventContextLoading]);
 
 
-  useEffect(() => {
+  // Effect to fetch parent event details
+   useEffect(() => {
     if (isSettingsContextLoading || isEventContextLoading || !eventId) {
       setEvent(undefined); 
       return;
@@ -76,10 +81,11 @@ export default function ShotListPage() {
   }, [eventId, isSettingsContextLoading, isEventContextLoading, getEventById]);
 
 
-  const handleShotRequestSubmit: SubmitHandler<ShotRequestFormData> = (data) => {
+  const handleShotRequestSubmit = (data: ShotRequestFormData) => {
     if (!eventId) return;
 
     let dataToSubmit: Partial<ShotRequestFormData> = { 
+        title: data.title,
         description: data.description,
         priority: data.priority,
         status: data.status,
@@ -105,7 +111,7 @@ export default function ShotListPage() {
       updateShotRequest(eventId, editingShotRequest.id, dataToSubmit);
       toast({
         title: "Shot Request Updated",
-        description: `"${dataToSubmit.description?.substring(0,30)}..." has been updated.`,
+        description: `"${dataToSubmit.title || dataToSubmit.description?.substring(0,30)}..." has been updated.`,
       });
     } else { 
       dataToSubmit.lastStatusModifierId = MOCK_CURRENT_USER_ID;
@@ -114,10 +120,10 @@ export default function ShotListPage() {
             dataToSubmit.initialCapturerId = MOCK_CURRENT_USER_ID;
       }
       
-      addShotRequest(eventId, dataToSubmit as ShotRequestFormData); // Cast needed as some fields might be missing for new shot
+      addShotRequest(eventId, dataToSubmit as ShotRequestFormData);
       toast({
         title: "Shot Request Added",
-        description: `"${data.description.substring(0,30)}..." has been added.`,
+        description: `"${data.title || data.description.substring(0,30)}..." has been added.`,
       });
     }
     setIsShotModalOpen(false);
@@ -145,7 +151,7 @@ export default function ShotListPage() {
       deleteShotRequest(eventId, shotRequestToDeleteId);
       toast({
         title: "Shot Request Deleted",
-        description: `Shot "${shot?.description.substring(0,30)}..." has been deleted.`,
+        description: `Shot "${shot?.title || shot?.description.substring(0,30)}..." has been deleted.`,
         variant: "destructive"
       });
       setShotRequestToDeleteId(null);
@@ -182,7 +188,7 @@ export default function ShotListPage() {
       updateShotRequest(eventId, shotId, updatePayload);
       toast({
         title: "Status Updated",
-        description: `Shot status for "${shotToUpdate.description.substring(0,30)}..." changed to "${newStatus}".`,
+        description: `Shot status for "${shotToUpdate.title || shotToUpdate.description.substring(0,30)}..." changed to "${newStatus}".`,
       });
 
       if (newStatus === "Request More") {
@@ -196,7 +202,7 @@ export default function ShotListPage() {
 
         toast({
           title: "Notification Simulated",
-          description: `A push notification for "Request More" on shot "${shotToUpdate.description.substring(0,30)}..." (modified by ${modifierName}) would be sent to ${assignedPersonName}.`,
+          description: `A push notification for "Request More" on shot "${shotToUpdate.title || shotToUpdate.description.substring(0,30)}..." (modified by ${modifierName}) would be sent to ${assignedPersonName}.`,
           variant: "default",
           duration: 7000,
         });
@@ -276,13 +282,13 @@ export default function ShotListPage() {
         personnelAssignedToEvent={personnelAssignedToEvent}
       />
         
-      <Card className="shadow-lg">
+      <Card className="shadow-none">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Manage Shot Requests</CardTitle>
             <CardDescription>Define and track all required shots for this event. ({currentShotRequests.length} shots)</CardDescription>
           </div>
-          <Button onClick={openAddShotModal}>
+          <Button onClick={openAddShotModal} variant="accent">
             <PlusCircle className="mr-2 h-5 w-5" />
             Add Shot Request
           </Button>
@@ -292,7 +298,8 @@ export default function ShotListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Description</TableHead>
+                  <TableHead className="w-[25%]">Title</TableHead>
+                  <TableHead className="w-[35%]">Description</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Status</TableHead>
@@ -302,7 +309,10 @@ export default function ShotListPage() {
               <TableBody>
                 {currentShotRequests.map((shot) => (
                   <TableRow key={shot.id}>
-                    <TableCell className="font-medium max-w-xs">
+                    <TableCell className="font-medium max-w-[150px] truncate" title={shot.title || ""}>
+                        {shot.title || <span className="italic text-muted-foreground">No Title</span>}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-xs">
                         <p className="truncate" title={shot.description}>{shot.description}</p>
                         {shot.status === "Blocked" && shot.blockedReason && (
                             <p className="text-xs text-destructive mt-1 flex items-center gap-1" title={shot.blockedReason}>
@@ -413,7 +423,7 @@ export default function ShotListPage() {
             </Table>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              <Camera size={48} className="mx-auto mb-4" />
+              <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium">No shot requests defined for this event yet.</p>
               <p>Click "Add Shot Request" to get started.</p>
             </div>
@@ -423,5 +433,3 @@ export default function ShotListPage() {
     </div>
   );
 }
-
-    

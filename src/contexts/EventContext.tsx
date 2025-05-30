@@ -11,16 +11,16 @@ import { z } from 'zod';
 import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore, subDays, addDays } from 'date-fns';
 
 // --- Shot Request Definitions ---
-// Removed "Planned" status, default for new shots will be "Unassigned"
 export const shotRequestSchemaInternal = z.object({
+  title: z.string().optional(), // New field
   description: z.string().min(3, { message: "Description must be at least 3 characters." }),
   priority: z.enum(["Low", "Medium", "High", "Critical"]),
   status: z.enum(["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"]),
   assignedPersonnelId: z.string().optional(),
   notes: z.string().optional(),
   blockedReason: z.string().optional(),
-  initialCapturerId: z.string().optional(), // Who first captured it
-  lastStatusModifierId: z.string().optional(), // Who made the last status change (could be initial capturer or someone else)
+  initialCapturerId: z.string().optional(),
+  lastStatusModifierId: z.string().optional(),
   lastStatusModifiedAt: z.string().optional().refine(val => !val || isValid(parseISO(val)), {
     message: "Last status modified must be a valid ISO date string or empty.",
   }),
@@ -35,19 +35,19 @@ export type ShotRequest = ShotRequestFormData & {
 export type Event = EventTypeDefinition & {
    personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
    organizationId?: string;
-   discipline?: "Photography" | ""; // Simplified
+   discipline?: "Photography" | "";
 };
 
 const G9E_SUMMIT_PROJECT_ID = "proj_g9e_summit_2024";
 const G9E_ORG_ID = "org_g9e";
-const SUMMIT_PHOTOGRAPHERS_IDS = ["user001", "user002", "user004", "user006"]; // Alice, Bob, Diana, Fiona
-const OTHER_TEAM_MEMBER_IDS = ["user003", "user005"]; // Charlie (PM), Edward (Editor)
+const SUMMIT_PHOTOGRAPHERS_IDS = ["user001", "user002", "user004", "user006"];
+const OTHER_TEAM_MEMBER_IDS = ["user003", "user005"];
 
 const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shotsByEventId: Record<string, ShotRequest[]> } => {
   const summitEvents: Event[] = [];
   const shotsByEventId: Record<string, ShotRequest[]> = {};
-  let eventIdCounter = 2000;
-  let shotIdCounter = 5000;
+  let eventIdCounter = 3000; // Adjusted to avoid potential ID clashes if other mocks exist
+  let shotIdCounter = 7000;
   const today = new Date();
 
   const summitDays = [
@@ -57,14 +57,25 @@ const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shotsByEve
     format(addDays(today, 2), "yyyy-MM-dd")  // Day after tomorrow
   ];
 
-  const priorities: Event['priority'][] = ["High", "Medium", "Critical", "Low"];
-  const disciplines: Event['discipline'][] = ["Photography", ""];
+  const eventPriorities: Event['priority'][] = ["High", "Medium", "Critical", "Low"];
+  const eventDisciplines: Event['discipline'][] = ["Photography", ""];
+
+  const shotTitles = [
+    "Keynote Opening", "Crowd Reaction Wide", "Speaker Close-up", "Stage Detail",
+    "Networking Candids", "Product Demo Shot", "VIP Interaction", "Venue Atmosphere",
+    "Panel Discussion Group", "Audience Q&A", "Awards Ceremony Highlights", "Closing Remarks Focus"
+  ];
+  const shotDescriptions = [
+    "Capture the energy of the opening address.", "Wide shot of the audience.", "Tight shot on the main speaker.", "Detail of the stage design.",
+    "Candid shots of attendees networking.", "Focus on the product being demonstrated.", "VIPs interacting with guests.", "General atmosphere shots of the venue.",
+    "Group shot of the panel.", "Audience members asking questions.", "Key moments from the awards.", "Speaker delivering closing remarks."
+  ];
   const shotPriorities: ShotRequest['priority'][] = ["High", "Medium", "Critical", "Low"];
   const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
   const sampleBlockedReasons = ["Access denied", "Talent unavailable", "Equipment malfunction", "Weather issues"];
   const sampleNotes = ["Ensure good lighting", "Focus on candid moments", "Get wide and tight shots", "Check background details"];
 
-  const createShotsForEvent = (eventId: string, eventNamePrefix: string) => {
+  const createShotsForEvent = (eventId: string, eventNamePrefix: string, eventAssignedPersonnel: string[]) => {
     if (!shotsByEventId[eventId]) {
       shotsByEventId[eventId] = [];
     }
@@ -78,26 +89,32 @@ const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shotsByEve
       let currentAssignedPersonnelId: string | undefined = undefined;
       let currentBlockedReason: string | undefined = undefined;
 
+      const basePhotogIndex = (i + eventIdCounter);
+      const primaryEventPhotog = eventAssignedPersonnel.length > 0 ? eventAssignedPersonnel[basePhotogIndex % eventAssignedPersonnel.length] : SUMMIT_PHOTOGRAPHERS_IDS[basePhotogIndex % SUMMIT_PHOTOGRAPHERS_IDS.length];
+      const otherTeamMemberForStatus = OTHER_TEAM_MEMBER_IDS[basePhotogIndex % OTHER_TEAM_MEMBER_IDS.length];
+
+
       if (shotStatus === "Captured" || shotStatus === "Completed") {
-        currentInitialCapturerId = SUMMIT_PHOTOGRAPHERS_IDS[(i + eventIdCounter) % SUMMIT_PHOTOGRAPHERS_IDS.length];
+        currentInitialCapturerId = primaryEventPhotog;
         currentLastStatusModifierId = currentInitialCapturerId;
         currentLastStatusModifiedAt = subDays(new Date(), (i % 3) + 1).toISOString();
       } else if (shotStatus === "Blocked") {
         currentBlockedReason = sampleBlockedReasons[i % sampleBlockedReasons.length];
-        currentLastStatusModifierId = OTHER_TEAM_MEMBER_IDS[i % OTHER_TEAM_MEMBER_IDS.length];
+        currentLastStatusModifierId = otherTeamMemberForStatus;
         currentLastStatusModifiedAt = subDays(new Date(), (i % 2)).toISOString();
       } else if (shotStatus === "Request More" || shotStatus === "Assigned") {
-         currentLastStatusModifierId = OTHER_TEAM_MEMBER_IDS[i % OTHER_TEAM_MEMBER_IDS.length];
+         currentLastStatusModifierId = otherTeamMemberForStatus;
          currentLastStatusModifiedAt = subDays(new Date(), (i % 2)).toISOString();
       }
       
       if (shotStatus === "Assigned" || ((shotStatus === "Captured" || shotStatus === "Completed") && Math.random() < 0.7) ) {
-          currentAssignedPersonnelId = SUMMIT_PHOTOGRAPHERS_IDS[(i+shotIdCounter) % SUMMIT_PHOTOGRAPHERS_IDS.length];
+          currentAssignedPersonnelId = primaryEventPhotog;
       }
 
       shotsByEventId[eventId].push({
         id: `sr_summit_${shotIdCounter++}`, eventId: eventId,
-        description: `${eventNamePrefix} - Shot ${i+1}: Focus on key speaker expressions`,
+        title: shotTitles[(shotIdCounter + i) % shotTitles.length],
+        description: `${eventNamePrefix} - ${shotDescriptions[(shotIdCounter + i) % shotDescriptions.length]}`,
         priority: shotPriorities[(i + eventIdCounter) % shotPriorities.length], status: shotStatus,
         assignedPersonnelId: currentAssignedPersonnelId,
         initialCapturerId: currentInitialCapturerId,
@@ -111,14 +128,17 @@ const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shotsByEve
   
   summitDays.forEach((day, dayIndex) => {
     SUMMIT_PHOTOGRAPHERS_IDS.forEach((photographerId, photographerIndex) => {
+      const eventSpecificPersonnel = [photographerId, OTHER_TEAM_MEMBER_IDS[0]]; // Current photog + Charlie (PM)
+
       const sessions = [
-        { namePart: `Coverage Block A`, time: "09:00 - 12:00", isQuick: (dayIndex + photographerIndex) % 3 === 0, deadlineOffset: 18 },
-        { namePart: `Coverage Block B`, time: "14:00 - 17:00", isQuick: false, deadlineOffset: 0 }
+        { namePart: `Morning Keynotes & Sessions`, time: "09:00 - 12:00", isQuick: (dayIndex + photographerIndex) % 3 === 0, deadlineOffset: 18, assigned: eventSpecificPersonnel },
+        { namePart: `Afternoon Workshops & Panels`, time: "14:00 - 17:00", isQuick: false, deadlineOffset: 0, assigned: eventSpecificPersonnel }
       ];
       
+      // Lunch Break (not covered, but blocks photographer)
       summitEvents.push({
         id: `evt_summit_d${dayIndex + 1}_p${photographerIndex + 1}_lunch_${eventIdCounter++}`,
-        name: `Photographer Lunch Break`,
+        name: `${SUMMIT_PHOTOGRAPHERS_IDS[photographerIndex].split(" ")[0]}'s Lunch Break`, // e.g. Alice's Lunch Break
         projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: day,
         time: "12:30 - 13:30", priority: "Low", assignedPersonnelIds: [photographerId],
         deliverables: 0, shotRequests: 0, organizationId: G9E_ORG_ID, discipline: "",
@@ -130,92 +150,97 @@ const generateDynamicG9eSummitEventsAndShots = (): { events: Event[], shotsByEve
         
         summitEvents.push({
           id: eventId,
-          name: `${session.namePart} - ${summitDays[dayIndex]}`,
+          name: `${session.namePart} - ${day}`,
           projectId: G9E_SUMMIT_PROJECT_ID,
           project: "G9e Annual Summit 2024",
           date: day,
           time: session.time,
-          priority: priorities[(dayIndex + photographerIndex + sessionIndex) % priorities.length],
-          assignedPersonnelIds: [photographerId, "user003"], // Assign current photographer and PM
+          priority: eventPriorities[(dayIndex + photographerIndex + sessionIndex) % eventPriorities.length],
+          assignedPersonnelIds: session.assigned,
           deliverables: 0, 
-          shotRequests: 0, // Will be updated after shots are created
+          shotRequests: 0, 
           organizationId: G9E_ORG_ID,
-          discipline: disciplines[(dayIndex + photographerIndex + sessionIndex) % disciplines.length],
+          discipline: eventDisciplines[(dayIndex + photographerIndex + sessionIndex) % eventDisciplines.length],
           isQuickTurnaround: session.isQuick,
           deadline: session.isQuick ? `${day}T${String(session.deadlineOffset).padStart(2, '0')}:00:00Z` : undefined,
           isCovered: true,
           personnelActivity: {},
         });
-        createShotsForEvent(eventId, session.namePart);
+        createShotsForEvent(eventId, session.namePart, session.assigned);
       });
       
       if ((dayIndex < 2 && photographerIndex % 2 === 0) || (dayIndex >=2 && photographerIndex % 2 !== dayIndex % 2)) {
         const eveningEventId = `evt_summit_d${dayIndex+1}_p${photographerIndex+1}_eve_${eventIdCounter++}`;
+        const eveningPersonnel = [photographerId, OTHER_TEAM_MEMBER_IDS[0]];
         summitEvents.push({
             id: eveningEventId,
-            name: `Evening Reception - ${summitDays[dayIndex]}`,
+            name: `Evening Networking Reception - ${day}`,
             projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: day,
             time: "18:30 - 20:30", priority: "Medium",
-            assignedPersonnelIds: [photographerId], deliverables: 0, shotRequests: 0, // Will be updated
+            assignedPersonnelIds: eveningPersonnel, deliverables: 0, shotRequests: 0,
             organizationId: G9E_ORG_ID, discipline: "Photography",
             isQuickTurnaround: photographerIndex % 2 === 0,
             isCovered: true, personnelActivity: {},
             deadline: (photographerIndex % 2 === 0) ? `${format(addDays(parseISO(day), 1), "yyyy-MM-dd")}T10:00:00Z` : undefined,
         });
-        createShotsForEvent(eveningEventId, "Evening Reception Coverage");
+        createShotsForEvent(eveningEventId, "Evening Reception", eveningPersonnel);
       }
     });
   });
-  
+
+  // Dynamically create a few events for today to ensure "In Progress", "Upcoming", "Completed" can be shown
   const now = new Date();
   const todayDateStr = format(now, "yyyy-MM-dd");
-  const todayDynamicEvents : Event[] = [
+
+  const todayDynamicEvents : Partial<Event>[] = [
     { 
-      id: `evt_today_completed_dyn_${eventIdCounter++}`, name: "Completed Today (Dynamic Demo)",
-      projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: todayDateStr,
+      id: `evt_today_completed_dyn_${eventIdCounter++}`, name: "Summit Daily Recap Meeting (Completed Today)",
       time: `${format(subHours(now, 2), "HH:mm")} - ${format(subHours(now, 1), "HH:mm")}`,
-      priority: "Medium", assignedPersonnelIds: [SUMMIT_PHOTOGRAPHERS_IDS[0]],
-      deliverables: 0, shotRequests: 0, organizationId: G9E_ORG_ID, isCovered: true, personnelActivity: {},
-      discipline: "Photography", isQuickTurnaround: true, deadline: `${todayDateStr}T${format(addHours(now,2), "HH:mm")}:00Z`
+      priority: "Medium", assignedPersonnelIds: [SUMMIT_PHOTOGRAPHERS_IDS[0], OTHER_TEAM_MEMBER_IDS[0]],
+      isQuickTurnaround: true, deadline: `${todayDateStr}T${format(addHours(now,2), "HH:mm")}:00Z`
     },
     { 
-      id: `evt_today_inprogress_dyn_${eventIdCounter++}`, name: "In Progress Now (Dynamic Demo)",
-      projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: todayDateStr,
+      id: `evt_today_inprogress_dyn_${eventIdCounter++}`, name: "Live Demo Session Coverage (In Progress)",
       time: `${format(subHours(now, 0.5), "HH:mm")} - ${format(addHours(now, 0.5), "HH:mm")}`,
-      priority: "High", assignedPersonnelIds: [SUMMIT_PHOTOGRAPHERS_IDS[1]],
-      deliverables: 0, shotRequests: 0, organizationId: G9E_ORG_ID, isCovered: true, personnelActivity: {},
-      discipline: "Photography"
+      priority: "High", assignedPersonnelIds: [SUMMIT_PHOTOGRAPHERS_IDS[1], OTHER_TEAM_MEMBER_IDS[0]],
     },
     { 
-      id: `evt_today_upcoming_dyn_${eventIdCounter++}`, name: "Upcoming Today (Dynamic Demo)",
-      projectId: G9E_SUMMIT_PROJECT_ID, project: "G9e Annual Summit 2024", date: todayDateStr,
+      id: `evt_today_upcoming_dyn_${eventIdCounter++}`, name: "Special Guest Interview (Upcoming Today)",
       time: `${format(addHours(now, 1), "HH:mm")} - ${format(addHours(now, 2), "HH:mm")}`,
-      priority: "Critical", assignedPersonnelIds: [SUMMIT_PHOTOGRAPHERS_IDS[2]],
-      deliverables: 0, shotRequests: 0, organizationId: G9E_ORG_ID, isCovered: true, personnelActivity: {},
-      discipline: ""
+      priority: "Critical", assignedPersonnelIds: [SUMMIT_PHOTOGRAPHERS_IDS[2], OTHER_TEAM_MEMBER_IDS[0]],
     }
   ];
-  todayDynamicEvents.forEach(evt => {
-    summitEvents.push(evt);
-    createShotsForEvent(evt.id, evt.name);
+
+  todayDynamicEvents.forEach(dynEventData => {
+    const fullEventData: Event = {
+        projectId: G9E_SUMMIT_PROJECT_ID,
+        project: "G9e Annual Summit 2024",
+        date: todayDateStr,
+        organizationId: G9E_ORG_ID,
+        discipline: "Photography",
+        isCovered: true,
+        personnelActivity: {},
+        deliverables: 0,
+        shotRequests: 0, // Will be updated by createShotsForEvent
+        isQuickTurnaround: dynEventData.isQuickTurnaround || false,
+        deadline: dynEventData.deadline,
+        ...dynEventData,
+    } as Event; // Cast as Event after merging
+    summitEvents.push(fullEventData);
+    createShotsForEvent(fullEventData.id, fullEventData.name, fullEventData.assignedPersonnelIds || []);
   });
 
   summitEvents.forEach(event => {
-    if (event.isCovered) {
-      event.shotRequests = shotsByEventId[event.id]?.length || 0;
-    } else {
-        event.shotRequests = 0;
-    }
+    event.shotRequests = shotsByEventId[event.id]?.length || 0;
   });
   
   return { events: summitEvents, shotsByEventId: shotsByEventId };
 };
 
-
 type EventContextType = {
   allEvents: Event[];
   eventsForSelectedProjectAndOrg: Event[];
-  addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }) => string; // Return eventId
+  addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }) => string;
   updateEvent: (eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => void;
   deleteEvent: (eventId: string) => void;
   isLoadingEvents: boolean;
@@ -223,7 +248,7 @@ type EventContextType = {
   
   shotRequestsByEventId: Record<string, ShotRequest[]>;
   getShotRequestsForEvent: (eventId: string) => ShotRequest[];
-  addShotRequest: (eventId: string, shotData: Pick<ShotRequestFormData, 'description' | 'priority' | 'status'> & Partial<ShotRequestFormData>) => void;
+  addShotRequest: (eventId: string, shotData: ShotRequestFormData) => void;
   updateShotRequest: (eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => void;
   deleteShotRequest: (eventId: string, shotId: string) => void;
 
@@ -279,6 +304,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
       };
       return [...prevEvents, newEvent];
     });
+    // Ensure new event has an empty shot list entry
+    setShotRequestsByEventId(prev => ({ ...prev, [newEventId]: [] }));
     return newEventId;
   }, [projects, allEventsState.length]);
 
@@ -322,8 +349,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
     return shotRequestsByEventId[eventId] || [];
   }, [shotRequestsByEventId]);
 
-  const addShotRequest = useCallback((eventId: string, shotData: Pick<ShotRequestFormData, 'description' | 'priority' | 'status'> & Partial<ShotRequestFormData>) => {
+  const addShotRequest = useCallback((eventId: string, shotData: ShotRequestFormData) => {
     const newShot: ShotRequest = {
+      ...shotData, // Include title here
       description: shotData.description,
       priority: shotData.priority || "Medium",
       status: shotData.status || "Unassigned",
@@ -484,5 +512,3 @@ export function useEventContext() {
   }
   return context;
 }
-
-    

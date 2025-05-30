@@ -19,7 +19,7 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import type { ShotRequest, ShotRequestFormData, Event } from "@/contexts/EventContext";
-import { shotRequestSchemaInternal } from "@/contexts/EventContext"; // Import schema
+import { shotRequestSchemaInternal } from "@/contexts/EventContext"; 
 import type { Personnel } from "@/app/(app)/personnel/page";
 
 const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
@@ -53,6 +53,7 @@ export function ShotRequestFormDialog({
   } = useForm<ShotRequestFormData>({
     resolver: zodResolver(shotRequestSchemaInternal),
     defaultValues: {
+      title: "",
       description: "",
       priority: "Medium",
       status: "Unassigned",
@@ -71,6 +72,7 @@ export function ShotRequestFormDialog({
     if (isOpen) {
       if (editingShotRequest) {
         reset({
+          title: editingShotRequest.title || "",
           description: editingShotRequest.description,
           priority: editingShotRequest.priority,
           status: editingShotRequest.status,
@@ -83,6 +85,7 @@ export function ShotRequestFormDialog({
         });
       } else {
         reset({ 
+          title: "",
           description: "",
           priority: "Medium",
           status: "Unassigned",
@@ -117,6 +120,13 @@ export function ShotRequestFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(internalOnSubmit)} className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="title" className="text-right">Title (Optional)</Label>
+            <div className="col-span-3">
+              <Input id="title" {...register("title")} className={errors.title ? "border-destructive" : ""} />
+              {errors.title && <p className="text-xs text-destructive mt-1">{errors.title.message}</p>}
+            </div>
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="description" className="text-right">Description</Label>
             <div className="col-span-3">
@@ -223,12 +233,10 @@ export function ShotRequestFormDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             </DialogClose>
-            <Button type="submit">{editingShotRequest ? "Save Changes" : "Add Shot"}</Button>
+            <Button type="submit" variant="accent">{editingShotRequest ? "Save Changes" : "Add Shot"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-    
