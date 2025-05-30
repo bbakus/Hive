@@ -92,11 +92,10 @@ function AppSidebar() {
 
 function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activePhase, setActivePhase, PHASES: availablePhasesFromContext } = usePhaseContext();
+  const { activePhase, setActivePhase, PHASES } = usePhaseContext();
   const [mounted, setMounted] = useState(false);
 
-  // Fallback to directly imported PHASES if context one is undefined during initial renders
-  const availablePhases = availablePhasesFromContext || AppPhasesArray;
+  const availablePhases = PHASES || AppPhasesArray;
 
 
   useEffect(() => {
@@ -104,36 +103,35 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let determinedPhase: Phase | null = null;
+    let newPhaseDetermination: Phase | null = null;
     const currentPath = pathname.split('?')[0];
 
+    // Determine phase based on top-level path segments
     if (currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')) {
-      determinedPhase = 'Dashboard';
-    } else if (currentPath.includes('/shots')) { // Prioritize shot lists for "Shoot" phase
-      determinedPhase = 'Shoot';
+      newPhaseDetermination = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
-      determinedPhase = 'Plan';
-    } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-      determinedPhase = 'Plan'; // Default for general event pages
+      newPhaseDetermination = 'Plan';
+    } else if (currentPath === '/events' && !currentPath.includes('/shots')) { 
+      // Only set to 'Plan' if it's /events, not /events/.../shots
+      newPhaseDetermination = 'Plan';
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
-      determinedPhase = 'Plan';
+      newPhaseDetermination = 'Plan';
     } else if (currentPath === '/scheduler' || currentPath.startsWith('/scheduler/')) {
-      determinedPhase = 'Plan';
+      newPhaseDetermination = 'Plan';
     } else if (currentPath === '/shoot' || currentPath.startsWith('/shoot/')) {
-      determinedPhase = 'Shoot';
+      newPhaseDetermination = 'Shoot';
     } else if (currentPath === '/post-production' || currentPath.startsWith('/post-production/')) {
-      determinedPhase = 'Edit';
+      newPhaseDetermination = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
-      determinedPhase = 'Deliver';
-    } else if (currentPath === '/settings' || currentPath.startsWith('/support/')) {
-      // For settings/support, keep the current main phase or default to Dashboard
-      // This prevents these utility pages from changing the primary phase context unnecessarily
-      determinedPhase = activePhase || 'Dashboard'; 
+      newPhaseDetermination = 'Deliver';
     }
+    // For pages like /events/[eventId]/shots, /settings, /support, 
+    // newPhaseDetermination remains null here. This means if the user is on such a page, 
+    // the activePhase will NOT be changed by this effect if it was already set to a relevant phase.
+    // It will retain the phase from which they navigated to this detailed page.
 
-
-    if (determinedPhase && availablePhases && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
-      setActivePhase(determinedPhase);
+    if (newPhaseDetermination && availablePhases.includes(newPhaseDetermination) && newPhaseDetermination !== activePhase) {
+      setActivePhase(newPhaseDetermination);
     }
   }, [pathname, activePhase, setActivePhase, availablePhases]);
 
