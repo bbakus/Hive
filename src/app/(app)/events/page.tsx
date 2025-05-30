@@ -7,7 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter, Camera as CameraIcon, Video } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; 
+import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
 import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -38,18 +38,17 @@ import {
 import { cn } from "@/lib/utils";
 import { EventFormDialog, type EventFormDialogData } from "@/components/modals/EventFormDialog";
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event } from "@/contexts/EventContext"; 
-import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page"; 
+import { useEventContext, type Event } from "@/contexts/EventContext";
+import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   if (!dateStr || !timeStr) return null;
-  
+
   let baseDate;
   try {
-    // Ensure dateStr is in YYYY-MM-DD format for parseISO
-    baseDate = parseISO(dateStr.replace(/\//g, '-')); 
+    baseDate = parseISO(dateStr.replace(/\//g, '-'));
   } catch (e) {
     console.error("Invalid date string for parseISO:", dateStr, e);
     return null;
@@ -68,40 +67,37 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
   if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) return null;
 
-  let startDate = startOfDay(baseDate); // Use startOfDay to avoid timezone issues from parseISO potentially setting time
+  let startDate = startOfDay(baseDate);
   startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), startHour, startMinute);
 
-
-  let endDate = startOfDay(baseDate); 
+  let endDate = startOfDay(baseDate);
   endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), endHour, endMinute);
-  
-  // Handle events that cross midnight
+
   if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
     endDate.setDate(endDate.getDate() + 1);
   }
-  
+
   return { start: startDate, end: endDate };
 };
 
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.id === eventB.id) return false; 
+  if (eventA.id === eventB.id) return false;
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false; 
+  if (!timesA || !timesB) return false;
 
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
-  // Check for shared personnel only if both events have assigned personnel
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-  return false; // No personnel overlap check if one or both have no assignments
+  return false;
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -122,7 +118,7 @@ const getCoverageIcon = (isCovered?: boolean) => {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIcon className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-accent" />;
-  return null; // No icon for "" or other disciplines
+  return null;
 };
 
 type EventFiltersProps = {
@@ -295,7 +291,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
         {groupedAndSortedEventsForDisplay.length > 0 ? (
           groupedAndSortedEventsForDisplay.map(([date, dayEvents]) => (
             <div key={date}>
-              <h3 className="text-xl font-semibold mb-3 border-b pb-2">
+              <h3 className="text-xl font-semibold mb-3 pb-2">
                 {format(parseISO(date), "EEEE, MMMM do, yyyy")}
               </h3>
               <div className="space-y-4">
@@ -303,10 +299,10 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                    <Card key={event.id} className="hover:border-foreground/30 transition-colors">
                      <div className="p-4 flex justify-between items-start gap-4">
                        <div className="flex-grow space-y-1">
-                          <CardTitle className="text-lg flex items-center gap-1.5">
+                          <CardTitle className="text-base font-semibold flex items-center gap-1.5">
                             {getCoverageIcon(event.isCovered)}
                             <span className="truncate" title={event.name}>{event.name}</span>
-                             {event.isQuickTurnaround && <Zap className="h-5 w-5 text-accent ml-1.5" title="Quick Turnaround"/>}
+                            {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                           </CardTitle>
                           <div className="text-xs text-muted-foreground space-y-0.5">
                               <div className="flex items-center gap-1.5">
@@ -486,7 +482,7 @@ type BlockScheduleTabContentProps = {
   selectedProject: Project | null;
   useDemoData: boolean;
   allPersonnel: Personnel[];
-  selectedEventDates: string[]; // Dates from the main filter
+  selectedEventDates: string[];
 };
 
 function BlockScheduleTabContent({
@@ -497,21 +493,19 @@ function BlockScheduleTabContent({
   allPersonnel,
   selectedEventDates
 }: BlockScheduleTabContentProps) {
-  
+
   const activeBlockScheduleDate = useMemo(() => {
     if (selectedEventDates.length > 0) {
-      // Sort selected dates and pick the first one
       const sortedSelectedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
       const dateObj = parseISO(sortedSelectedDates[0].replace(/\//g, '-'));
       return isValid(dateObj) ? dateObj : null;
     }
-    // If no dates are selected in the main filter, try to find the earliest date from all displayable events
-    if (displayableEvents.length > 0) {
+     if (displayableEvents.length > 0 && !selectedEventDates.length) {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         const dateObj = parseISO(sortedEvents[0].date.replace(/\//g, '-'));
         return isValid(dateObj) ? dateObj : null;
     }
-    return null; // Default to null if no specific date can be determined
+    return null;
   }, [selectedEventDates, displayableEvents]);
 
   const eventsForBlockSchedule = useMemo(() => {
@@ -519,7 +513,7 @@ function BlockScheduleTabContent({
     const dateKey = format(activeBlockScheduleDate, "yyyy-MM-dd");
     return displayableEvents.filter(event => event.date === dateKey);
   }, [activeBlockScheduleDate, displayableEvents]);
-  
+
   const personnelForActiveDate = useMemo(() => {
     if (!activeBlockScheduleDate) return [];
     const personnelIds = new Set<string>();
@@ -577,12 +571,12 @@ export default function EventsPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { organizations, isLoadingOrganizations } = useOrganizationContext();
   const {
-    eventsForSelectedProjectAndOrg = [], 
+    eventsForSelectedProjectAndOrg = [],
     addEvent,
     updateEvent,
     deleteEvent,
     isLoadingEvents: isLoadingContextEvents,
-    addShotRequest, // ensure this is available if used directly, or through context
+    addShotRequest,
   } = useEventContext();
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -639,8 +633,8 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
           filtered = filtered.filter(event => event.discipline === "Photography");
-      } else if (filterDiscipline === "na_or_other") { 
-          filtered = filtered.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video");
+      } else if (filterDiscipline === "na_or_other") {
+          filtered = filtered.filter(event => !event.discipline || event.discipline === "" );
       }
     }
     if (selectedEventDates.length > 0) {
@@ -668,7 +662,7 @@ export default function EventsPage() {
       const dateAVal = a.date ? parseISO(a.date.replace(/\//g, '-')).getTime() : 0;
       const dateBVal = b.date ? parseISO(b.date.replace(/\//g, '-')).getTime() : 0;
       if (dateAVal !== dateBVal) return dateAVal - dateBVal;
-      
+
       const timesA = parseEventTimes(a.date, a.time);
       const timesB = parseEventTimes(b.date, b.time);
       const timeAStart = timesA ? timesA.start.getTime() : 0;
@@ -730,8 +724,8 @@ export default function EventsPage() {
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
           sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
-      } else if (filterDiscipline === "na_or_other") { 
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "" || event.discipline === "Video");
+      } else if (filterDiscipline === "na_or_other") {
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "" );
       }
     }
     const dates = new Set(sourceForDateFiltering.map(event => event.date));
@@ -760,14 +754,14 @@ export default function EventsPage() {
       isCovered: data.isCovered === undefined ? true : data.isCovered,
       personnelActivity: data.personnelActivity || {},
     };
-    
+
     let currentEventId = existingEventId;
 
     if (editingEvent && currentEventId) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>> = {
         ...eventPayload,
-        deliverables: editingEvent.deliverables, 
-        shotRequests: editingEvent.shotRequests, 
+        deliverables: editingEvent.deliverables,
+        shotRequests: editingEvent.shotRequests,
       };
       updateEvent(currentEventId, fullUpdatePayload);
       toast({
@@ -781,19 +775,19 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully added.`,
       });
     }
-    
+
     if (currentEventId && data.quickShotDescriptionsInput) {
         const descriptions = data.quickShotDescriptionsInput
             .split('\n')
             .map(desc => desc.trim())
             .filter(desc => desc.length > 0);
-        
+
         descriptions.forEach(desc => {
             addShotRequest(currentEventId!, {
-                title: "", // No title for quick shots initially
+                title: "",
                 description: desc,
-                priority: "Medium", 
-                status: "Unassigned" 
+                priority: "Medium",
+                status: "Unassigned"
             });
         });
         if (descriptions.length > 0) {
@@ -807,7 +801,7 @@ export default function EventsPage() {
     setIsEventModalOpen(false);
     setEditingEvent(null);
   };
-  
+
   const openAddEventModal = () => {
     setEditingEvent(null);
     setIsEventModalOpen(true);
@@ -838,17 +832,15 @@ export default function EventsPage() {
   };
 
   const firstSelectedDateForDialog = useMemo(() => {
-    // Use the first date from the main 'Specific Dates' filter, if any selected
     if (selectedEventDates.length > 0) {
         const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
         return sortedDates[0];
     }
-     // Fallback: if no dates selected in filter, but there are displayable events, use the earliest of those
      if (displayableEvents.length > 0 && !selectedEventDates.length) {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         return sortedEvents[0].date;
     }
-    return null; // No reasonable default otherwise
+    return null;
   }, [selectedEventDates, displayableEvents]);
 
 
@@ -943,11 +935,11 @@ export default function EventsPage() {
 
         <TabsContent value="block-schedule">
             <BlockScheduleTabContent
-                displayableEvents={displayableEvents} 
+                displayableEvents={displayableEvents}
                 openEditEventModal={openEditEventModal}
                 selectedProject={selectedProject}
                 useDemoData={useDemoData}
-                allPersonnel={initialPersonnelMock} 
+                allPersonnel={initialPersonnelMock}
                 selectedEventDates={selectedEventDates}
             />
         </TabsContent>
