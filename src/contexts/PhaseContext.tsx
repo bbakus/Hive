@@ -10,11 +10,11 @@ import {
   Cpu,
   Settings,
   LifeBuoy,
-  ImageIcon, // Changed from Film for Post-Production
+  ImageIcon, 
   PackageCheck,
   RadioTower,
   UploadCloud,
-  LayoutDashboard, // For explicit Dashboard link if needed elsewhere, but not for sidebar main items
+  ListChecks, // Added for Shot Planner
 } from "lucide-react";
 
 export type NavItem = {
@@ -24,16 +24,17 @@ export type NavItem = {
   matchStartsWith?: boolean;
 };
 
-export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver" | "Dashboard"; // Added Dashboard back for internal phase tracking
+export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver" | "Dashboard"; 
 
-export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver"]; // Dashboard removed from top nav
-export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES]; // For layout internal logic to know about Dashboard as a phase
+export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver"]; 
+export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES]; 
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [], // When Dashboard is active, sidebar main section is empty
+  "Dashboard": [], 
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
+    { href: "/shot-planner", label: "Shot Planner", icon: ListChecks, matchStartsWith: true }, // New Item
     { href: "/personnel", label: "Personnel Roster", icon: Users, matchStartsWith: true },
     { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true },
   ],
@@ -59,16 +60,17 @@ type PhaseContextType = {
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
   constantFooterNavItems: NavItem[];
-  PHASES: Phase[]; // For TopPhaseNavigation iteration
+  PHASES: Phase[]; 
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); // Default to Dashboard
+  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); 
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    return phaseNavConfigs[phase] || [];
+    if (phase === "Dashboard") return []; // Dashboard has no specific sidebar items from phaseNavConfigs
+    return phaseNavConfigs[phase] || []; 
   };
 
   const value = useMemo(() => ({
@@ -76,7 +78,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
     setActivePhase,
     getNavItemsForPhase,
     constantFooterNavItems,
-    PHASES, // Expose PHASES for TopPhaseNavigation
+    PHASES, 
   }), [activePhase]);
 
   return (

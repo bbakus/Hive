@@ -38,6 +38,7 @@ function AppSidebar() {
 
   const currentPhaseNavItems = getNavItemsForPhase(activePhase) || [];
 
+
   return (
     <Sidebar 
       collapsible="icon"
@@ -46,7 +47,7 @@ function AppSidebar() {
     >
       <SidebarHeader className={cn("h-16 border-b border-sidebar-border", open ? "p-4" : "p-2 justify-center")}>
         <Link href="/dashboard" className="flex items-center gap-2">
-          <Icons.HiveLogo className={cn("h-8 w-8 text-accent", open ? "h-8 w-8" : "h-6 w-6")} />
+          <Icons.HiveLogo className={cn("text-accent", open ? "h-8 w-8" : "h-6 w-6")} />
           {open && <span className="text-xl font-semibold text-foreground">HIVE</span>}
         </Link>
       </SidebarHeader>
@@ -96,11 +97,10 @@ function AppSidebar() {
 
 function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activePhase, setActivePhase } = usePhaseContext();
+  const { activePhase, setActivePhase, PHASES: availableTopPhases } = usePhaseContext(); // PHASES is for top nav
   const [mounted, setMounted] = useState(false);
 
-  const availablePhasesForLogic = AppPhasesArray;
-
+  const allPossiblePhases = AppPhasesArray; // For internal logic including Dashboard
 
   useEffect(() => {
     setMounted(true);
@@ -114,13 +114,15 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
       determinedPhase = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
-    } else if (currentPath === '/events' || (currentPath.startsWith('/events/') && currentPath.includes('/shots'))) { 
-      // Keep current phase if it's 'Shoot' and we are on a shots page, otherwise default to 'Plan' for events
+    } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
+      // If already in Shoot and navigating within events (e.g. to shots page), keep Shoot
       if (activePhase === "Shoot" && currentPath.includes('/shots')) {
         determinedPhase = "Shoot";
       } else {
         determinedPhase = "Plan";
       }
+    } else if (currentPath === '/shot-planner' || currentPath.startsWith('/shot-planner/')) { // New case
+        determinedPhase = 'Plan';
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/scheduler' || currentPath.startsWith('/scheduler/')) {
@@ -137,13 +139,24 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
        determinedPhase = activePhase || 'Dashboard'; // Keep current phase or default
     } else if (currentPath === '/support' || currentPath.startsWith('/support/')) {
        determinedPhase = activePhase || 'Dashboard'; // Keep current phase or default
+    } else {
+      // Fallback if no specific match: check if current activePhase is still valid for the current path
+      // This handles cases where activePhase might be set by top nav, and user navigates to a sub-page of that phase.
+      // For simplicity, if we don't have a direct match, we might not change the phase,
+      // relying on top nav clicks to be the primary driver for phase changes outside these main routes.
+      // Or, default to dashboard if phase seems incongruent.
+      // For now, let's keep current phase if no rule matches, unless path implies dashboard.
+      if (!currentPath.startsWith('/')) { // a catch for invalid paths
+        determinedPhase = 'Dashboard';
+      }
     }
 
 
-    if (determinedPhase && availablePhasesForLogic.includes(determinedPhase) && determinedPhase !== activePhase) {
+    if (determinedPhase && allPossiblePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
       setActivePhase(determinedPhase);
     }
-  }, [pathname, activePhase, setActivePhase, availablePhasesForLogic]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, activePhase, setActivePhase, allPossiblePhases]); // Removed availableTopPhases, using allPossiblePhases
 
   return (
     <SidebarProvider defaultOpen={false}>
