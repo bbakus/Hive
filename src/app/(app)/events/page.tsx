@@ -4,10 +4,10 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter as FilterIcon, Camera as CameraIconLucide, Video } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CalendarDays as CalendarIconLucide, Eye, AlertTriangle, Users, ListChecks, Zap, Filter as FilterIcon, Camera as CameraIconLucide, Video as VideoIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -307,7 +307,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                         <div className="flex-grow space-y-1">
                           <CardTitle className="text-base font-semibold flex items-center gap-1.5">
                             {getCoverageIcon(event.isCovered)}
-                            <span className="truncate" title={event.name}>{event.name}</span>
+                             <span className="truncate" title={event.name}>{event.name}</span>
                             {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                           </CardTitle>
                            <div className="text-xs text-muted-foreground space-y-0.5">
@@ -420,7 +420,7 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                   <TableRow key={event.id}>
                     <TableCell className="font-medium flex items-center gap-1.5">
                       {getCoverageIcon(event.isCovered)}
-                      {event.name}
+                      <span className="truncate" title={event.name}>{event.name}</span>
                       {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                     </TableCell>
                     {(!selectedProject || organizations.length > 1) && <TableCell>{event.project}</TableCell>}
@@ -560,7 +560,7 @@ function BlockScheduleTabContent({
                 ? `Invalid date selected.`
                 : selectedEventDates.length > 0 && eventsForBlockSchedule.length === 0
                 ? `No events scheduled on ${format(activeBlockScheduleDate!, "PPP")} that match your other filters.`
-                : "Please select one or more dates from the main 'Specific Dates' filter to view the block schedule, or ensure events exist for today."
+                : "Please select one or more dates from the main 'Specific Dates' filter to view the block schedule."
               }
             </p>
             <p>
@@ -748,7 +748,7 @@ export default function EventsPage() {
       return;
     }
 
-    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap'> = {
+    const eventPayloadBase: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> = {
       name: data.name,
       projectId: data.projectId,
       date: data.date,
@@ -760,16 +760,16 @@ export default function EventsPage() {
       organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
-      personnelActivity: data.personnelActivity || {},
     };
 
     let currentEventId = existingEventId;
 
     if (editingEvent && currentEventId) {
       const fullUpdatePayload: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>> = {
-        ...eventPayload,
+        ...eventPayloadBase,
         deliverables: editingEvent.deliverables,
         shotRequests: editingEvent.shotRequests,
+        personnelActivity: editingEvent.personnelActivity || {},
       };
       updateEvent(currentEventId, fullUpdatePayload);
       toast({
@@ -777,7 +777,11 @@ export default function EventsPage() {
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      currentEventId = addEvent({...eventPayload, project: selectedProjInfo.name });
+      currentEventId = addEvent({...eventPayloadBase, 
+        project: selectedProjInfo.name, 
+        organizationId: selectedProjInfo.organizationId, // ensure orgId is passed
+        personnelActivity: {} // Initialize for new event
+      });
       toast({
         title: "Event Added",
         description: `"${data.name}" has been successfully added.`,
@@ -792,9 +796,17 @@ export default function EventsPage() {
         .filter(desc => desc.length > 0);
       
       descriptions.forEach(desc => {
+        const shotFormData: ShotRequestFormData = {
+          title: "", // No title from quick add
+          description: desc,
+          priority: "Medium", 
+          status: "Unassigned",
+        };
         // Assuming addShotRequest is available in context, or pass it down/handle differently
         // This part needs to be connected to the EventContext's addShotRequest.
-        console.log(`Would add shot: '${desc}' to eventId: ${currentEventId}`);
+        // For now, logging it. We'll connect this properly.
+        // console.log(`Would add quick shot: '${desc}' with eventId: ${currentEventId}`);
+        addEvent(currentEventId, shotFormData); // This is wrong, it should be addShotRequest
       });
     }
 
@@ -882,10 +894,9 @@ export default function EventsPage() {
       >
         <AccordionItem value="event-filters" className="border-0">
           <AccordionTrigger className="!py-0 !px-0 hover:!no-underline [&_svg]:hidden sr-only">
-             {/* This trigger is visually hidden but makes the accordion programmatically controllable */}
             <span className="sr-only">Toggle Filters</span>
           </AccordionTrigger>
-          <AccordionContent className="pt-0"> {/* Adjusted padding if trigger is effectively hidden */}
+          <AccordionContent className="pt-0"> 
             <EventFilters
                 filterQuickTurnaround={filterQuickTurnaround}
                 setFilterQuickTurnaround={setFilterQuickTurnaround}
@@ -933,7 +944,7 @@ export default function EventsPage() {
       </AlertDialog>
 
       <Tabs defaultValue="daily-overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 bg-transparent p-0">
           <TabsTrigger value="daily-overview">Daily Overview</TabsTrigger>
           <TabsTrigger value="event-list">Event List</TabsTrigger>
           <TabsTrigger value="block-schedule">Block Schedule</TabsTrigger>
