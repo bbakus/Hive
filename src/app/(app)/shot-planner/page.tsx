@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, ListChecks, Film, Info, CheckCircle, AlertTriangle, Edit, Trash2, UserCheck } from 'lucide-react';
+import { PlusCircle, ListChecks, Edit, Trash2, Info, CheckCircle, AlertTriangle, UserCheck } from 'lucide-react';
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -38,13 +38,12 @@ export default function ShotPlannerPage() {
   const { toast } = useToast();
 
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
-  const [expandedAccordionItems, setExpandedAccordionItems] = useState<string[]>([]);
+  const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
   
   const [newShotTitleInputValues, setNewShotTitleInputValues] = useState<Record<string, string>>({});
   const [newShotDescriptionInputValues, setNewShotDescriptionInputValues] = useState<Record<string, string>>({});
   
   const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
 
   const getPersonnelNameById = useCallback((id?: string): string => {
     if (!id) return "Unknown";
@@ -60,9 +59,12 @@ export default function ShotPlannerPage() {
     setIsLoadingPageData(false);
 
     if (eventIdFromQuery && eventsForSelectedProjectAndOrg.some(e => e.id === eventIdFromQuery)) {
-      if (!expandedAccordionItems.includes(eventIdFromQuery)) {
-        setExpandedAccordionItems(prev => [...prev, eventIdFromQuery]);
+      if (activeAccordionItem !== eventIdFromQuery) {
+        setActiveAccordionItem(eventIdFromQuery);
       }
+    } else if (!eventIdFromQuery && eventsForSelectedProjectAndOrg.length > 0 && !activeAccordionItem) {
+      // Optionally, open the first event if no specific event is queried
+      // setActiveAccordionItem(eventsForSelectedProjectAndOrg[0].id);
     }
   }, [
     eventIdFromQuery, 
@@ -70,7 +72,7 @@ export default function ShotPlannerPage() {
     isLoadingEvents, 
     isLoadingSettings,
     isLoadingProjects,
-    expandedAccordionItems // Keep if you want to control expansion based on this too
+    activeAccordionItem
   ]);
 
   const handleAddShot = (e: FormEvent<HTMLFormElement>, eventId: string) => {
@@ -84,7 +86,7 @@ export default function ShotPlannerPage() {
     }
 
     addShotRequest(eventId, {
-      title: title || undefined,
+      title: title || undefined, // Send undefined if empty for optional field
       description: description,
       priority: "Medium", 
       status: "Unassigned", 
@@ -94,12 +96,10 @@ export default function ShotPlannerPage() {
       description: `"${title || description.substring(0,30)}..." added to event.`,
     });
     
-    // Clear input fields for this eventId
     setNewShotTitleInputValues(prev => ({ ...prev, [eventId]: '' }));
     setNewShotDescriptionInputValues(prev => ({ ...prev, [eventId]: '' }));
 
-    // Reset focus to the title input for this eventId
-    setTimeout(() => { // Timeout to allow state update and re-render
+    setTimeout(() => {
         titleInputRefs.current[eventId]?.focus();
     }, 0);
   };
@@ -114,8 +114,8 @@ export default function ShotPlannerPage() {
     });
   };
 
-  const onAccordionValueChange = (value: string[]) => {
-    setExpandedAccordionItems(value);
+  const onAccordionValueChange = (value: string) => { // Value is now a string for single type
+    setActiveAccordionItem(value);
   };
 
   if (isLoadingPageData || isLoadingProjects || isLoadingEvents || isLoadingSettings) {
@@ -177,20 +177,24 @@ export default function ShotPlannerPage() {
       <Card>
         <CardHeader>
           <CardTitle>Events & Shot Lists ({eventsForSelectedProjectAndOrg.length} events)</CardTitle>
-          <CardDescription>Expand an event to view its shot list and add new shots directly.</CardDescription>
+          <CardDescription>Expand an event to view its shot list and add new shots directly. Only one event can be expanded at a time.</CardDescription>
         </CardHeader>
         <CardContent>
           {eventsForSelectedProjectAndOrg.length > 0 ? (
             <Accordion 
-              type="multiple" 
-              value={expandedAccordionItems}
+              type="single" // Changed to single
+              collapsible // Allows closing the open item
+              value={activeAccordionItem}
               onValueChange={onAccordionValueChange}
               className="w-full space-y-2"
             >
               {eventsForSelectedProjectAndOrg.map((event) => {
                 const currentEventShots = shotRequestsByEventId[event.id] || [];
                 return (
-                  <AccordionItem value={event.id} key={event.id} className={cn("border rounded-none")}>
+                  <AccordionItem value={event.id} key={event.id} className={cn(
+                    "border rounded-none",
+                    activeAccordionItem === event.id && "border-accent" // Highlight active for input
+                  )}>
                     <AccordionTrigger 
                         className="p-3 hover:no-underline text-left" 
                     >
@@ -198,7 +202,7 @@ export default function ShotPlannerPage() {
                         <div>
                           <p className={cn("font-medium")}>{event.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {format(parseISO(event.date), "PPP")} ({event.time}) - Shots: {currentEventShots.length}
+                            {format(parseISO(event.date), "PPP")} ({event.time}) - Shots: {event.shotRequests} {/* Use count from event object */}
                           </p>
                         </div>
                       </div>
@@ -215,7 +219,7 @@ export default function ShotPlannerPage() {
                               value={newShotTitleInputValues[event.id] || ''}
                               onChange={(e) => setNewShotTitleInputValues(prev => ({ ...prev, [event.id]: e.target.value }))}
                               placeholder="e.g., Keynote Opening Wide"
-                              className="text-sm h-9"
+                              className="text-sm h-9 border-accent focus:ring-accent"
                             />
                           </div>
                           <div className="w-full">
@@ -226,7 +230,7 @@ export default function ShotPlannerPage() {
                               value={newShotDescriptionInputValues[event.id] || ''}
                               onChange={(e) => setNewShotDescriptionInputValues(prev => ({ ...prev, [event.id]: e.target.value }))}
                               placeholder="Enter new shot description"
-                              className="text-sm h-9"
+                              className="text-sm h-9 border-accent focus:ring-accent"
                             />
                           </div>
                           <Button type="submit" variant="accent" size="sm" className="h-9 w-full sm:w-auto" disabled={!(newShotDescriptionInputValues[event.id]?.trim())}>
@@ -253,7 +257,7 @@ export default function ShotPlannerPage() {
                                   </TableCell>
                                   <TableCell className="text-xs text-muted-foreground max-w-xs">
                                     <p className="truncate" title={shot.description}>{shot.description}</p>
-                                     {shot.initialCapturerId && (
+                                    {shot.initialCapturerId && (
                                       <p className="text-[11px] text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
                                         <CheckCircle className="h-3 w-3"/> Initially Captured by: {getPersonnelNameById(shot.initialCapturerId)}
                                       </p>
