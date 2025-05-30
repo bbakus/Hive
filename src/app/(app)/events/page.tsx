@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useOrganizationContext, type Organization, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
-import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay, addHours } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
@@ -80,7 +80,7 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), endHour, endMinute);
 
   if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
-    endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1, endHour, endMinute);
+    endDate = addHours(endDate, 24);
   }
 
   return { start: startDate, end: endDate };
@@ -124,7 +124,6 @@ const getCoverageIcon = (isCovered?: boolean) => {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIconLucide className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-primary" />;
-  // Removed Video icon as per previous refinement.
   return null;
 };
 
@@ -156,7 +155,7 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="p-3 px-4">
+    <div className="p-3 px-4 border rounded-none bg-card/50">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
@@ -305,14 +304,14 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                 {dayEvents.map((event) => (
                    <Card key={event.id} className="hover:border-foreground/30 transition-colors">
                      <div className="p-4 flex justify-between items-start gap-4">
-                       <div className="flex-grow space-y-1">
+                        <div className="flex-grow space-y-1">
                           <CardTitle className="text-base font-semibold flex items-center gap-1.5">
                             {getCoverageIcon(event.isCovered)}
                             <span className="truncate" title={event.name}>{event.name}</span>
                             {event.isQuickTurnaround && <Zap className="h-4 w-4 text-accent ml-1.5 flex-shrink-0" title="Quick Turnaround"/>}
                           </CardTitle>
                            <div className="text-xs text-muted-foreground space-y-0.5">
-                              <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5">
                                   <p>{event.time}</p>
                                   {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
                                   <Badge variant={
@@ -326,7 +325,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                   Project: {event.project}
                               </p>
                               )}
-                        </div>
+                           </div>
 
                           <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                               {event.deadline && (
@@ -359,7 +358,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                             <Eye className="mr-2 h-4 w-4" /> Manage Shots
                           </Link>
                         </Button>
-                        <Button variant="accent" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
+                        <Button variant="outline" size="sm" onClick={() => openEditEventModal(event)} className="w-full sm:w-auto">
                           <Edit className="mr-2 h-4 w-4" /> Edit Event
                         </Button>
                        </div>
@@ -518,7 +517,7 @@ function BlockScheduleTabContent({
 
   const eventsForBlockSchedule = useMemo(() => {
     if (!activeBlockScheduleDate) return [];
-    const dateKey = format(activeBlockScheduleDate, "yyyy-MM-dd"); // Ensure consistent date format for comparison
+    const dateKey = format(activeBlockScheduleDate, "yyyy-MM-dd"); 
     return displayableEvents.filter(event => event.date === dateKey);
   }, [activeBlockScheduleDate, displayableEvents]);
 
@@ -590,6 +589,8 @@ export default function EventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [eventToDeleteId, setEventToDeleteId] = useState<string | null>(null);
+  
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
   const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "past" | "now">("all");
@@ -792,7 +793,6 @@ export default function EventsPage() {
       
       descriptions.forEach(desc => {
         // Assuming addShotRequest is available in context, or pass it down/handle differently
-        // For now, this relies on EventFormDialog having access or the parent page handling it.
         // This part needs to be connected to the EventContext's addShotRequest.
         console.log(`Would add shot: '${desc}' to eventId: ${currentEventId}`);
       });
@@ -836,7 +836,6 @@ export default function EventsPage() {
         const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
         return sortedDates[0];
     }
-     // Fallback: if no dates selected via filter, try to find the first date from displayableEvents
      if (displayableEvents.length > 0 && !selectedEventDates.length) {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         return sortedEvents[0].date;
@@ -858,19 +857,35 @@ export default function EventsPage() {
             {selectedProject ? `Events for ${selectedProject.name}` : "Manage all events, shot requests, timings, and priorities."}
           </p>
         </div>
-        <Button onClick={openAddEventModal} variant="outline">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Add New Event
-        </Button>
-      </div>
-
-      <Accordion type="single" collapsible className="w-full mb-4">
-        <AccordionItem value="event-filters">
-          <AccordionTrigger className={cn(buttonVariants({ variant: "outline" }), "w-auto font-normal text-sm px-3 py-2 h-9")}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="w-auto font-normal text-sm px-3 py-2 h-9"
+            onClick={() => setFiltersOpen(prev => !prev)}
+          >
             <FilterIcon className="mr-2 h-4 w-4" />
             Filters
+          </Button>
+          <Button onClick={openAddEventModal} variant="outline" className="px-3 py-2 h-9">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Add New Event
+          </Button>
+        </div>
+      </div>
+
+      <Accordion
+        type="single"
+        collapsible
+        className="w-full mb-4"
+        value={filtersOpen ? "event-filters" : undefined}
+        onValueChange={(value) => setFiltersOpen(value === "event-filters")}
+      >
+        <AccordionItem value="event-filters" className="border-0">
+          <AccordionTrigger className="!py-0 !px-0 hover:!no-underline [&_svg]:hidden sr-only">
+             {/* This trigger is visually hidden but makes the accordion programmatically controllable */}
+            <span className="sr-only">Toggle Filters</span>
           </AccordionTrigger>
-          <AccordionContent>
+          <AccordionContent className="pt-0"> {/* Adjusted padding if trigger is effectively hidden */}
             <EventFilters
                 filterQuickTurnaround={filterQuickTurnaround}
                 setFilterQuickTurnaround={setFilterQuickTurnaround}
