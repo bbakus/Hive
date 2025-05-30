@@ -18,16 +18,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon as CalendarIconLucide } from "lucide-react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { CalendarIcon as CalendarIconLucide, PlusCircle, Trash2 } from "lucide-react";
+import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { format, parseISO, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { Event } from "@/contexts/EventContext";
+import type { Event } from "@/contexts/EventContext"; // Updated import
+import { useEventContext, type ShotRequestFormData } from "@/contexts/EventContext"; // Import addShotRequest and type
 import type { Project } from "@/contexts/ProjectContext";
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
+import { Textarea } from "@/components/ui/textarea";
+
 
 export const eventFormSchema = z.object({
   name: z.string().min(3, { message: "Event name must be at least 3 characters." }),
@@ -47,6 +50,7 @@ export const eventFormSchema = z.object({
     checkInTime: z.string().optional(),
     checkOutTime: z.string().optional(),
   })).optional(),
+  quickShotDescriptionsInput: z.string().optional(), // For textarea input
 });
 
 export type EventFormDialogData = z.infer<typeof eventFormSchema>;
@@ -55,7 +59,7 @@ interface EventFormDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   editingEvent: Event | null;
-  onSubmit: (data: EventFormDialogData) => void;
+  onSubmit: (data: EventFormDialogData, eventId?: string) => void; // Pass eventId back for shot creation
   allProjects: Project[];
   allPersonnel: Personnel[];
   activeBlockScheduleDate?: string | null;
@@ -70,6 +74,7 @@ export function EventFormDialog({
   allPersonnel,
   activeBlockScheduleDate
 }: EventFormDialogProps) {
+  const { addShotRequest } = useEventContext();
   const {
     register,
     handleSubmit,
@@ -77,6 +82,7 @@ export function EventFormDialog({
     control,
     setValue,
     formState: { errors },
+    watch,
   } = useForm<EventFormDialogData>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: {
@@ -87,6 +93,7 @@ export function EventFormDialog({
       isCovered: true,
       personnelActivity: {},
       organizationId: "",
+      quickShotDescriptionsInput: "",
     }
   });
 
@@ -113,6 +120,7 @@ export function EventFormDialog({
         discipline: editingEvent.discipline === "Photography" ? "Photography" : "",
         isCovered: editingEvent.isCovered === undefined ? true : editingEvent.isCovered,
         personnelActivity: editingEvent.personnelActivity || {},
+        quickShotDescriptionsInput: "", // Clear for edits, or load existing shots if needed
       });
     } else if (!editingEvent && isOpen) {
       reset({
@@ -128,17 +136,18 @@ export function EventFormDialog({
         discipline: "",
         isCovered: true,
         personnelActivity: {},
+        quickShotDescriptionsInput: "",
       });
     }
   }, [editingEvent, isOpen, reset, allProjects, activeBlockScheduleDate]);
   
   const internalOnSubmit: SubmitHandler<EventFormDialogData> = (data) => {
-    onSubmit(data);
+    onSubmit(data, editingEvent?.id); // Pass editingEvent.id if updating, for context
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl"> {/* Increased width */}
         <DialogHeader>
           <DialogTitle>{editingEvent ? "Edit Event" : "Add New Event"}</DialogTitle>
           <DialogDescription>
@@ -147,6 +156,7 @@ export function EventFormDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(internalOnSubmit)} className="grid gap-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            {/* Left Column for Core Event Details */}
             <div className="space-y-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="event-name" className="text-right col-span-1">Name</Label>
@@ -265,7 +275,7 @@ export function EventFormDialog({
                     render={({ field }) => (
                       <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""}>
                         <SelectTrigger className={errors.discipline ? "border-destructive" : ""}>
-                          <SelectValue placeholder="Select discipline (optional)" />
+                          <SelectValue placeholder="N/A or Other" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">N/A or Other</SelectItem>
@@ -329,41 +339,60 @@ export function EventFormDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Assign Personnel</Label>
-              <ScrollArea className="h-60 w-full rounded-none border p-4">
-                <Controller
-                  name="assignedPersonnelIds"
-                  control={control}
-                  defaultValue={[]}
-                  render={({ field }) => (
-                    <div className="space-y-2">
-                      {allPersonnel.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").map((person) => (
-                        <div key={person.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`event-dialog-person-${person.id}`}
-                            checked={field.value?.includes(person.id)}
-                            onCheckedChange={(checked) => {
-                              return checked
-                                ? field.onChange([...(field.value || []), person.id])
-                                : field.onChange(
-                                    (field.value || []).filter(
-                                      (id) => id !== person.id
-                                    )
-                                  );
-                            }}
-                          />
-                          <Label htmlFor={`event-dialog-person-${person.id}`} className="font-normal">
-                            {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
-                          </Label>
-                        </div>
-                      ))}
-                      {allPersonnel.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").length === 0 && <p className="text-muted-foreground text-xs">No photography team members in system.</p>}
-                    </div>
-                  )}
+            {/* Right Column for Personnel & Quick Shots */}
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label>Assign Personnel</Label>
+                <ScrollArea className="h-48 w-full rounded-none border p-4">
+                  <Controller
+                    name="assignedPersonnelIds"
+                    control={control}
+                    defaultValue={[]}
+                    render={({ field }) => (
+                      <div className="space-y-2">
+                        {allPersonnel.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").map((person) => (
+                          <div key={person.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`event-dialog-person-${person.id}`}
+                              checked={field.value?.includes(person.id)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...(field.value || []), person.id])
+                                  : field.onChange(
+                                      (field.value || []).filter(
+                                        (id) => id !== person.id
+                                      )
+                                    );
+                              }}
+                            />
+                            <Label htmlFor={`event-dialog-person-${person.id}`} className="font-normal">
+                              {person.name} <span className="text-xs text-muted-foreground">({person.role})</span>
+                            </Label>
+                          </div>
+                        ))}
+                        {allPersonnel.filter(p=> PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client").length === 0 && <p className="text-muted-foreground text-xs">No photography team members in system.</p>}
+                      </div>
+                    )}
+                  />
+                </ScrollArea>
+                {errors.assignedPersonnelIds && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelIds.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quickShotDescriptionsInput">Initial Shot Ideas (Quick Add)</Label>
+                <Textarea
+                  id="quickShotDescriptionsInput"
+                  {...register("quickShotDescriptionsInput")}
+                  placeholder="Enter shot descriptions, one per line. E.g.,&#10;- Wide shot of main stage&#10;- Close-up of keynote speaker&#10;- Crowd reactions"
+                  rows={5}
+                  className={errors.quickShotDescriptionsInput ? "border-destructive" : ""}
                 />
-              </ScrollArea>
-              {errors.assignedPersonnelIds && <p className="text-xs text-destructive mt-1">{errors.assignedPersonnelIds.message}</p>}
+                <p className="text-xs text-muted-foreground">
+                  These will be added as 'Unassigned' shots with 'Medium' priority.
+                  For detailed shot management (priorities, specific assignments, notes, etc.), use the 'Manage Shots' link for the event after saving.
+                </p>
+                {errors.quickShotDescriptionsInput && <p className="text-xs text-destructive mt-1">{errors.quickShotDescriptionsInput.message}</p>}
+              </div>
             </div>
           </div>
           <DialogFooter className="mt-4">
@@ -377,3 +406,5 @@ export function EventFormDialog({
     </Dialog>
   );
 }
+
+    

@@ -37,18 +37,30 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { EventFormDialog, type EventFormDialogData, eventFormSchema } from "@/components/modals/EventFormDialog";
+import { EventFormDialog, type EventFormDialogData } from "@/components/modals/EventFormDialog";
 
 import { BlockScheduleView } from "@/components/block-schedule-view";
-import { useEventContext, type Event } from "@/contexts/EventContext";
+import { useEventContext, type Event, type ShotRequestFormData } from "@/contexts/EventContext"; // Updated to use Event from EventContext
 import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
 export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date; end: Date } | null => {
   if (!dateStr || !timeStr) return null;
-  const baseDate = parseISO(dateStr);
-  if (!isValid(baseDate)) return null;
+  
+  let baseDate;
+  try {
+    // Handle YYYY-MM-DD or YYYY/MM/DD by replacing / with -
+    baseDate = parseISO(dateStr.replace(/\//g, '-'));
+  } catch (e) {
+    console.error("Invalid date string for parseISO:", dateStr);
+    return null;
+  }
+
+  if (!isValid(baseDate)) {
+     console.error("Parsed baseDate is invalid:", dateStr, baseDate);
+    return null;
+  }
 
   const parts = timeStr.split(' - ');
   if (parts.length !== 2) return null;
@@ -62,11 +74,14 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let startDate = startOfDay(baseDate);
   startDate.setHours(startHour, startMinute);
 
-  let endDate = startOfDay(baseDate);
+  let endDate = startOfDay(baseDate); // Start with the same day for end date
   endDate.setHours(endHour, endMinute);
   
-  if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour > 0 || startMinute > 0) )) { 
-    endDate = addHours(endDate, 24);
+  // Handle events that cross midnight
+  // If end time is numerically less than start time (e.g. 22:00 - 02:00)
+  // OR if end time is 00:00 (and start time is not 00:00), assume it's next day.
+  if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
+    endDate = addHours(endDate, 24); // Add 24 hours to push it to the next day
   }
   
   return { start: startDate, end: endDate };
@@ -74,22 +89,24 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
 
 
 const checkOverlap = (eventA: Event, eventB: Event): boolean => {
-  if (eventA.id === eventB.id) return false;
+  if (eventA.id === eventB.id) return false; // Don't compare an event with itself
 
   const timesA = parseEventTimes(eventA.date, eventA.time);
   const timesB = parseEventTimes(eventB.date, eventB.time);
 
-  if (!timesA || !timesB) return false;
+  if (!timesA || !timesB) return false; // If parsing fails for either, no overlap
 
+  // Check for time overlap: (StartA < EndB) and (EndA > StartB)
   const basicOverlap = isBefore(timesA.start, timesB.end) && isAfter(timesA.end, timesB.start);
   if (!basicOverlap) return false;
 
+  // If there's time overlap, check for shared personnel (only if both events have assigned personnel)
   if (eventA.assignedPersonnelIds && eventA.assignedPersonnelIds.length > 0 &&
       eventB.assignedPersonnelIds && eventB.assignedPersonnelIds.length > 0) {
     const sharedPersonnel = eventA.assignedPersonnelIds.some(id => eventB.assignedPersonnelIds?.includes(id));
     return sharedPersonnel;
   }
-  return false; 
+  return false; // Time overlap but no personnel assigned to one or both, or no shared personnel
 };
 
 export function formatDeadline(deadlineString?: string): string | null {
@@ -141,7 +158,7 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="mb-6 p-4 border rounded-none bg-card/50">
+    <div className="mb-6 p-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
@@ -296,15 +313,15 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                             {event.isQuickTurnaround && <Zap className="h-5 w-5 text-accent ml-1.5" title="Quick Turnaround"/>}
                           </CardTitle>
                           <div className="text-xs text-muted-foreground space-y-0.5">
-                            <p className="flex items-center gap-1">
-                                {event.time}
+                             <div className="flex items-center gap-1.5">
+                                <p>{event.time}</p>
                                 {event.hasOverlap && <AlertTriangle className="ml-1 h-4 w-4 text-destructive flex-shrink-0" title="Potential Time Conflict (Overlapping time with shared personnel)" />}
                                 <Badge variant={
                                 event.priority === "Critical" ? "destructive" :
                                 event.priority === "High" ? "secondary" :
                                 event.priority === "Medium" ? "outline" : "default"
                                 } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
-                            </p>
+                            </div>
                              {!selectedProject && organizations.length > 1 && event.project && (
                               <p className="text-xs mt-0.5 truncate" title={event.project}>
                                   Project: {event.project}
@@ -490,8 +507,14 @@ function BlockScheduleTabContent({
       const dateObj = parseISO(sortedSelectedDates[0]);
       return isValid(dateObj) ? dateObj : null;
     }
+    // If no dates are selected in the main filter, try to find the earliest date from all displayable events
+    if (displayableEvents.length > 0) {
+        const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const dateObj = parseISO(sortedEvents[0].date);
+        return isValid(dateObj) ? dateObj : null;
+    }
     return null;
-  }, [selectedEventDates]);
+  }, [selectedEventDates, displayableEvents]);
 
   const eventsForBlockSchedule = useMemo(() => {
     if (!activeBlockScheduleDate) return [];
@@ -537,7 +560,7 @@ function BlockScheduleTabContent({
                 ? `Invalid date selected.`
                 : selectedEventDates.length > 0 && eventsForBlockSchedule.length === 0
                 ? `No events scheduled on ${format(activeBlockScheduleDate!, "PPP")} that match your other filters.`
-                : "Please select one or more dates from the main 'Specific Dates' filter to view the block schedule."
+                : "Please select one or more dates from the main 'Specific Dates' filter to view the block schedule, or ensure events exist for today."
               }
             </p>
             <p>
@@ -560,6 +583,7 @@ export default function EventsPage() {
     updateEvent,
     deleteEvent,
     isLoadingEvents: isLoadingContextEvents,
+    addShotRequest, // For quick shot entry
   } = useEventContext();
 
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -642,8 +666,8 @@ export default function EventsPage() {
       }
       return { ...event, hasOverlap };
     }).sort((a,b) => {
-      const dateA = a.date ? parseISO(a.date).getTime() : 0;
-      const dateB = b.date ? parseISO(b.date).getTime() : 0;
+      const dateA = a.date ? parseISO(a.date.replace(/\//g, '-')).getTime() : 0;
+      const dateB = b.date ? parseISO(b.date.replace(/\//g, '-')).getTime() : 0;
       if (dateA !== dateB) return dateA - dateB;
       
       const timesA = parseEventTimes(a.date, a.time);
@@ -675,7 +699,7 @@ export default function EventsPage() {
         return 0;
       });
     });
-    return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
+    return Object.entries(grouped).sort(([dateA], [dateB]) => new Date(dateA.replace(/\//g, '-')).getTime() - new Date(dateB.replace(/\//g, '-')).getTime());
   }, [displayableEvents]);
 
   const uniqueEventDatesForFilter = useMemo(() => {
@@ -712,18 +736,18 @@ export default function EventsPage() {
       }
     }
     const dates = new Set(sourceForDateFiltering.map(event => event.date));
-    return Array.from(dates).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    return Array.from(dates).sort((a, b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
   }, [eventsForSelectedProjectAndOrg, filterCoverageStatus, filterQuickTurnaround, filterTimeStatus, filterAssignedMemberId, filterDiscipline]);
 
 
-  const handleEventSubmit = (data: EventFormDialogData) => {
+  const handleEventSubmit = (data: EventFormDialogData, existingEventId?: string) => {
     const selectedProjInfo = allProjectsFromContext.find(p => p.id === data.projectId);
     if (!selectedProjInfo) {
       toast({ title: "Error", description: "Selected project not found.", variant: "destructive" });
       return;
     }
 
-    const eventPayload = {
+    const eventPayload: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string } = {
       name: data.name,
       projectId: data.projectId,
       date: data.date,
@@ -735,28 +759,52 @@ export default function EventsPage() {
       organizationId: data.organizationId || selectedProjInfo.organizationId,
       discipline: data.discipline || "",
       isCovered: data.isCovered === undefined ? true : data.isCovered,
-      personnelActivity: data.personnelActivity || {},
     };
+    
+    let currentEventId = existingEventId;
 
-    if (editingEvent) {
-      const fullUpdatePayload: Partial<Omit<Event, 'id' | 'hasOverlap'>> = {
+    if (editingEvent && currentEventId) {
+      const fullUpdatePayload: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>> = {
         ...eventPayload,
-        project: selectedProjInfo.name,
         deliverables: editingEvent.deliverables, 
         shotRequests: editingEvent.shotRequests, 
+        personnelActivity: editingEvent.personnelActivity,
       };
-      updateEvent(editingEvent.id, fullUpdatePayload);
+      updateEvent(currentEventId, fullUpdatePayload);
       toast({
         title: "Event Updated",
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      addEvent({...eventPayload, project: selectedProjInfo.name });
+      currentEventId = addEvent({...eventPayload, project: selectedProjInfo.name });
       toast({
         title: "Event Added",
         description: `"${data.name}" has been successfully added.`,
       });
     }
+    
+    // Process quick shot descriptions
+    if (currentEventId && data.quickShotDescriptionsInput) {
+        const descriptions = data.quickShotDescriptionsInput
+            .split('\n')
+            .map(desc => desc.trim())
+            .filter(desc => desc.length > 0);
+        
+        descriptions.forEach(desc => {
+            addShotRequest(currentEventId!, {
+                description: desc,
+                priority: "Medium", // Default
+                status: "Unassigned" // Default
+            });
+        });
+        if (descriptions.length > 0) {
+             toast({
+                title: "Quick Shots Added",
+                description: `${descriptions.length} shot(s) added to "${data.name}".`,
+            });
+        }
+    }
+
     setIsEventModalOpen(false);
     setEditingEvent(null);
   };
@@ -792,11 +840,15 @@ export default function EventsPage() {
 
   const firstSelectedDateForDialog = useMemo(() => {
     if (selectedEventDates.length > 0) {
-        const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+        const sortedDates = [...selectedEventDates].sort((a,b) => new Date(a.replace(/\//g, '-')).getTime() - new Date(b.replace(/\//g, '-')).getTime());
         return sortedDates[0];
     }
+     if (displayableEvents.length > 0 && !selectedEventDates.length) {
+        const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
+        return sortedEvents[0].date;
+    }
     return null;
-  }, [selectedEventDates]);
+  }, [selectedEventDates, displayableEvents]);
 
 
   if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents || isLoadingOrganizations) {
@@ -902,3 +954,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
+    
