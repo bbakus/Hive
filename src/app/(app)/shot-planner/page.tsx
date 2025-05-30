@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, type FormEvent, useCallback, useMemo } from 'react';
+import { useEffect, useState, type FormEvent, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Edit, Trash2, ListChecks, Film, Info, CheckCircle, AlertTriangle, User, UserCheck } from 'lucide-react';
+import { PlusCircle, ListChecks, Film, Info, CheckCircle, AlertTriangle, Edit, Trash2, UserCheck } from 'lucide-react';
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from '@/contexts/EventContext';
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useSettingsContext } from '@/contexts/SettingsContext';
@@ -28,12 +28,12 @@ export default function ShotPlannerPage() {
     getEventById, 
     getShotRequestsForEvent, 
     addShotRequest,
-    updateShotRequest, 
-    deleteShotRequest, 
+    deleteShotRequest,
     isLoadingEvents,
     eventsForSelectedProjectAndOrg,
+    shotRequestsByEventId,
   } = useEventContext();
-  const { selectedProject } = useProjectContext(); 
+  const { selectedProject, isLoadingProjects } = useProjectContext(); 
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { toast } = useToast();
 
@@ -43,7 +43,8 @@ export default function ShotPlannerPage() {
   const [newShotTitleInputValues, setNewShotTitleInputValues] = useState<Record<string, string>>({});
   const [newShotDescriptionInputValues, setNewShotDescriptionInputValues] = useState<Record<string, string>>({});
   
-  const [shotLists, setShotLists] = useState<Record<string, ShotRequest[]>>({});
+  const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
 
   const getPersonnelNameById = useCallback((id?: string): string => {
     if (!id) return "Unknown";
@@ -51,40 +52,30 @@ export default function ShotPlannerPage() {
     return person ? person.name : "Unknown User";
   }, []);
 
-  // Effect to load shot lists for expanded items or for an eventId from query
   useEffect(() => {
-    if (isLoadingEvents || isLoadingSettings) return;
-
-    const loadShots = async (eventId: string) => {
-      if (!shotLists[eventId]) { // Fetch only if not already loaded
-        const shots = getShotRequestsForEvent(eventId);
-        setShotLists(prev => ({ ...prev, [eventId]: shots }));
-      }
-    };
+    if (isLoadingEvents || isLoadingSettings || isLoadingProjects) {
+      setIsLoadingPageData(true);
+      return;
+    }
+    setIsLoadingPageData(false);
 
     if (eventIdFromQuery && eventsForSelectedProjectAndOrg.some(e => e.id === eventIdFromQuery)) {
       if (!expandedAccordionItems.includes(eventIdFromQuery)) {
         setExpandedAccordionItems(prev => [...prev, eventIdFromQuery]);
       }
-      loadShots(eventIdFromQuery);
     }
-    expandedAccordionItems.forEach(id => loadShots(id));
-    
-    setIsLoadingPageData(false); // Mark page as loaded after initial attempts
-
   }, [
     eventIdFromQuery, 
-    expandedAccordionItems, 
     eventsForSelectedProjectAndOrg, 
-    getShotRequestsForEvent, 
     isLoadingEvents, 
     isLoadingSettings,
-    shotLists // Add shotLists to dependencies
+    isLoadingProjects,
+    expandedAccordionItems // Keep if you want to control expansion based on this too
   ]);
 
   const handleAddShot = (e: FormEvent<HTMLFormElement>, eventId: string) => {
     e.preventDefault();
-    const title = newShotTitleInputValues[eventId]?.trim();
+    const title = newShotTitleInputValues[eventId]?.trim() || "";
     const description = newShotDescriptionInputValues[eventId]?.trim();
 
     if (!description) {
@@ -93,7 +84,7 @@ export default function ShotPlannerPage() {
     }
 
     addShotRequest(eventId, {
-      title: title || undefined, // Send undefined if title is empty
+      title: title || undefined,
       description: description,
       priority: "Medium", 
       status: "Unassigned", 
@@ -102,35 +93,32 @@ export default function ShotPlannerPage() {
       title: "Shot Added",
       description: `"${title || description.substring(0,30)}..." added to event.`,
     });
-    // Do NOT clear input values for rapid fire
+    
+    // Clear input fields for this eventId
+    setNewShotTitleInputValues(prev => ({ ...prev, [eventId]: '' }));
+    setNewShotDescriptionInputValues(prev => ({ ...prev, [eventId]: '' }));
+
+    // Reset focus to the title input for this eventId
+    setTimeout(() => { // Timeout to allow state update and re-render
+        titleInputRefs.current[eventId]?.focus();
+    }, 0);
   };
   
-  const openEditShotModal = (shot: ShotRequest) => {
-    // TODO: Implement modal opening for editing a shot. For now, use a toast.
-    // This would likely involve setting state to manage an "editingShot" and "isModalOpen".
-    toast({ title: "Edit Shot Placeholder", description: `Editing for shot "${shot.title || shot.description.substring(0,20)}..." would open a dialog here. Use the original Shot List page for full editing for now.`});
-  };
-
-  const handleDeleteShot = (eventId: string, shotId: string) => {
+  const handleDeleteExistingShot = (eventId: string, shotId: string) => {
+    const shot = (shotRequestsByEventId[eventId] || []).find(s => s.id === shotId);
     deleteShotRequest(eventId, shotId);
-    toast({ title: "Shot Deleted", description: `Shot has been deleted from this event.`});
-     // Re-fetch shots for the event to update the list
-    const shots = getShotRequestsForEvent(eventId);
-    setShotLists(prev => ({ ...prev, [eventId]: shots }));
+    toast({ 
+        title: "Shot Deleted", 
+        description: `Shot "${shot?.title || shot?.description.substring(0,30)}..." deleted.`,
+        variant: "destructive"
+    });
   };
 
   const onAccordionValueChange = (value: string[]) => {
     setExpandedAccordionItems(value);
-    // Fetch shots for newly expanded items
-    value.forEach(eventId => {
-      if (!shotLists[eventId]) {
-        const shots = getShotRequestsForEvent(eventId);
-        setShotLists(prev => ({ ...prev, [eventId]: shots }));
-      }
-    });
   };
 
-  if (isLoadingPageData || isLoadingEvents || isLoadingSettings) {
+  if (isLoadingPageData || isLoadingProjects || isLoadingEvents || isLoadingSettings) {
     return (
       <div className="flex flex-col gap-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -141,7 +129,7 @@ export default function ShotPlannerPage() {
     );
   }
   
-  if (!selectedProject && !useDemoData) {
+  if (!selectedProject && !useDemoData && !isLoadingProjects) {
      return (
       <div className="flex flex-col gap-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -158,7 +146,7 @@ export default function ShotPlannerPage() {
     );
   }
   
-  if (eventsForSelectedProjectAndOrg.length === 0 && useDemoData) {
+  if (eventsForSelectedProjectAndOrg.length === 0 && !isLoadingEvents) {
      return (
       <div className="flex flex-col gap-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -168,7 +156,7 @@ export default function ShotPlannerPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>No Events Found</AlertTitle>
           <AlertDescription>
-            The selected project <span className="font-semibold">"{selectedProject?.name}"</span> has no events. Please add events on the "Events Setup" page first.
+            The selected project <span className="font-semibold">"{selectedProject?.name}"</span> has no events. Please add events on the "Events Setup" page first or ensure filters allow events to be shown.
           </AlertDescription>
         </Alert>
       </div>
@@ -200,7 +188,7 @@ export default function ShotPlannerPage() {
               className="w-full space-y-2"
             >
               {eventsForSelectedProjectAndOrg.map((event) => {
-                const currentEventShots = shotLists[event.id] || [];
+                const currentEventShots = shotRequestsByEventId[event.id] || [];
                 return (
                   <AccordionItem value={event.id} key={event.id} className={cn("border rounded-none")}>
                     <AccordionTrigger 
@@ -217,11 +205,12 @@ export default function ShotPlannerPage() {
                     </AccordionTrigger>
                     <AccordionContent className="p-0">
                       <div className="border-t p-3 space-y-3">
-                        <form onSubmit={(e) => handleAddShot(e, event.id)} className="flex flex-col sm:flex-row items-end gap-2">
-                          <div className="flex-grow w-full sm:w-auto">
+                        <form onSubmit={(e) => handleAddShot(e, event.id)} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] items-end gap-2">
+                          <div className="w-full">
                             <Label htmlFor={`newShotTitle-${event.id}`} className="text-xs text-muted-foreground">Shot Title (Optional)</Label>
                             <Input
                               id={`newShotTitle-${event.id}`}
+                              ref={(el) => titleInputRefs.current[event.id] = el}
                               type="text"
                               value={newShotTitleInputValues[event.id] || ''}
                               onChange={(e) => setNewShotTitleInputValues(prev => ({ ...prev, [event.id]: e.target.value }))}
@@ -229,18 +218,18 @@ export default function ShotPlannerPage() {
                               className="text-sm h-9"
                             />
                           </div>
-                          <div className="flex-grow w-full sm:w-auto">
+                          <div className="w-full">
                             <Label htmlFor={`newShotDesc-${event.id}`} className="text-xs text-muted-foreground">Shot Description *</Label>
                             <Input
                               id={`newShotDesc-${event.id}`}
                               type="text"
                               value={newShotDescriptionInputValues[event.id] || ''}
                               onChange={(e) => setNewShotDescriptionInputValues(prev => ({ ...prev, [event.id]: e.target.value }))}
-                              placeholder="Enter new shot description and press Enter or Add"
+                              placeholder="Enter new shot description"
                               className="text-sm h-9"
                             />
                           </div>
-                          <Button type="submit" variant="outline" size="sm" className="h-9 w-full sm:w-auto" disabled={!(newShotDescriptionInputValues[event.id]?.trim())}>
+                          <Button type="submit" variant="accent" size="sm" className="h-9 w-full sm:w-auto" disabled={!(newShotDescriptionInputValues[event.id]?.trim())}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add
                           </Button>
                         </form>
@@ -249,8 +238,8 @@ export default function ShotPlannerPage() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="w-[30%]">Title</TableHead>
-                                <TableHead className="w-[40%]">Description</TableHead>
+                                <TableHead className="w-[25%]">Title</TableHead>
+                                <TableHead className="w-[35%]">Description</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Priority</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -259,10 +248,10 @@ export default function ShotPlannerPage() {
                             <TableBody>
                               {currentEventShots.map((shot) => (
                                 <TableRow key={shot.id}>
-                                  <TableCell className="font-medium max-w-xs">
+                                  <TableCell className="font-medium max-w-[150px]">
                                     <p className="truncate" title={shot.title || "No Title"}>{shot.title || <span className="italic text-muted-foreground">No Title</span>}</p>
                                   </TableCell>
-                                  <TableCell className="text-xs text-muted-foreground max-w-md">
+                                  <TableCell className="text-xs text-muted-foreground max-w-xs">
                                     <p className="truncate" title={shot.description}>{shot.description}</p>
                                      {shot.initialCapturerId && (
                                       <p className="text-[11px] text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
@@ -306,10 +295,10 @@ export default function ShotPlannerPage() {
                                     }>{shot.priority}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" className="hover:text-foreground/80 h-8 w-8" onClick={() => openEditShotModal(shot)} disabled>
+                                    <Button variant="ghost" size="icon" className="hover:text-foreground/80 h-8 w-8" disabled>
                                       <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="hover:text-destructive h-8 w-8" onClick={() => handleDeleteShot(event.id, shot.id)}>
+                                    <Button variant="ghost" size="icon" className="hover:text-destructive h-8 w-8" onClick={() => handleDeleteExistingShot(event.id, shot.id)}>
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
                                   </TableCell>
@@ -337,3 +326,4 @@ export default function ShotPlannerPage() {
     </div>
   );
 }
+
