@@ -61,12 +61,6 @@ const parseScheduleString = (scheduleString: string, eventsForDay: Event[], getS
         for (const event of eventsForDay) {
           if (event.name && taskDescription.toLowerCase().includes(event.name.toLowerCase())) {
             matchedEventId = event.id;
-            // Enhancement: try to directly link shots if event is matched
-            // This is illustrative; more robust parsing might be needed
-            const shotsForTaskEvent = getShotsFn(event.id);
-            if (shotsForTaskEvent.length > 0) {
-              // You could add logic here if AI mentions specific shot needs in the task
-            }
             break;
           }
         }
@@ -141,7 +135,7 @@ export default function SchedulerPage() {
       return;
     }
     
-    const relevantEvents = eventsForSelectedProjectAndOrg.filter(event => event.isCovered);
+    const relevantEvents = (eventsForSelectedProjectAndOrg || []).filter(event => event.isCovered);
     setCurrentProjectEvents(relevantEvents);
 
     const uniqueDates = Array.from(new Set(relevantEvents.map(event => event.date))).sort();
@@ -171,15 +165,7 @@ export default function SchedulerPage() {
     setParsedSchedule([]);
     setIsScheduleApplied(false);
 
-  }, [selectedProjectId, useDemoData, isLoadingSettings, eventsForSelectedProjectAndOrg, isLoadingContextEvents]);
-
-  useEffect(() => {
-    if (projectEventDates.length > 0 && (!selectedDateString || !projectEventDates.includes(selectedDateString))) {
-      setSelectedDateString(projectEventDates[0]);
-    } else if (projectEventDates.length === 0) {
-      setSelectedDateString(undefined);
-    }
-  }, [projectEventDates, selectedDateString]);
+  }, [selectedProjectId, useDemoData, isLoadingSettings, eventsForSelectedProjectAndOrg, isLoadingContextEvents, selectedDateString]); // Added selectedDateString to re-evaluate personnel if date changes
 
 
   const eventsForSelectedDate = useMemo(() => {
@@ -259,7 +245,7 @@ export default function SchedulerPage() {
     }
 
     let assignmentsMadeCount = 0;
-    const eventsToUpdate: Record<string, Set<string>> = {}; // eventId -> Set of personnelIds
+    const eventsToUpdate: Record<string, Set<string>> = {}; 
 
     parsedSchedule.forEach(personSchedule => {
         const personnelDetails = initialPersonnelMock.find(p => p.name === personSchedule.name);
@@ -302,13 +288,13 @@ export default function SchedulerPage() {
     if (uniqueAssignmentsMade > 0) {
         toast({
             title: "Schedule Applied (Event Data Updated)",
-            description: `${uniqueAssignmentsMade} new assignment(s) notionally updated in the EventContext based on the AI schedule.`,
+            description: `${uniqueAssignmentsMade} new assignment(s) applied to shared Event data based on the AI schedule.`,
             duration: 7000,
         });
     } else {
         toast({
             title: "Schedule Reviewed (No New Assignments)",
-            description: "No new personnel assignments were made to the EventContext based on the schedule.",
+            description: "No new personnel assignments were made to shared Event data based on the schedule.",
             duration: 7000,
         });
     }
@@ -329,9 +315,9 @@ export default function SchedulerPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Cpu className="h-8 w-8 text-accent icon-glow" /> Smart Schedule Generator
-        </h1>
+        <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <Cpu className="h-8 w-8" /> Smart Schedule Generator 
+        </p>
         <p className="text-muted-foreground">
           {selectedProject ? `Generating schedule for ${selectedProject.name}. ` : "Select a project to begin. "}
            Dynamically generate per-day and per-person schedule views using AI for events marked as "Covered".
@@ -350,12 +336,12 @@ export default function SchedulerPage() {
         </Alert>
       )}
 
-      <Card className={cn("shadow-lg", isSchedulerFormDisabled && "opacity-50 pointer-events-none")}>
+      <Card className={cn(isSchedulerFormDisabled && "opacity-50 pointer-events-none")}>
         <CardHeader>
-          <CardTitle>Generate New Schedule</CardTitle>
-          <CardDescription>
+          <p className="text-lg font-semibold">Generate New Schedule</p> 
+          <div className="text-sm text-muted-foreground"> 
             Provide details to generate an optimized schedule for covered events. Date and Personnel are dynamically populated based on the selected project's covered events.
-          </CardDescription>
+          </div>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="grid md:grid-cols-2 gap-x-6 gap-y-4">
@@ -384,7 +370,7 @@ export default function SchedulerPage() {
               <div>
                 <Label htmlFor="location">Location (Optional)</Label>
                 <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Main Stage, Hall B" disabled={isSchedulerFormDisabled} />
-                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing"). For specific sub-locations or venue details, refer to the event names for today or add them to 'Additional Criteria'.</p>
+                 <p className="text-xs text-muted-foreground mt-1">Optional. Specify a general event area (e.g., "Conference Center West Wing"). For specific sub-locations or venue details, refer to event names or add to 'Additional Criteria'.</p>
               </div>
               <div>
                 <Label htmlFor="eventType">Event Type (Optional)</Label>
@@ -396,7 +382,7 @@ export default function SchedulerPage() {
             <div className="space-y-2">
               <Label>Select Personnel <span className="text-destructive">*</span></Label>
               {projectPersonnel.length > 0 && !isSchedulerFormDisabled ? (
-                <ScrollArea className="h-48 w-full rounded-md border p-4">
+                <ScrollArea className="h-48 w-full rounded-none border p-4">
                   <div className="space-y-2">
                     {projectPersonnel.map((person) => (
                       <div key={person.id} className="flex items-center space-x-2">
@@ -413,7 +399,7 @@ export default function SchedulerPage() {
                   </div>
                 </ScrollArea>
               ) : (
-                 <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-md min-h-[10rem] flex items-center justify-center bg-muted/50">
+                 <div className="text-xs text-muted-foreground mt-1 p-4 border rounded-none min-h-[10rem] flex items-center justify-center bg-muted/50">
                     <p className="text-center">
                       {isSchedulerFormDisabled
                         ? (selectedProject ? "No personnel assigned to covered events for this project." : "Select a project to see available personnel.")
@@ -448,21 +434,21 @@ export default function SchedulerPage() {
       </Card>
 
       {scheduleOutput && !isSchedulerFormDisabled && (
-        <Card className="shadow-lg" id="schedule-preview">
+        <Card id="schedule-preview">
           <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-4">
             <div>
-              <CardTitle>Formatted Schedule Preview</CardTitle>
-              <CardDescription>
+              <p className="text-lg font-semibold">Formatted Schedule Preview</p> 
+              <div className="text-sm text-muted-foreground"> 
                 For {selectedProject?.name || "Selected Project"}, {selectedDateString ? format(parseISO(selectedDateString), "PPP") : "the selected date"}
                 {location.trim() ? ` at ${location.trim()}` : ""}
                 {eventType.trim() ? `. Type: ${eventType.trim()}` : ""}
                 . Personnel: {selectedPersonnelNames.join(", ") || "N/A"}.
-              </CardDescription>
+              </div>
             </div>
             <div className="flex gap-2">
                 <Button onClick={handleApplySchedule} variant="outline" disabled={isScheduleApplied || !parsedSchedule.length}>
                     <CheckSquare className="mr-2 h-4 w-4" />
-                    {isScheduleApplied ? "Schedule Applied (Events Updated)" : "Apply Schedule to Event Data"}
+                    {isScheduleApplied ? "Schedule Applied (Event Data Updated)" : "Apply Schedule to Event Data"}
                 </Button>
                 <Button onClick={handlePrint} variant="outline">
                     <Printer className="mr-2 h-4 w-4" />
@@ -476,9 +462,9 @@ export default function SchedulerPage() {
                     <Info className="h-4 w-4" />
                     <AlertTitle>Assignments Reflected in Shared Event Data</AlertTitle>
                     <AlertDescription>
-                        Personnel assignments based on this schedule have been notionally updated in the shared EventContext.
-                        These changes should reflect on other pages like the Events page. Review event details there to see updated assignments.
-                        (Actual persistence to a backend database is not implemented.)
+                        Personnel assignments based on this schedule have been applied to the shared Event data.
+                        These changes should reflect on other pages like the Events page.
+                        (Note: This is a client-side update; no backend persistence is implemented.)
                     </AlertDescription>
                 </Alert>
             )}
@@ -486,7 +472,7 @@ export default function SchedulerPage() {
               parsedSchedule.map((person, pIndex) => (
                 <Card key={`person-${pIndex}`} className="bg-muted/30">
                   <CardHeader>
-                    <CardTitle className="text-lg">{person.name}</CardTitle>
+                    <p className="text-base font-medium">{person.name}</p> 
                   </CardHeader>
                   <CardContent>
                     {person.items.length > 0 ? (
@@ -528,7 +514,7 @@ export default function SchedulerPage() {
               <p className="text-muted-foreground">Could not parse the schedule into a structured format. Displaying raw output:</p>
             )}
             {parsedSchedule.length === 0 && scheduleOutput?.schedule && (
-                 <pre className="p-4 bg-muted/50 rounded-md whitespace-pre-wrap text-sm max-h-96 overflow-auto">
+                 <pre className="p-4 bg-muted/50 rounded-none whitespace-pre-wrap text-sm max-h-96 overflow-auto">
                     {scheduleOutput.schedule}
                 </pre>
             )}
@@ -538,7 +524,7 @@ export default function SchedulerPage() {
               <AlertTitle>Exporting & Applying Schedule</AlertTitle>
               <AlertDescription>
                 To export this schedule as a PDF, please use your browser's "Print" function (Ctrl/Cmd + P) and choose "Save as PDF" as the destination.
-                The "Apply Schedule" button updates personnel assignments for events in the current client-side EventContext based on the AI-generated schedule. This does not save to a backend database.
+                The "Apply Schedule" button updates personnel assignments for events in the shared Event data based on the AI-generated schedule. This is a client-side update.
               </AlertDescription>
             </Alert>
           </CardContent>

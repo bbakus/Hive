@@ -156,7 +156,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" /> Event Coverage</CardTitle> {/* Use primary for icon color */}
+            <CardTitle className="flex items-center gap-2"><BarChart3 className="h-6 w-6 text-primary" /> Event Coverage</CardTitle>
             <CardDescription>
               {selectedProject ? `Event coverage for ${selectedProject.name}` : "Overview of event coverage status."}
             </CardDescription>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
                     cursor={false}
                     content={<ChartTooltipContent indicator="dashed" />}
                   />
-                  <Bar dataKey="coverage" radius={0}> {/* radius 0 for sharp bars */}
+                  <Bar dataKey="coverage" radius={0}> 
                     {eventCoverageData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
@@ -193,7 +193,7 @@ export default function DashboardPage() {
         </Card>
         <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Package className="h-6 w-6 text-primary" /> Deliverables Status</CardTitle> {/* Use primary for icon color */}
+            <CardTitle className="flex items-center gap-2"><Package className="h-6 w-6 text-primary" /> Deliverables Status</CardTitle>
             <CardDescription>
               {selectedProject ? `Deliverable progress for ${selectedProject.name}` : "Summary of current deliverable progress."}
             </CardDescription>

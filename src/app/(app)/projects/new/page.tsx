@@ -22,7 +22,6 @@ import { Progress } from "@/components/ui/progress";
 import { AddPersonnelToRosterDialog, type WizardAvailablePersonnel } from "@/components/modals/AddPersonnelToRosterDialog";
 import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; 
 
-// Initial mock data for available personnel for the wizard
 const initialAvailablePersonnelList: WizardAvailablePersonnel[] = [
   { id: "user001", name: "Alice Wonderland", capabilities: ["Photographer", "Editor"] },
   { id: "user002", name: "Bob The Builder", capabilities: ["Photographer", "Editor"] },
@@ -129,7 +128,6 @@ export default function NewProjectWizardPage() {
         }
     });
     
-    // Sort for consistent comparison
     const sortedNewKeyPersonnel = [...newKeyPersonnelArray].sort((a, b) => a.personnelId.localeCompare(b.personnelId));
     const sortedCurrentKeyPersonnel = [...currentFormKeyPersonnel].sort((a, b) => a.personnelId.localeCompare(b.personnelId));
 
@@ -156,7 +154,6 @@ export default function NewProjectWizardPage() {
 
   const handleAddNewPersonnelToRosterDialog = (newPersonnel: WizardAvailablePersonnel) => {
     setCurrentAvailablePersonnel(prev => [...prev, newPersonnel]);
-    // Automatically select the new personnel for the current project
     const currentMap = getValues("selectedPersonnelMap") || {};
     currentMap[newPersonnel.id] = true;
     setValue("selectedPersonnelMap", currentMap , { shouldValidate: true, shouldDirty: true });
@@ -245,7 +242,7 @@ export default function NewProjectWizardPage() {
     <div className="max-w-2xl mx-auto flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Project Setup Wizard</h1>
+          <p className="text-3xl font-bold tracking-tight">New Project Setup Wizard</p>
           <p className="text-muted-foreground">Step {currentStep} of {TOTAL_STEPS}: Guiding you through project creation.</p>
         </div>
         <Button variant="outline" onClick={() => router.push("/projects")}>
@@ -262,12 +259,12 @@ export default function NewProjectWizardPage() {
       />
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <Card className="shadow-lg">
+        <Card>
           {currentStep === 1 && (
             <>
               <CardHeader>
-                <CardTitle>Step 1: Core Project Details</CardTitle>
-                <CardDescription>Basic information for your new project.</CardDescription>
+                <p className="text-lg font-semibold">Step 1: Core Project Details</p> 
+                <div className="text-sm text-muted-foreground">Basic information for your new project.</div> 
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
@@ -345,8 +342,8 @@ export default function NewProjectWizardPage() {
              <>
               <CardHeader className="flex flex-row items-start sm:items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Step 2: Assign Key Roles & Personnel</CardTitle>
-                  <CardDescription>Select team members and their project-specific roles.</CardDescription>
+                  <p className="text-lg font-semibold flex items-center gap-2"><Users className="h-6 w-6" />Step 2: Assign Key Roles & Personnel</p> 
+                  <div className="text-sm text-muted-foreground">Select team members and their project-specific roles.</div> 
                 </div>
                 <Button type="button" size="sm" variant="outline" onClick={() => setIsAddPersonnelDialogOpen(true)} className="shrink-0 mt-2 sm:mt-0">
                   <UserPlus className="mr-2 h-4 w-4" /> Add New to Roster
@@ -354,14 +351,14 @@ export default function NewProjectWizardPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Label>Available Team Members:</Label>
-                <ScrollArea className="h-72 w-full rounded-md border p-3">
+                <ScrollArea className="h-72 w-full rounded-none border p-3">
                   {currentAvailablePersonnel.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No personnel in roster. Add some first using the button above.</p>}
                   {currentAvailablePersonnel.map((person) => {
                     const isSelected = !!selectedPersonnelMap?.[person.id];
                     const keyPersonnelEntryIndex = watchedKeyPersonnel.findIndex(kp => kp.personnelId === person.id);
                     
                     return (
-                      <div key={person.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2.5 rounded-md hover:bg-muted/50 transition-colors min-h-[48px] border-b last:border-b-0">
+                      <div key={person.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 p-2.5 rounded-none hover:bg-muted/50 min-h-[48px] border-b last:border-b-0">
                         <div className="flex items-center flex-shrink-0 mb-2 sm:mb-0">
                           <Checkbox
                             id={`wizard-person-select-${person.id}`}
@@ -410,7 +407,7 @@ export default function NewProjectWizardPage() {
                             )}
                           </div>
                         )}
-                         {isSelected && keyPersonnelEntryIndex === -1 && ( // Person selected but not yet in keyPersonnel array (React render lag)
+                         {isSelected && keyPersonnelEntryIndex === -1 && ( 
                             <p className="text-xs text-muted-foreground italic w-full text-center sm:text-left sm:w-60 sm:ml-auto">Loading role...</p>
                          )}
                       </div>
@@ -427,8 +424,8 @@ export default function NewProjectWizardPage() {
           {currentStep === 3 && (
             <>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><MapPin className="h-6 w-6 text-accent" />Step 3: Set Project Location</CardTitle>
-                <CardDescription>Specify the primary location or venue for this project. (Optional)</CardDescription>
+                <p className="text-lg font-semibold flex items-center gap-2"><MapPin className="h-6 w-6" />Step 3: Set Project Location</p> 
+                <div className="text-sm text-muted-foreground">Specify the primary location or venue for this project. (Optional)</div> 
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
@@ -452,8 +449,8 @@ export default function NewProjectWizardPage() {
           {currentStep === 4 && (
             <>
               <CardHeader>
-                <CardTitle>Step 4: Review & Create Project</CardTitle>
-                <CardDescription>Please review the project details below before creating.</CardDescription>
+                <p className="text-lg font-semibold">Step 4: Review & Create Project</p> 
+                <div className="text-sm text-muted-foreground">Please review the project details below before creating.</div> 
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -541,5 +538,3 @@ export default function NewProjectWizardPage() {
     </div>
   );
 }
-
-    

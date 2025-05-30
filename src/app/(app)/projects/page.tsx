@@ -102,7 +102,7 @@ export default function ProjectsPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+          <p className="text-3xl font-bold tracking-tight">Projects</p>
           <p className="text-muted-foreground">
             {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId) 
               ? `Projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. ` 
@@ -142,17 +142,17 @@ export default function ProjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className="shadow-lg">
+      <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-grow">
-              <CardTitle>Project List</CardTitle>
-              <CardDescription>
+              <p className="text-lg font-semibold">Project List</p> 
+              <div className="text-sm text-muted-foreground"> 
                 {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId) 
                   ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. ` 
                   : "Showing projects for all your organizations. "}
                 ({displayProjects.length} projects shown)
-              </CardDescription>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               <div className="relative w-full sm:w-64">
@@ -228,7 +228,7 @@ export default function ProjectsPage() {
                         : "N/A"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditProjectModal(project)}>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                       </Button>
@@ -253,5 +253,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
-    

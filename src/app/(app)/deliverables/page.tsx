@@ -181,7 +181,7 @@ export default function DeliverablesPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Deliverables Tracker</h1>
+          <p className="text-3xl font-bold tracking-tight">Deliverables Tracker</p>
           <p className="text-muted-foreground">
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
           </p>
@@ -216,13 +216,13 @@ export default function DeliverablesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className="shadow-lg">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileText className="h-6 w-6 text-accent" /> Deliverables List</CardTitle>
-          <CardDescription>
+          <p className="text-lg font-semibold flex items-center gap-2"><FileText className="h-6 w-6" /> Deliverables List</p> 
+          <div className="text-sm text-muted-foreground"> 
             {selectedProject ? `Deliverables associated with ${selectedProject.name}.` : "Centralized list of all project deliverables."}
             ({filteredDeliverables.length} items)
-          </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           {filteredDeliverables.length > 0 ? (
@@ -255,11 +255,11 @@ export default function DeliverablesPage() {
                     </TableCell>
                     <TableCell>{item.type}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" disabled>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" disabled>
                         <UploadCloud className="h-4 w-4" />
                         <span className="sr-only">Upload</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditDeliverableModal(item)}>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditDeliverableModal(item)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                       </Button>
@@ -280,10 +280,10 @@ export default function DeliverablesPage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-lg">
+      <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Sparkles className="h-6 w-6 text-accent icon-glow" /> AI Deliverable Summary</CardTitle>
-          <CardDescription>Generate an AI-powered summary of deliverable statuses {selectedProject ? `for ${selectedProject.name}`: "for all projects"}.</CardDescription>
+          <p className="text-lg font-semibold flex items-center gap-2"><Sparkles className="h-6 w-6" /> AI Deliverable Summary</p> 
+          <div className="text-sm text-muted-foreground">Generate an AI-powered summary of deliverable statuses {selectedProject ? `for ${selectedProject.name}`: "for all projects"}.</div> 
         </CardHeader>
         <form onSubmit={handleGenerateSummary}>
           <CardContent className="space-y-4">
@@ -309,10 +309,10 @@ export default function DeliverablesPage() {
         {summaryResult && (
           <CardContent className="mt-4 border-t pt-4">
             <h3 className="text-lg font-semibold mb-2">Generated Summary for {eventNameForSummary}:</h3>
-            <div className="p-4 bg-muted/50 rounded-md space-y-2">
+            <div className="p-4 bg-muted/50 rounded-none space-y-2">
               <p><span className="font-medium">Overall Progress:</span> {summaryResult.progress}</p>
               <p><span className="font-medium">Detailed Summary:</span></p>
-              <pre className="whitespace-pre-wrap text-sm bg-background p-3 rounded">{summaryResult.summary}</pre>
+              <pre className="whitespace-pre-wrap text-sm bg-background p-3 rounded-none">{summaryResult.summary}</pre>
             </div>
           </CardContent>
         )}
@@ -320,5 +320,3 @@ export default function DeliverablesPage() {
     </div>
   );
 }
-
-    

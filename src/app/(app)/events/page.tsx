@@ -23,8 +23,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useOrganizationContext, type Organization } from "@/contexts/OrganizationContext"; // Added import
-import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { useOrganizationContext, type Organization } from "@/contexts/OrganizationContext"; 
+import { format, parseISO, isValid, isAfter, isBefore, isWithinInterval, startOfDay, endOfDay, addHours } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -66,8 +66,8 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   let endDate = startOfDay(baseDate);
   endDate.setHours(endHour, endMinute);
   
-  if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour > 0 || startMinute > 0) )) { // Handles overnight or events ending at midnight next day
-    endDate.setDate(endDate.getDate() + 1);
+  if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour > 0 || startMinute > 0) )) { 
+    endDate = addHours(endDate, 24);
   }
   
   return { start: startDate, end: endDate };
@@ -142,7 +142,7 @@ function EventFilters({
   uniqueEventDatesForFilter
 }: EventFiltersProps) {
   return (
-    <div className="mb-6 p-4 border rounded-md bg-card/50 shadow-sm">
+    <div className="mb-6 p-4 border rounded-none bg-card/50">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
         <div className="flex items-center space-x-2 pt-2">
           <Checkbox
@@ -267,13 +267,14 @@ type DailyOverviewTabContentProps = {
   selectedProject: Project | null;
   useDemoData: boolean;
   openEditEventModal: (event: Event) => void;
+  organizations: Organization[];
 };
 
-function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedProject, useDemoData, openEditEventModal }: DailyOverviewTabContentProps) {
+function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedProject, useDemoData, openEditEventModal, organizations }: DailyOverviewTabContentProps) {
   return (
-    <Card className="shadow-lg mt-4">
+    <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Daily Schedule Overview</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6" /> Daily Schedule Overview</CardTitle>
         <CardDescription>
           Visualizes events grouped by day. Events with potential time conflicts (overlapping time and shared personnel) are marked with <AlertTriangle className="inline h-4 w-4 text-destructive" />.
           {selectedProject ? ` (Filtered for ${selectedProject.name})` : " (Showing all projects)"}
@@ -288,7 +289,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
               </h3>
               <div className="space-y-4">
                 {dayEvents.map((event) => (
-                   <Card key={event.id} className="shadow-md hover:shadow-lg transition-shadow">
+                   <Card key={event.id} className="hover:border-foreground/30 transition-colors">
                      <div className="p-4 flex justify-between items-start gap-4">
                        <div className="flex-grow space-y-1">
                           <CardTitle className="text-lg flex items-center gap-1.5">
@@ -306,7 +307,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                 event.priority === "Medium" ? "outline" : "default"
                                 } className="ml-2 text-xs whitespace-nowrap">{event.priority}</Badge>
                             </p>
-                             {!selectedProject && event.project && (
+                             {!selectedProject && organizations.length > 1 && event.project && (
                               <p className="text-xs mt-0.5 truncate" title={event.project}>
                                   Project: {event.project}
                               </p>
@@ -314,7 +315,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                           </div>
                           <div className="pt-2 text-xs flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                               {event.deadline && (
-                                  <p className="text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                                  <p className="text-foreground/80 whitespace-nowrap">
                                   Deadline: {formatDeadline(event.deadline)}
                                   </p>
                               )}
@@ -324,7 +325,7 @@ function DailyOverviewTabContent({ groupedAndSortedEventsForDisplay, selectedPro
                                   Assigned: {event.assignedPersonnelIds.length}
                                   </p>
                               )}
-                              <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline flex items-center gap-1 whitespace-nowrap">
+                              <Link href={`/events/${event.id}/shots`} className="text-foreground hover:underline flex items-center gap-1 whitespace-nowrap">
                                   <ListChecks className="h-3.5 w-3.5 opacity-80 flex-shrink-0" />
                                   Shot Requests: {event.shotRequests}
                               </Link>
@@ -374,9 +375,9 @@ type EventListTabContentProps = {
 
 function EventListTabContent({ displayableEvents, selectedProject, useDemoData, openEditEventModal, handleDeleteClick, organizations }: EventListTabContentProps) {
   return (
-    <Card className="shadow-lg mt-4">
+    <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6 text-accent" /> Event List (Table View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ListChecks className="h-6 w-6" /> Event List (Table View)</CardTitle>
         <CardDescription>
           {selectedProject ? `Events scheduled for ${selectedProject.name}.` : "Overview of all scheduled events and their details."}
           ({displayableEvents.length} events found)
@@ -431,19 +432,19 @@ function EventListTabContent({ displayableEvents, selectedProject, useDemoData, 
                       {event.assignedPersonnelIds?.length || 0}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/events/${event.id}/shots`} className="text-accent hover:underline">
+                      <Link href={`/events/${event.id}/shots`} className="text-foreground hover:underline">
                         {event.shotRequests}
                       </Link>
                     </TableCell>
                     <TableCell>{event.deliverables}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" asChild>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" asChild>
                         <Link href={`/events/${event.id}/shots`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View/Manage Shots</span>
                         </Link>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditEventModal(event)}>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditEventModal(event)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit Event</span>
                       </Button>
@@ -512,9 +513,9 @@ function BlockScheduleTabContent({
   }, [activeBlockScheduleDate, eventsForBlockSchedule, allPersonnel]);
 
   return (
-    <Card className="shadow-lg mt-4">
+    <Card className="mt-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6 text-accent" /> Block Schedule (Timeline View)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CalendarIconLucide className="h-6 w-6" /> Block Schedule (Timeline View)</CardTitle>
         <CardDescription>
           View events for the selected date(s) from the main filter, laid out on an hourly timeline by assigned photographer.
           {activeBlockScheduleDate ? ` Showing schedule for ${format(activeBlockScheduleDate, "PPP")}.` : " Select date(s) from the main filters to view schedule."}
@@ -531,7 +532,7 @@ function BlockScheduleTabContent({
             allPersonnel={allPersonnel}
           />
         ) : (
-          <div className="p-8 text-center text-muted-foreground rounded-md min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
+          <div className="p-8 text-center text-muted-foreground rounded-none min-h-[400px] flex flex-col items-center justify-center bg-muted/20">
             <CalendarIconLucide size={48} className="mb-4 text-muted" />
             <p className="text-lg font-medium">
               {selectedEventDates.length > 0 && !activeBlockScheduleDate
@@ -616,7 +617,7 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          filtered = filtered.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+          filtered = filtered.filter(event => event.discipline === "Photography");
       } else if (filterDiscipline === "na_or_other") { 
           filtered = filtered.filter(event => !event.discipline || event.discipline === "");
       }
@@ -707,7 +708,7 @@ export default function EventsPage() {
     }
     if (filterDiscipline !== "all") {
       if (filterDiscipline === "Photography") {
-          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography" || event.discipline === "Both");
+          sourceForDateFiltering = sourceForDateFiltering.filter(event => event.discipline === "Photography");
       } else if (filterDiscipline === "na_or_other") { 
           sourceForDateFiltering = sourceForDateFiltering.filter(event => !event.discipline || event.discipline === "");
       }
@@ -856,7 +857,7 @@ export default function EventsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setEventToDeleteId(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className={buttonVariants({ variant: "destructive" })}>Delete Event</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className={cn(buttonVariants({variant: "destructive"}))}>Delete Event</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -874,6 +875,7 @@ export default function EventsPage() {
                 selectedProject={selectedProject}
                 useDemoData={useDemoData}
                 openEditEventModal={openEditEventModal}
+                organizations={organizations}
             />
         </TabsContent>
 

@@ -43,7 +43,7 @@ export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "
 
 export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
   id: string;
-  cameraSerials?: string[]; // Changed from cameraSerial to cameraSerials array
+  cameraSerials?: string[];
 };
 
 export const initialPersonnelMock: Personnel[] = [
@@ -203,7 +203,7 @@ export default function PersonnelPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Personnel Management</h1>
+          <p className="text-3xl font-bold tracking-tight">Personnel Management</p>
           <p className="text-muted-foreground">Assign team members to events and visualize schedules.</p>
         </div>
         <Button onClick={openAddPersonnelModal}>
@@ -281,15 +281,15 @@ export default function PersonnelPage() {
       )}
 
 
-      <Card className="shadow-lg">
+      <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle>Team Roster</CardTitle>
-              <CardDescription>
+              <p className="text-lg font-semibold">Team Roster</p> 
+              <div className="text-sm text-muted-foreground"> 
                 List of all team members and their current status. 
                 (Showing {filteredPersonnelList.length} of {personnelList.length} members)
-              </CardDescription>
+              </div>
             </div>
             <div className="relative w-full sm:w-72">
               <Input
@@ -345,11 +345,11 @@ export default function PersonnelPage() {
                       }>{member.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => handleViewSchedule(member)}>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => handleViewSchedule(member)}>
                         <CalendarDays className="h-4 w-4" />
                         <span className="sr-only">View Schedule</span>
                       </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-accent" onClick={() => openEditPersonnelModal(member)}>
+                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditPersonnelModal(member)}>
                         <Edit className="h-4 w-4" />
                         <span className="sr-only">Edit</span>
                       </Button>
@@ -371,12 +371,12 @@ export default function PersonnelPage() {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment</CardTitle>
-            <CardDescription>
+            <p className="text-lg font-semibold flex items-center gap-2"><Workflow className="h-5 w-5" />Personnel Assignment</p> 
+            <div className="text-sm text-muted-foreground"> 
               {selectedProject ? `Assign personnel to events for ${selectedProject.name}.` : "Select a project to assign personnel to its events."}
-            </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             { !selectedProject && <p className="text-muted-foreground text-sm">Please select a project from the main header to manage event assignments.</p>}
@@ -401,13 +401,13 @@ export default function PersonnelPage() {
                 </div>
 
                 {eventDetailsForAssignment && (
-                  <ScrollArea className="h-72 border rounded-md p-3">
-                    <h4 className="text-sm font-medium mb-2">Assign team members to: <span className="text-accent">{eventDetailsForAssignment.name}</span></h4>
+                  <ScrollArea className="h-72 border rounded-none p-3">
+                    <h4 className="text-sm font-medium mb-2">Assign team members to: <span className="text-foreground/80">{eventDetailsForAssignment.name}</span></h4>
                     <div className="space-y-2">
                       {personnelList.filter(p => p.role !== "Client").map(person => {
                         const isAssigned = eventDetailsForAssignment.assignedPersonnelIds?.includes(person.id);
                         return (
-                          <div key={`assign-${person.id}-${eventDetailsForAssignment.id}`} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
+                          <div key={`assign-${person.id}-${eventDetailsForAssignment.id}`} className="flex items-center justify-between p-2 rounded-none hover:bg-muted/50">
                             <div className="flex items-center gap-2">
                                <Avatar className="h-7 w-7">
                                 <AvatarImage src={person.avatar || `https://placehold.co/40x40.png?text=${person.name.split(" ").map(n => n[0]).join("").toUpperCase()}`} alt={person.name} data-ai-hint="person avatar" />
@@ -437,10 +437,10 @@ export default function PersonnelPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</CardTitle>
-            <CardDescription>View team member schedules and event commitments across all projects. Sorted by date.</CardDescription>
+            <p className="text-lg font-semibold flex items-center gap-2"><GanttChartSquare className="h-5 w-5" />Team Schedule Visualization</p> 
+            <div className="text-sm text-muted-foreground">View team member schedules and event commitments across all projects. Sorted by date.</div> 
           </CardHeader>
           <CardContent>
             {personnelList.filter(p => p.role !== "Client").length === 0 && <p className="text-sm text-muted-foreground">No team members (excluding Clients) to visualize schedules for.</p>}

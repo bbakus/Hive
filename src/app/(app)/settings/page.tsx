@@ -5,26 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useTheme } from "@/contexts/ThemeContext"; // Added import
-import { Settings as SettingsIcon, Info, Sun, Moon } from "lucide-react"; // Added Sun, Moon
+import { useTheme } from "@/contexts/ThemeContext"; 
+import { Settings as SettingsIcon, Info, Sun, Moon } from "lucide-react"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SettingsPage() {
   const { useDemoData, setUseDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { theme, setTheme, toggleTheme } = useTheme(); // Added useTheme
+  const { theme, setTheme, toggleTheme } = useTheme(); 
 
-  if (isLoadingSettings) { // isLoading from ThemeContext might also be relevant if it had one
+  if (isLoadingSettings) { 
     return (
       <div className="flex flex-col gap-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <SettingsIcon className="h-8 w-8 text-accent" /> Settings
-          </h1>
+          <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <SettingsIcon className="h-8 w-8" /> Settings 
+          </p>
           <p className="text-muted-foreground">Manage your application settings and preferences.</p>
         </div>
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader>
-            <CardTitle>Application Preferences</CardTitle>
+            <p className="text-lg font-semibold">Application Preferences</p> 
           </CardHeader>
           <CardContent>
             <p>Loading settings...</p>
@@ -37,19 +37,19 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <SettingsIcon className="h-8 w-8 text-accent" /> Settings
-        </h1>
+        <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <SettingsIcon className="h-8 w-8" /> Settings 
+        </p>
         <p className="text-muted-foreground">Manage your application settings and preferences.</p>
       </div>
 
-      <Card className="shadow-lg">
+      <Card>
         <CardHeader>
-          <CardTitle>Application Preferences</CardTitle>
-          <CardDescription>Customize HIVE to your needs.</CardDescription>
+          <p className="text-lg font-semibold">Application Preferences</p> 
+          <div className="text-sm text-muted-foreground">Customize HIVE to your needs.</div> 
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center space-x-4 rounded-md border p-4">
+          <div className="flex items-center space-x-4 rounded-none border p-4">
             <div className="flex-1 space-y-1">
               <Label htmlFor="demo-data-toggle" className="text-base font-medium">
                 Load Demo Data
@@ -73,7 +73,7 @@ export default function SettingsPage() {
             </AlertDescription>
           </Alert>
           
-          <div className="flex items-center space-x-4 rounded-md border p-4">
+          <div className="flex items-center space-x-4 rounded-none border p-4">
             <div className="flex-1 space-y-1">
               <Label htmlFor="theme-toggle" className="text-base font-medium">
                 Appearance
