@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
-import { PhaseProvider, usePhaseContext, type Phase, PHASES as AppPhasesArray } from "@/contexts/PhaseContext";
+import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray } from "@/contexts/PhaseContext";
 import { EventProvider } from "@/contexts/EventContext";
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
@@ -33,7 +33,7 @@ import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
 function AppSidebar() {
   const pathname = usePathname();
-  const { open, setOpen } = useSidebar(); // Get setOpen from context
+  const { open, setOpen } = useSidebar();
   const { activePhase, getNavItemsForPhase, constantFooterNavItems } = usePhaseContext();
 
   const currentPhaseNavItems = getNavItemsForPhase(activePhase) || [];
@@ -53,7 +53,7 @@ function AppSidebar() {
       <SidebarContent className="flex-1 p-2">
         <SidebarMenu>
           {(currentPhaseNavItems).map((item) => (
-            <SidebarMenuItem key={`${activePhase}-${item.href}`}> {/* Ensure key is unique across phase changes */}
+            <SidebarMenuItem key={`${activePhase}-${item.href}`}>
                <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
                   asChild
@@ -96,10 +96,10 @@ function AppSidebar() {
 
 function AppLayoutInternal({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { activePhase, setActivePhase, PHASES } = usePhaseContext();
+  const { activePhase, setActivePhase } = usePhaseContext();
   const [mounted, setMounted] = useState(false);
 
-  const availablePhases = PHASES || AppPhasesArray;
+  const availablePhasesForLogic = AppPhasesArray;
 
 
   useEffect(() => {
@@ -114,15 +114,12 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
       determinedPhase = 'Dashboard';
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
-    } else if (currentPath === '/events' && !currentPath.includes('/shots')) { 
-      determinedPhase = 'Plan';
-    } else if (currentPath.startsWith('/events/') && currentPath.includes('/shots')) {
-      // If we are on a shot list page, keep the current phase unless it's not set
-      // This is to allow "Shoot" phase to remain active when viewing shots from /shoot
-      if (activePhase === "Shoot") {
+    } else if (currentPath === '/events' || (currentPath.startsWith('/events/') && currentPath.includes('/shots'))) { 
+      // Keep current phase if it's 'Shoot' and we are on a shots page, otherwise default to 'Plan' for events
+      if (activePhase === "Shoot" && currentPath.includes('/shots')) {
         determinedPhase = "Shoot";
       } else {
-        determinedPhase = "Plan"; // Default to Plan if accessed from elsewhere
+        determinedPhase = "Plan";
       }
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
@@ -131,26 +128,25 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/shoot' || currentPath.startsWith('/shoot/')) {
       determinedPhase = 'Shoot';
     } else if (currentPath === '/ingestion' || currentPath.startsWith('/ingestion/')) {
-      determinedPhase = 'Shoot'; // Ingestion is part of Shoot phase
+      determinedPhase = 'Shoot'; 
     } else if (currentPath === '/post-production' || currentPath.startsWith('/post-production/')) {
       determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
     } else if (currentPath === '/settings' || currentPath.startsWith('/settings/')) {
-      // Keep current phase for settings, or default if none sensible
-       determinedPhase = activePhase; // Or a default like 'Dashboard'
+       determinedPhase = activePhase || 'Dashboard'; // Keep current phase or default
     } else if (currentPath === '/support' || currentPath.startsWith('/support/')) {
-       determinedPhase = activePhase; // Or a default
+       determinedPhase = activePhase || 'Dashboard'; // Keep current phase or default
     }
 
 
-    if (determinedPhase && availablePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
+    if (determinedPhase && availablePhasesForLogic.includes(determinedPhase) && determinedPhase !== activePhase) {
       setActivePhase(determinedPhase);
     }
-  }, [pathname, activePhase, setActivePhase, availablePhases]);
+  }, [pathname, activePhase, setActivePhase, availablePhasesForLogic]);
 
   return (
-    <SidebarProvider defaultOpen={false}> {/* Changed defaultOpen to false */}
+    <SidebarProvider defaultOpen={false}>
       <AppSidebar />
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:px-6">

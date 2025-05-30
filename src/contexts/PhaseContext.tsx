@@ -4,18 +4,17 @@
 import type { ReactNode, LucideIcon } from 'react';
 import { createContext, useContext, useState, useMemo } from 'react';
 import {
-  LayoutDashboard,
   FolderKanban,
   CalendarDays,
   Users,
   Cpu,
   Settings,
   LifeBuoy,
-  Film,
-  ClipboardList,
+  ImageIcon, // Changed from Film for Post-Production
   PackageCheck,
   RadioTower,
   UploadCloud,
+  LayoutDashboard, // For explicit Dashboard link if needed elsewhere, but not for sidebar main items
 } from "lucide-react";
 
 export type NavItem = {
@@ -25,12 +24,13 @@ export type NavItem = {
   matchStartsWith?: boolean;
 };
 
-export type Phase = "Dashboard" | "Plan" | "Shoot" | "Edit" | "Deliver";
+export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver" | "Dashboard"; // Added Dashboard back for internal phase tracking
 
-export const PHASES: Phase[] = ["Dashboard", "Plan", "Shoot", "Edit", "Deliver"];
+export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver"]; // Dashboard removed from top nav
+export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES]; // For layout internal logic to know about Dashboard as a phase
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [], // Dashboard link is now handled by its own top-level phase button
+  "Dashboard": [], // When Dashboard is active, sidebar main section is empty
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -42,10 +42,10 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true },
   ],
   "Edit": [
-    { href: "/post-production", label: "Post-Production", icon: Film, matchStartsWith: true },
+    { href: "/post-production", label: "Post-Production", icon: ImageIcon, matchStartsWith: true },
   ],
   "Deliver": [
-    { href: "/deliverables", label: "Deliverables", icon: PackageCheck, matchStartsWith: true }, // Changed icon
+    { href: "/deliverables", label: "Deliverables", icon: PackageCheck, matchStartsWith: true },
   ],
 };
 
@@ -59,16 +59,15 @@ type PhaseContextType = {
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
   constantFooterNavItems: NavItem[];
-  PHASES: Phase[];
+  PHASES: Phase[]; // For TopPhaseNavigation iteration
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
+  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); // Default to Dashboard
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    if (phase === "Dashboard") return []; // No sidebar items when Dashboard phase is active
     return phaseNavConfigs[phase] || [];
   };
 
@@ -77,7 +76,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
     setActivePhase,
     getNavItemsForPhase,
     constantFooterNavItems,
-    PHASES,
+    PHASES, // Expose PHASES for TopPhaseNavigation
   }), [activePhase]);
 
   return (
