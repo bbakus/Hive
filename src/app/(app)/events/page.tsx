@@ -80,7 +80,6 @@ export const parseEventTimes = (dateStr: string, timeStr: string): { start: Date
   endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), endHour, endMinute);
 
   if (isBefore(endDate, startDate) || (endDate.getHours() === 0 && endDate.getMinutes() === 0 && (startHour !== 0 || startMinute !== 0))) {
-    // endDate.setDate(endDate.getDate() + 1);
     endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1, endHour, endMinute);
   }
 
@@ -125,6 +124,7 @@ const getCoverageIcon = (isCovered?: boolean) => {
 
 const getDisciplineIcon = (discipline?: Event['discipline']) => {
   if (discipline === "Photography") return <CameraIconLucide className="h-3.5 w-3.5 opacity-80 flex-shrink-0 text-primary" />;
+  // Removed Video icon as per previous refinement.
   return null;
 };
 
@@ -489,7 +489,7 @@ type BlockScheduleTabContentProps = {
   selectedProject: Project | null;
   useDemoData: boolean;
   allPersonnel: Personnel[];
-  selectedEventDates: string[];
+  selectedEventDates: string[]; // For determining which date to show
 };
 
 function BlockScheduleTabContent({
@@ -783,7 +783,21 @@ export default function EventsPage() {
       });
     }
 
-    // Quick Shot Descriptions are handled in EventFormDialog after event is created/updated
+    // Handle quick shot descriptions
+    if (currentEventId && data.quickShotDescriptionsInput) {
+      const descriptions = data.quickShotDescriptionsInput
+        .split('\n')
+        .map(desc => desc.trim())
+        .filter(desc => desc.length > 0);
+      
+      descriptions.forEach(desc => {
+        // Assuming addShotRequest is available in context, or pass it down/handle differently
+        // For now, this relies on EventFormDialog having access or the parent page handling it.
+        // This part needs to be connected to the EventContext's addShotRequest.
+        console.log(`Would add shot: '${desc}' to eventId: ${currentEventId}`);
+      });
+    }
+
     setIsEventModalOpen(false);
     setEditingEvent(null);
   };
@@ -827,7 +841,7 @@ export default function EventsPage() {
         const sortedEvents = [...displayableEvents].sort((a,b) => new Date(a.date.replace(/\//g, '-')).getTime() - new Date(b.date.replace(/\//g, '-')).getTime());
         return sortedEvents[0].date;
     }
-    return null; // Or today's date if preferred
+    return null; 
   }, [selectedEventDates, displayableEvents]);
 
 
@@ -844,19 +858,17 @@ export default function EventsPage() {
             {selectedProject ? `Events for ${selectedProject.name}` : "Manage all events, shot requests, timings, and priorities."}
           </p>
         </div>
-        <Button onClick={openAddEventModal} variant="accent">
+        <Button onClick={openAddEventModal} variant="outline">
           <PlusCircle className="mr-2 h-5 w-5" />
           Add New Event
         </Button>
       </div>
 
-      <Accordion type="single" collapsible className="w-full mb-6">
+      <Accordion type="single" collapsible className="w-full mb-4">
         <AccordionItem value="event-filters">
-          <AccordionTrigger>
-            <Button variant="outline" className="w-full justify-start font-normal text-sm">
-              <FilterIcon className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
+          <AccordionTrigger className={cn(buttonVariants({ variant: "outline" }), "w-auto font-normal text-sm px-3 py-2 h-9")}>
+            <FilterIcon className="mr-2 h-4 w-4" />
+            Filters
           </AccordionTrigger>
           <AccordionContent>
             <EventFilters
@@ -947,5 +959,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-    
