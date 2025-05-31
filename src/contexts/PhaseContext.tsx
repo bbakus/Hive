@@ -40,10 +40,10 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Shoot": [
     { href: "/shoot", label: "Live Schedule & Tracking", icon: RadioTower, matchStartsWith: true },
-    { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true },
   ],
   "Edit": [
     { href: "/post-production", label: "Post-Production", icon: ImageIcon, matchStartsWith: true },
+    { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true },
   ],
   "Deliver": [
     { href: "/deliverables", label: "Deliverables", icon: PackageCheck, matchStartsWith: true },
@@ -95,3 +95,4 @@ export function usePhaseContext() {
   }
   return context;
 }
+

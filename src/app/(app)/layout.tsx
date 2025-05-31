@@ -130,7 +130,7 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/shoot' || currentPath.startsWith('/shoot/')) {
       determinedPhase = 'Shoot';
     } else if (currentPath === '/ingestion' || currentPath.startsWith('/ingestion/')) {
-      determinedPhase = 'Shoot'; 
+      determinedPhase = 'Edit'; 
     } else if (currentPath === '/post-production' || currentPath.startsWith('/post-production/')) {
       determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
@@ -197,3 +197,4 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SettingsProvider>
   );
 }
+
