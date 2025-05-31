@@ -91,18 +91,14 @@ export default function PostProductionPage() {
                                ? task.assignedEditorId 
                                : (newAssignedEditorId === null ? task.assignedEditorId : newAssignedEditorId);
           
-          // If newAssignedEditorId is explicitly null, it means unassign.
-          // If it's undefined, it means keep current assignee.
-          // If it's a string, it means assign to that new editor.
           const finalAssignedEditorId = newAssignedEditorId === undefined 
                                         ? task.assignedEditorId 
                                         : newAssignedEditorId;
 
-          const editorName = getEditorName(editorForLog) || getEditorName(MOCK_CURRENT_USER_ID) || 'System';
+          const editorName = getEditorName(finalAssignedEditorId) || getEditorName(MOCK_CURRENT_USER_ID) || 'System Action';
           let newActivity = task.lastActivity;
 
           switch(specificAction) {
-            case "claim_ingestion_task": newActivity = `Ingestion task claimed for culling by ${editorName}`; break;
             case "claim_culling_task": newActivity = `Culling claimed by ${editorName}`; break;
             case "complete_culling": newActivity = `Culling completed by ${editorName}, sent to Color Treatment`; break;
             case "release_from_culling": newActivity = `Released from Culling by ${editorName}, back to Ingestion Queue`; break;
@@ -141,7 +137,6 @@ export default function PostProductionPage() {
         ? 'reopen_completed_task'
         : 'request_revision_from_review';
       
-      // When sending for revision, it should become unassigned to go back into the general pool for that stage
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, actionType, reason);
     }
     setIsRevisionDialogOpen(false);
@@ -182,6 +177,7 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
+            {/* Updated description to mention auto-population */}
             <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated from ingestion utility reports via HIVE's backend.</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
@@ -247,53 +243,53 @@ export default function PostProductionPage() {
                           <p className="text-muted-foreground/80 italic">Last Activity: {task.lastActivity}</p>
                           <div className="mt-2.5 flex flex-wrap gap-1.5">
                             {task.status === 'ingestion' && !task.assignedEditorId && (
-                              <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling_task')} className="text-xs">
+                              <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling_task')} className="text-xs text-accent">
                                 Start Culling
                               </Button>
                             )}
                             {task.status === 'culling' && !task.assignedEditorId && (
-                               <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling_task')} className="text-xs">
+                               <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling_task')} className="text-xs text-accent">
                                 Start Culling
                               </Button>
                             )}
                             {task.status === 'culling' && isCurrentUserAssigned && (
                               <>
-                                <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'color', task.assignedEditorId, 'complete_culling')} className="text-xs">
+                                <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'color', task.assignedEditorId, 'complete_culling')} className="text-xs text-accent">
                                   Mark Culling Complete
                                 </Button>
-                                <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'ingestion', null, 'release_from_culling')}>
+                                <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => handleTaskAction(task.id, 'ingestion', null, 'release_from_culling')}>
                                   Release Task
                                 </Button>
                               </>
                             )}
                              {task.status === 'color' && !task.assignedEditorId && (
-                               <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'color', MOCK_CURRENT_USER_ID, 'claim_color_task')} className="text-xs">
+                               <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'color', MOCK_CURRENT_USER_ID, 'claim_color_task')} className="text-xs text-accent">
                                 Start Color Treatment
                               </Button>
                             )}
                              {task.status === 'color' && isCurrentUserAssigned && (
                               <>
-                                <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'complete_color')} className="text-xs">
+                                <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'complete_color')} className="text-xs text-accent">
                                   Mark Color Complete
                                 </Button>
-                                <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color')}>
+                                <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color')}>
                                   Release Task
                                 </Button>
                               </>
                             )}
                             {task.status === 'review' && (
                                 <>
-                                  <Button size="xs" variant="accent" onClick={() => handleTaskAction(task.id, 'completed', MOCK_CURRENT_USER_ID, 'approve_review')} className="text-xs"> 
-                                      Approve & Complete
+                                  <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'completed', MOCK_CURRENT_USER_ID, 'approve_review')} className="text-xs text-green-600 dark:text-green-400"> 
+                                      Approve &amp; Complete
                                   </Button>
-                                  <Button size="xs" variant="ghost" className="text-muted-foreground text-xs" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
+                                  <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
                                       <RotateCcw className="mr-1 h-3 w-3" /> Request Revisions
                                   </Button>
                                 </>
                             )}
                              {task.status === 'completed' && (
                                 <>
-                                   <Button size="xs" variant="ghost" className="text-muted-foreground text-xs" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
+                                   <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
                                       <RotateCcw className="mr-1 h-3 w-3" /> Reopen Task
                                   </Button>
                                 </>
