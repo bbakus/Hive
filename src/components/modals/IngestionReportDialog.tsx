@@ -108,19 +108,19 @@ interface FullIngestionReport {
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("p-4 mb-4 bg-card/50", className)}> {/* Removed border from here */}
-    <h3 className="text-md font-semibold mb-3 flex items-center">
-      {Icon && <Icon className="mr-2 h-5 w-5 text-accent" />}
+  <div className={cn("p-4 mb-4 bg-card/50 print:p-0 print:mb-2 print:bg-transparent", className)}>
+    <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
+      {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
     </h3>
-    {isEmpty ? <p className="text-xs text-muted-foreground italic">No data provided for this section.</p> : <div className="space-y-2 text-xs">{children}</div>}
+    {isEmpty ? <p className="text-xs text-muted-foreground italic print:text-xs">No data provided for this section.</p> : <div className="space-y-2 text-xs print:space-y-1">{children}</div>}
   </div>
 );
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
-  <div className={cn("flex flex-col sm:flex-row sm:items-start", className)}>
-    <p className="font-medium text-muted-foreground sm:w-1/3">{label}:</p>
-    {children ? <div className="sm:w-2/3">{children}</div> : <p className="sm:w-2/3 break-words">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
+  <div className={cn("flex flex-col sm:flex-row sm:items-start print:flex-row", className)}>
+    <p className="font-medium text-muted-foreground sm:w-1/3 print:w-1/4 print:font-normal">{label}:</p>
+    {children ? <div className="sm:w-2/3 print:w-3/4">{children}</div> : <p className="sm:w-2/3 break-words print:w-3/4">{String(value ?? "").trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
 );
 
@@ -146,9 +146,9 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   else if (["failed", "error", "no", "excluded", "false"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
   
-  const successClass = (variant === "default") ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700" : "";
+  const successClass = (variant === "default") ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700 print:bg-green-100 print:text-green-800 print:border-green-500" : "print:border-gray-400 print:bg-gray-100 print:text-gray-700";
 
-  return <Badge variant={variant} className={cn("capitalize text-xs", successClass)}>{String(status === undefined || status === null || String(status).trim() === "" ? "N/A" : status)}</Badge>;
+  return <Badge variant={variant} className={cn("capitalize text-xs print:text-[10px] print:px-1 print:py-0", successClass)}>{String(status === undefined || status === null || String(status).trim() === "" ? "N/A" : status)}</Badge>;
 };
 
 
@@ -194,19 +194,8 @@ export function IngestionReportDialog({
     }
   }, [isOpen, reportUrl]);
 
-  const handleDownloadJson = () => {
-    if (!reportData) return;
-    const jsonString = JSON.stringify(reportData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const reportId = reportData.reportSummary?.id || 'ingestion_report';
-    a.download = `${reportId}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handlePrintReport = () => {
+    window.print();
   };
 
   return (
@@ -218,7 +207,7 @@ export function IngestionReportDialog({
             Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl})
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0">
+        <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0" id="ingestion-report-content">
           {isLoading && (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -226,14 +215,14 @@ export function IngestionReportDialog({
             </div>
           )}
           {error && (
-            <Alert variant="destructive" className="my-4">
+            <Alert variant="destructive" className="my-4 print:hidden">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Error Loading Report</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
           {reportData && !isLoading && (
-            <div className="space-y-3 p-1">
+            <div className="space-y-3 p-1 print:space-y-1 print:p-0">
               {reportData.reportSummary && (
                 <SectionCard title="Report Summary" icon={FileText}>
                   <InfoPair label="Report ID" value={reportData.reportSummary.id} />
@@ -273,8 +262,8 @@ export function IngestionReportDialog({
               {reportData.phases && Object.keys(reportData.phases).length > 0 ? (
                 <SectionCard title="Ingestion Phases" icon={Settings2}>
                   {reportData.phases.merge && (
-                    <div className="border-b border-border/50 pb-2 mb-2">
-                      <h4 className="font-medium text-sm mb-1">Merge Phase</h4>
+                    <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
+                      <h4 className="font-medium text-sm mb-1 print:text-xs">Merge Phase</h4>
                       <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
                       <InfoPair label="Duration" value={`${new Date(reportData.phases.merge.started).toLocaleTimeString()} - ${new Date(reportData.phases.merge.ended).toLocaleTimeString()}`} />
                       <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
@@ -283,8 +272,8 @@ export function IngestionReportDialog({
                     </div>
                   )}
                   {reportData.phases.copy && (
-                    <div className="border-b border-border/50 pb-2 mb-2">
-                      <h4 className="font-medium text-sm mb-1">Copy Phase</h4>
+                    <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
+                      <h4 className="font-medium text-sm mb-1 print:text-xs">Copy Phase</h4>
                       <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
                       <InfoPair label="Duration" value={`${new Date(reportData.phases.copy.started).toLocaleTimeString()} - ${new Date(reportData.phases.copy.ended).toLocaleTimeString()}`} />
                       <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
@@ -294,8 +283,8 @@ export function IngestionReportDialog({
                     </div>
                   )}
                   {reportData.phases.checksum && (
-                    <div>
-                      <h4 className="font-medium text-sm mb-1">Checksum Phase</h4>
+                    <div className="print:pt-1">
+                      <h4 className="font-medium text-sm mb-1 print:text-xs">Checksum Phase</h4>
                       <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
                       <InfoPair label="Duration" value={`${new Date(reportData.phases.checksum.started).toLocaleTimeString()} - ${new Date(reportData.phases.checksum.ended).toLocaleTimeString()}`} />
                       <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
@@ -313,25 +302,25 @@ export function IngestionReportDialog({
 
               {reportData.fileDetails && reportData.fileDetails.length > 0 ? (
                 <SectionCard title="File Details" icon={FileText}>
-                  <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none">
-                    <Table className="text-xs">
-                      <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                  <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none print:max-h-none print:overflow-visible print:border-gray-300">
+                    <Table className="text-xs print:text-[9px]">
+                      <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm print:bg-gray-100">
                         <TableRow>
-                          <TableHead className="p-1.5">Filename</TableHead>
-                          <TableHead className="p-1.5 text-right">Size</TableHead>
-                          <TableHead className="p-1.5">Status</TableHead>
-                          <TableHead className="p-1.5">Checksum</TableHead>
-                          <TableHead className="p-1.5">Reason</TableHead>
+                          <TableHead className="p-1.5 print:p-0.5">Filename</TableHead>
+                          <TableHead className="p-1.5 text-right print:p-0.5">Size</TableHead>
+                          <TableHead className="p-1.5 print:p-0.5">Status</TableHead>
+                          <TableHead className="p-1.5 print:p-0.5">Checksum</TableHead>
+                          <TableHead className="p-1.5 print:p-0.5">Reason</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {reportData.fileDetails.map((file, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="p-1.5 font-mono truncate max-w-xs" title={file.name}>{file.name}</TableCell>
-                            <TableCell className="p-1.5 text-right font-mono">{formatBytes(file.size)}</TableCell>
-                            <TableCell className="p-1.5"><StatusBadge status={file.status} /></TableCell>
-                            <TableCell className="p-1.5 font-mono truncate max-w-[100px]" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
-                            <TableCell className="p-1.5 truncate max-w-xs" title={file.reason}>{file.reason || "N/A"}</TableCell>
+                          <TableRow key={index} className="print:even:bg-gray-50">
+                            <TableCell className="p-1.5 font-mono truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.name}>{file.name}</TableCell>
+                            <TableCell className="p-1.5 text-right font-mono print:p-0.5">{formatBytes(file.size)}</TableCell>
+                            <TableCell className="p-1.5 print:p-0.5"><StatusBadge status={file.status} /></TableCell>
+                            <TableCell className="p-1.5 font-mono truncate max-w-[100px] print:p-0.5 print:max-w-[80px]" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
+                            <TableCell className="p-1.5 truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.reason}>{file.reason || "N/A"}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -352,7 +341,7 @@ export function IngestionReportDialog({
                       {(reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0) ? (
                           <ul className="list-disc list-inside">
                             {reportData.overallSummary.excludedFiles.map((ef, idx) => (
-                                <li key={`${ef.name}-${idx}`}>{ef.name} <span className="text-muted-foreground/80">({ef.reason})</span></li>
+                                <li key={`${ef.name}-${idx}`}>{ef.name} <span className="text-muted-foreground/80 print:text-gray-600">({ef.reason})</span></li>
                             ))}
                           </ul>
                       ) : (<span className="italic text-muted-foreground/70">None</span>) }
@@ -367,7 +356,7 @@ export function IngestionReportDialog({
                 <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={true} />
               )}
 
-              <div className="grid md:grid-cols-2 gap-3">
+              <div className="grid md:grid-cols-2 gap-3 print:grid-cols-2">
                 {reportData.environment ? (
                   <SectionCard title="Ingest Utility Environment" icon={Laptop}>
                     <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
@@ -396,19 +385,19 @@ export function IngestionReportDialog({
         </ScrollArea>
         <Alert variant="default" className="mt-2 print:hidden">
           <Info className="h-4 w-4" />
-          <AlertTitle>Exporting Data</AlertTitle>
+          <AlertTitle>Exporting This Report</AlertTitle>
           <AlertDescription className="text-xs">
-            The "Download Report Data (JSON)" button will directly download the raw JSON for this report. For a formatted PDF, use your browser's print functionality (Ctrl/Cmd + P) and select "Save as PDF".
+            To save this report as a PDF, click the "Download PDF" button. This will use your browser&apos;s print functionality.
+            Ensure you select "Save as PDF" as the destination in the print preview dialog. Adjust layout options (e.g., "Portrait", "Fit to page", disable headers/footers) in the print dialog for best results.
           </AlertDescription>
         </Alert>
         <DialogFooter className="mt-auto pt-4 border-t border-border/50 print:hidden">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button onClick={handleDownloadJson} variant="accent" disabled={!reportData || isLoading}>
-            <Download className="mr-2 h-4 w-4"/> Download Report Data (JSON)
+          <Button onClick={handlePrintReport} variant="accent" disabled={!reportData || isLoading}>
+            <Download className="mr-2 h-4 w-4"/> Download PDF
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
