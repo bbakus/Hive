@@ -42,12 +42,13 @@ const MOCK_EDITORS: Editor[] = [
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
 
 // Initial mock data for tasks. In a real application, tasks in the 'ingestion'
-// queue would be populated dynamically based on completed ingestion jobs.
+// queue would be populated dynamically based on completed ingestion jobs reported by a local utility
+// to HIVE's backend (e.g., via POST /api/ingestion/notify-completion).
 const initialTasksData: KanbanTask[] = [
   { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC' },
   { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF'},
   { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
-  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
+  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
   { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
   { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
@@ -79,7 +80,7 @@ export default function PostProductionPage() {
   const handleTaskAction = (
     taskId: string,
     newStatus: TaskStatus,
-    newAssignedEditorId?: string | null | undefined,
+    newAssignedEditorId: string | null | undefined, // Allow undefined to mean "don't change assignee"
     specificAction?: string,
     revisionReason?: string
   ) => {
@@ -89,11 +90,19 @@ export default function PostProductionPage() {
           const editorForLog = newAssignedEditorId === undefined 
                                ? task.assignedEditorId 
                                : (newAssignedEditorId === null ? task.assignedEditorId : newAssignedEditorId);
+          
+          // If newAssignedEditorId is explicitly null, it means unassign.
+          // If it's undefined, it means keep current assignee.
+          // If it's a string, it means assign to that new editor.
+          const finalAssignedEditorId = newAssignedEditorId === undefined 
+                                        ? task.assignedEditorId 
+                                        : newAssignedEditorId;
+
           const editorName = getEditorName(editorForLog) || getEditorName(MOCK_CURRENT_USER_ID) || 'System';
           let newActivity = task.lastActivity;
 
           switch(specificAction) {
-            case "claim_ingestion_task": newActivity = `Ingestion task claimed by ${editorName}`; break;
+            case "claim_ingestion_task": newActivity = `Ingestion task claimed for culling by ${editorName}`; break;
             case "claim_culling_task": newActivity = `Culling claimed by ${editorName}`; break;
             case "complete_culling": newActivity = `Culling completed by ${editorName}, sent to Color Treatment`; break;
             case "release_from_culling": newActivity = `Released from Culling by ${editorName}, back to Ingestion Queue`; break;
@@ -110,12 +119,8 @@ export default function PostProductionPage() {
             default:
               newActivity = `${KANBAN_COLUMNS.find(c => c.id === newStatus)?.title || 'Task'} updated by ${editorName}.`;
           }
-
-          const assignmentUpdate = newAssignedEditorId === undefined
-            ? {} 
-            : { assignedEditorId: newAssignedEditorId }; 
-
-          return { ...task, status: newStatus, ...assignmentUpdate, lastActivity: newActivity };
+          
+          return { ...task, status: newStatus, assignedEditorId: finalAssignedEditorId, lastActivity: newActivity };
         }
         return task;
       })
@@ -131,9 +136,12 @@ export default function PostProductionPage() {
     if (revisionTaskDetails) {
       const taskToRevise = tasks.find(t => t.id === revisionTaskDetails.taskId);
       if (!taskToRevise) return;
+
       const actionType = taskToRevise.status === 'completed'
         ? 'reopen_completed_task'
         : 'request_revision_from_review';
+      
+      // When sending for revision, it should become unassigned to go back into the general pool for that stage
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, actionType, reason);
     }
     setIsRevisionDialogOpen(false);
@@ -174,7 +182,7 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
-            <p className="text-muted-foreground">Manage photo editing tasks through different stages. Tasks in 'Ingestion Queue' would typically auto-populate from ingestion utility reports.</p>
+            <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated from ingestion utility reports via HIVE's backend.</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
             <PlusCircle className="mr-2 h-4 w-4" /> Simulate New Ingested Task
@@ -305,3 +313,4 @@ export default function PostProductionPage() {
     </div>
   );
 }
+

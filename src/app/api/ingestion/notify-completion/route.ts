@@ -13,7 +13,9 @@ export async function POST(request: Request) {
     // TODO: Validate jobCompletionData against expected schema
     // TODO: Update job status in HIVE's database to 'completed' or 'failed' based on payload
     // TODO: Store reportUrl or summary data from jobCompletionData
-    // TODO: Trigger HIVE-internal workflows (e.g., update shot statuses, create edit tasks)
+    // TODO: Trigger HIVE-internal workflows (e.g., create Post-Production Kanban task, update shot statuses, etc.)
+    //       - Specifically, this is where a new task would be created for the 'Ingestion Queue'
+    //         on the Post-Production Kanban board, using details from jobCompletionData.
     // TODO: Notify connected HIVE web clients (via WebSockets or similar)
 
     return NextResponse.json({ message: "HIVE notified of job completion.", receivedJobId: jobCompletionData.jobId });
@@ -23,3 +25,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to process job completion notification." }, { status: 500 });
   }
 }
+
