@@ -27,6 +27,9 @@ import { EventShootAccordionItem } from "@/components/shoot/EventShootAccordionI
 
 const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
 
+type EventTimeStatus = "past" | "in_progress" | "upcoming";
+
+
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
   const {
@@ -41,7 +44,7 @@ export default function ShootPage() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const { toast } = useToast();
 
-  const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | "upcoming" | "in_progress" | "past">("all");
+  const [filterTimeStatus, setFilterTimeStatus] = useState<"all" | EventTimeStatus>("all");
   const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false);
   const [filterHidePastEvents, setFilterHidePastEvents] = useState(false);
 
@@ -60,21 +63,7 @@ export default function ShootPage() {
     return person ? person.name : "Unknown User";
   }, []);
 
-  const todaysCoveredEvents = useMemo(() => {
-    if (!currentTime || !eventsForSelectedProjectAndOrg) return [];
-    return eventsForSelectedProjectAndOrg.filter(event => {
-      const eventTimes = parseEventTimes(event.date, event.time);
-      if (!eventTimes) return false;
-      const eventStartDate = eventTimes.start;
-      return eventStartDate && isToday(eventStartDate) && event.isCovered;
-    }).sort((a, b) => {
-        const timeA = parseEventTimes(a.date, a.time)?.start.getTime() || 0;
-        const timeB = parseEventTimes(b.date, b.time)?.start.getTime() || 0;
-        return timeA - timeB;
-    });
-  }, [currentTime, eventsForSelectedProjectAndOrg]);
-
-  const getEventStatus = useCallback((event: Event, now: Date): "in_progress" | "upcoming" | "past" => {
+  const getEventStatus = useCallback((event: Event, now: Date): EventTimeStatus => {
     const times = parseEventTimes(event.date, event.time);
     if (!times) return "upcoming"; 
 
@@ -86,6 +75,37 @@ export default function ShootPage() {
     }
     return "past";
   }, []);
+
+  const todaysCoveredEvents = useMemo(() => {
+    if (!currentTime || !eventsForSelectedProjectAndOrg) return [];
+    
+    const statusOrder: Record<EventTimeStatus, number> = {
+      past: 0,
+      in_progress: 1,
+      upcoming: 2,
+    };
+
+    return eventsForSelectedProjectAndOrg
+      .filter(event => {
+        const eventTimes = parseEventTimes(event.date, event.time);
+        if (!eventTimes) return false;
+        const eventStartDate = eventTimes.start;
+        return eventStartDate && isToday(eventStartDate) && event.isCovered;
+      })
+      .sort((a, b) => {
+        const statusA = getEventStatus(a, currentTime);
+        const statusB = getEventStatus(b, currentTime);
+
+        if (statusOrder[statusA] !== statusOrder[statusB]) {
+          return statusOrder[statusA] - statusOrder[statusB];
+        }
+
+        const timeA = parseEventTimes(a.date, a.time)?.start.getTime() || 0;
+        const timeB = parseEventTimes(b.date, b.time)?.start.getTime() || 0;
+        return timeA - timeB;
+      });
+  }, [currentTime, eventsForSelectedProjectAndOrg, getEventStatus]);
+
 
   const filteredTodaysEvents = useMemo(() => {
     if (!currentTime) return [];
@@ -276,7 +296,7 @@ export default function ShootPage() {
                 </Select>
             </div>
             <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-end sm:justify-end gap-x-6 gap-y-2">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 justify-end">
                   <Checkbox
                       id="filter-quick-turnaround"
                       checked={filterQuickTurnaround}
@@ -284,7 +304,7 @@ export default function ShootPage() {
                   />
                   <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 justify-end">
                   <Checkbox
                       id="filter-hide-past"
                       checked={filterHidePastEvents}
@@ -331,3 +351,4 @@ export default function ShootPage() {
     
 
     
+
