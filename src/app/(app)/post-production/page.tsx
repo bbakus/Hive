@@ -220,9 +220,9 @@ export default function PostProductionPage() {
 
 
       <ScrollArea className="flex-grow pb-4">
-        <div className="flex justify-center gap-4 items-start">
+        <div className="flex w-full justify-start gap-4 items-start">
           {KANBAN_COLUMNS.map((column) => (
-            <div key={column.id} className="w-72 min-w-[18rem] flex-shrink-0">
+            <div key={column.id} className="min-w-[18rem] flex-1">
               <Card className="border-0 bg-transparent h-full">
                 <CardHeader className="pb-3 pt-4 px-4 border-b">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
