@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { Icons } from "@/components/icons"; // Import HIVE Icons
+import { Icons } from "@/components/icons";
 
 // --- Report Data Structure Interfaces ---
 interface ReportUser {
@@ -81,6 +81,7 @@ interface ReportOverallSummary {
   overallStatus: string;
   notes: string[];
 }
+
 interface ReportEnvironment {
   ingestUtilityVersion?: string;
   nodeVersion?: string;
@@ -109,7 +110,7 @@ interface FullIngestionReport {
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("p-4 mb-0 print:p-0 print:mb-4 print:bg-transparent", className)}> {/* Increased print:mb-4 */}
+  <div className={cn("section-card-print mb-0 print:p-0 print:mb-4", className)}>
     <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
@@ -119,7 +120,7 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
 );
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
-  <div className={cn("flex flex-col sm:flex-row sm:items-start print:flex-row", className)}>
+  <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start print:flex-row", className)}>
     <p className="font-medium text-muted-foreground sm:w-1/3 print:w-1/4 print:font-normal">{label}:</p>
     {children ? <div className="sm:w-2/3 print:w-3/4">{children}</div> : <p className="sm:w-2/3 break-words print:w-3/4">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
@@ -146,12 +147,9 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   else if (["failed", "error", "no", "excluded", "false"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
   
-  const successClass = (variant === "default") ? "print:badge-default" : 
-                       (variant === "destructive") ? "print:badge-destructive" :
-                       (variant === "secondary") ? "print:badge-secondary" : "print:badge-outline";
+  const printClass = "print-status-badge";
 
-
-  return <Badge variant={variant} className={cn("capitalize text-xs print:text-[10px] print:px-1 print:py-0", successClass)}>{String(status === undefined || status === null || String(status).trim() === "" ? "N/A" : status)}</Badge>;
+  return <Badge variant={variant} className={cn("capitalize text-xs print:text-[10px] print:px-1 print:py-0", printClass)}>{String(status === undefined || status === null || String(status).trim() === "" ? "N/A" : status)}</Badge>;
 };
 
 
@@ -218,7 +216,6 @@ export function IngestionReportDialog({
     } catch (e) {
       console.error("Error calling window.print():", e);
     } finally {
-      // Restore the original title after a short delay.
       setTimeout(() => {
         document.title = originalTitle;
         console.log("Original document title restored.");
@@ -238,15 +235,10 @@ export function IngestionReportDialog({
         </DialogHeader>
         <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0">
           <div id="ingestion-report-content">
-            {/* Printable Header with Logo */}
-            <div className="hidden print:block print:mb-6 print:pt-2">
-              <div className="flex items-center justify-between">
-                <Icons.HiveLogo className="h-8 w-auto text-accent" />
-                {reportData?.reportSummary?.id && (
-                  <p className="text-xs text-foreground">Report ID: {reportData.reportSummary.id}</p>
-                )}
-              </div>
-              <hr className="my-2 border-border" />
+            {/* Printable Header - Replicates DialogHeader for print */}
+            <div className="hidden print:block printable-dialog-header">
+              <h2>Ingestion Report Details</h2>
+              <p>Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl})</p>
             </div>
 
             {isLoading && (
@@ -443,4 +435,3 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
-
