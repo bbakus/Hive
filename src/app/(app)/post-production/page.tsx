@@ -9,26 +9,24 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog";
-import { IngestionReportDialog } from "@/components/modals/IngestionReportDialog"; // New Import
+import { IngestionReportDialog } from "@/components/modals/IngestionReportDialog";
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
 
-// This interface represents a task on the Kanban board.
-// In a real system, these tasks would be created based on reports from the ingestion utility.
 interface KanbanTask {
   id: string;
-  title: string; // e.g., "Keynote Speaker Candids", "Ingested Batch XYZ"
-  content: string; // e.g., "150 Images", "Source: Card_A"
+  title: string; 
+  content: string; 
   status: TaskStatus;
   assignedEditorId?: string | null;
   lastActivity?: string;
-  eventName?: string; // Derived from ingestion report or folder structure
-  photographerName?: string; // Derived from ingestion report or folder structure
-  ingestionJobId?: string; // Link back to the ingestion job
-  reportUrl?: string; // URL to the detailed ingestion report
+  eventName?: string; 
+  photographerName?: string; 
+  ingestionJobId?: string; 
+  reportUrl?: string; 
 }
 
 interface KanbanColumnDef {
@@ -40,23 +38,18 @@ interface KanbanColumnDef {
 const MOCK_EDITORS: Editor[] = [
   { id: 'editor1', name: 'Alice Editor' },
   { id: 'editor2', name: 'Bob Retoucher' },
-  { id: 'editor_current_user', name: 'Charlie CurrentUser' }, // Current user
+  { id: 'editor_current_user', name: 'Charlie CurrentUser' }, 
 ];
 
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
 
-// Initial mock data for tasks. In a real application, tasks in the 'ingestion'
-// queue would be populated dynamically based on completed ingestion jobs reported by a local utility
-// to HIVE's backend (e.g., via POST /api/ingestion/notify-completion).
-// The reportUrl should point to a publicly accessible JSON file if it's to be fetched.
-// For this prototype, we'll assume a mock report file in public/reports/mock/
 const initialTasksData: KanbanTask[] = [
   { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC', reportUrl: '/reports/mock/sample_ingest_report.json' },
   { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF', reportUrl: '/reports/mock/sample_ingest_report.json'},
-  { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_GHI' },
+  { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_GHI', reportUrl: '/reports/mock/sample_ingest_report.json' },
   { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}`, ingestionJobId: 'Job_JKL', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
-  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
+  { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}`, reportUrl: '/reports/mock/sample_ingest_report.json' },
+  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}`, reportUrl: '/reports/mock/sample_ingest_report.json' },
 ];
 
 
@@ -89,7 +82,7 @@ export default function PostProductionPage() {
   const handleTaskAction = (
     taskId: string,
     newStatus: TaskStatus,
-    newAssignedEditorId: string | null | undefined, // Allow undefined to mean "don't change assignee"
+    newAssignedEditorId: string | null | undefined, 
     specificAction?: string,
     revisionReason?: string
   ) => {
@@ -169,7 +162,7 @@ export default function PostProductionPage() {
       photographerName: randomPhotographerNames[Math.floor(Math.random() * randomPhotographerNames.length)],
       lastActivity: `Awaiting culling (Simulated Ingestion - ${new Date().toLocaleTimeString()})`,
       ingestionJobId: jobSimId,
-      reportUrl: '/reports/mock/sample_ingest_report.json' // Points to the sample report
+      reportUrl: '/reports/mock/sample_ingest_report.json' 
     };
     setTasks(prevTasks => [newSimulatedTask, ...prevTasks]);
   };
@@ -195,7 +188,6 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
-            {/* Comment about task origination */}
             <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated based on completion reports from local ingestion utilities (via POST to `/api/ingestion/notify-completion`).</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
