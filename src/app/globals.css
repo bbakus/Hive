@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -126,131 +127,82 @@ body {
 }
 
 @media print {
-  body {
-    background-color: white !important; /* Ensure white background for printing */
-    color: black !important; /* Ensure black text for printing */
-    -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
-    color-adjust: exact !important; /* Standard */
+  /* Force light theme variables for printing */
+  body { /* Apply to body to ensure high specificity */
+    --background: 0 0% 100% !important;
+    --foreground: 0 0% 9% !important;
+    --card: 0 0% 100% !important;
+    --card-foreground: 0 0% 9% !important;
+    --popover: 0 0% 100% !important;
+    --popover-foreground: 0 0% 9% !important;
+    --primary: 0 0% 9% !important;
+    --primary-foreground: 0 0% 100% !important;
+    --secondary: 0 0% 96.1% !important;
+    --secondary-foreground: 0 0% 9% !important;
+    --muted:  0 0% 90% !important;
+    --muted-foreground: 0 0% 45.1% !important;
+    --accent: 40 100% 50% !important;
+    --accent-foreground: 0 0% 9% !important;
+    --destructive: 0 84.2% 60.2% !important;
+    --destructive-foreground: 0 0% 98% !important;
+    --border: 0 0% 80% !important;
+    --input: 0 0% 100% !important;
+    --ring: 40 100% 50% !important;
+
+    background-color: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    font-family: Arial, Helvetica, sans-serif !important;
   }
-  .print\:hidden {
-    display: none !important;
-  }
-  .print\:block {
-    display: block !important;
-  }
-  .print\:overflow-visible {
-    overflow: visible !important;
-  }
-  .print\:h-auto {
-    height: auto !important;
-  }
-  .print\:max-w-full {
-    max-width: 100% !important;
-  }
-  .print\:border-0 {
-    border: 0 !important;
-  }
-  .print\:shadow-none {
-    box-shadow: none !important;
-  }
-  .print\:p-0 {
-    padding: 0 !important;
-  }
-  .print\:mb-2 {
-    margin-bottom: 0.5rem !important; /* 8px */
-  }
-  .print\:text-base {
-    font-size: 1rem !important; /* 16px */
-    line-height: 1.5rem !important; /* 24px */
-  }
-  .print\:text-xs {
-    font-size: 0.75rem !important; /* 12px */
-    line-height: 1rem !important; /* 16px */
-  }
-   .print\:text-\[10px\] {
-    font-size: 10px !important;
-    line-height: 12px !important;
-  }
-  .print\:text-\[9px\] {
-    font-size: 9px !important;
-    line-height: 11px !important;
-  }
-  .print\:mb-1 {
-    margin-bottom: 0.25rem !important; /* 4px */
-  }
-  .print\:space-y-1 > :not([hidden]) ~ :not([hidden]) {
-    --tw-space-y-reverse: 0;
-    margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse))) !important;
-    margin-bottom: calc(0.25rem * var(--tw-space-y-reverse)) !important;
-  }
-  .print\:border-gray-300 {
-    border-color: #d1d5db !important;
-  }
-   .print\:bg-gray-100 {
-    background-color: #f3f4f6 !important;
-  }
-  .print\:text-gray-700 {
-    color: #374151 !important;
-  }
-  .print\:text-gray-600 {
-    color: #4b5563 !important;
-  }
-  .print\:even\:bg-gray-50:nth-child(even) {
-    background-color: #f9fafb !important;
-  }
-  .print\:p-0\.5 {
-    padding: 0.125rem !important;
-  }
-   .print\:max-w-\[150px\] {
-    max-width: 150px !important;
-  }
-  .print\:max-w-\[80px\] {
-    max-width: 80px !important;
-  }
-  .print\:bg-transparent {
-    background-color: transparent !important;
-  }
-  .print\:pt-1 {
-    padding-top: 0.25rem !important;
-  }
-  .print\:grid-cols-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-   .print\:w-1\/4 {
-    width: 25% !important;
-  }
-  .print\:w-3\/4 {
-    width: 75% !important;
-  }
-  /* Ensure dark mode styles are overridden for print */
-  .dark .print\:bg-gray-100 {
-    background-color: #f3f4f6 !important;
-  }
-  .dark .print\:text-gray-700 {
-    color: #374151 !important;
-  }
-  .dark .print\:border-gray-300 {
-     border-color: #d1d5db !important;
-  }
-  .dark .print\:even\:bg-gray-50:nth-child(even) {
-    background-color: #f9fafb !important;
-  }
-  .dark .print\:bg-green-100 {
-    background-color: #d1fae5 !important; /* A light green for dark mode print */
-  }
-  .dark .print\:text-green-800 {
-    color: #065f46 !important; /* A dark green for text on light green */
-  }
-  .dark .print\:border-green-500 {
-     border-color: #10b981 !important;
-  }
+
+  .print\:hidden { display: none !important; }
+  .print\:block { display: block !important; }
+  .print\:overflow-visible { overflow: visible !important; }
+  .print\:h-auto { height: auto !important; }
+  .print\:max-w-full { max-width: 100% !important; }
+  .print\:border-0 { border: 0 !important; }
+  .print\:shadow-none { box-shadow: none !important; }
+  .print\:p-0 { padding: 0 !important; }
+  .print\:mb-2 { margin-bottom: 0.5rem !important; }
+  .print\:text-base { font-size: 1rem !important; line-height: 1.5rem !important; }
+  .print\:text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
+  .print\:text-\[10px\] { font-size: 10px !important; line-height: 12px !important; }
+  .print\:text-\[9px\] { font-size: 9px !important; line-height: 11px !important; }
+  .print\:mb-1 { margin-bottom: 0.25rem !important; }
+  .print\:space-y-1 > :not([hidden]) ~ :not([hidden]) { --tw-space-y-reverse: 0; margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse))) !important; margin-bottom: calc(0.25rem * var(--tw-space-y-reverse)) !important; }
+  .print\:border-gray-300 { border-color: #d1d5db !important; } /* Specific light theme border */
+  .print\:bg-gray-100 { background-color: #f3f4f6 !important; } /* Specific light theme background */
+  .print\:text-gray-700 { color: #374151 !important; } /* Specific light theme text */
+  .print\:text-gray-600 { color: #4b5563 !important; }
+  .print\:even\:bg-gray-50:nth-child(even) { background-color: #f9fafb !important; }
+  .print\:p-0\.5 { padding: 0.125rem !important; }
+  .print\:max-w-\[150px\] { max-width: 150px !important; }
+  .print\:max-w-\[80px\] { max-width: 80px !important; }
+  .print\:bg-transparent { background-color: transparent !important; }
+  .print\:pt-1 { padding-top: 0.25rem !important; }
+  .print\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .print\:w-1\/4 { width: 25% !important; }
+  .print\:w-3\/4 { width: 75% !important; }
+
+  /* Override dark mode styles for print explicitly if needed, though vars should handle it */
+  .dark .print\:bg-gray-100 { background-color: #f3f4f6 !important; }
+  .dark .print\:text-gray-700 { color: #374151 !important; }
+  .dark .print\:border-gray-300 { border-color: #d1d5db !important; }
+  .dark .print\:even\:bg-gray-50:nth-child(even) { background-color: #f9fafb !important; }
+  
+  /* Badge print styles */
+  .print\:badge-default { background-color: #d1fae5 !important; color: #065f46 !important; border-color: #10b981 !important; border-width: 1px !important; } /* Light green */
+  .print\:badge-secondary { background-color: #e0e7ff !important; color: #3730a3 !important; border-color: #6366f1 !important; border-width: 1px !important; } /* Light indigo */
+  .print\:badge-destructive { background-color: #fee2e2 !important; color: #991b1b !important; border-color: #ef4444 !important; border-width: 1px !important; } /* Light red */
+  .print\:badge-outline { background-color: #f3f4f6 !important; color: #374151 !important; border-color: #9ca3af !important; border-width: 1px !important; } /* Light gray */
+
   /* Specific to IngestionReportDialog for better print layout */
   @page {
-    size: auto; /* auto is the initial value */
-    margin: 0.5in; /* Adjust margins as needed */
+    size: auto;
+    margin: 0.5in;
   }
-  /* Hide Dialog Overlay, Header, Footer, and Scrollbar for printing */
-  .print\:dialog-content-reset { /* Custom class to target the specific dialog content for print */
+  .print\:dialog-content-reset {
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
@@ -260,5 +212,45 @@ body {
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
+    background-color: white !important; /* Ensure dialog content bg is white */
+  }
+  
+  #ingestion-report-content {
+    background-color: white !important;
+  }
+  #ingestion-report-content h3,
+  #ingestion-report-content h4,
+  #ingestion-report-content p,
+  #ingestion-report-content div,
+  #ingestion-report-content span,
+  #ingestion-report-content li,
+  #ingestion-report-content th,
+  #ingestion-report-content td {
+    color: black !important; /* Force text to black */
+    background-color: transparent !important; /* Ensure no dark backgrounds leak */
+  }
+  #ingestion-report-content .text-muted-foreground,
+  #ingestion-report-content .text-muted-foreground\/70,
+  #ingestion-report-content .text-muted-foreground\/80 {
+    color: #4b5563 !important; /* Specific gray for muted text */
+  }
+  #ingestion-report-content .text-accent {
+    color: hsl(40 100% 50%) !important; /* Original accent color */
+  }
+   #ingestion-report-content .bg-card\/50 {
+     background-color: #f9fafb !important; /* Light gray similar to muted */
+  }
+  #ingestion-report-content table thead th {
+    background-color: #e5e7eb !important; /* Slightly darker gray for table headers */
+  }
+  #ingestion-report-content table td, #ingestion-report-content table th {
+    border-color: #d1d5db !important; /* Consistent light border for table cells */
+  }
+  #ingestion-report-content .border-border\/50 {
+    border-color: #d1d5db !important;
+  }
+  #ingestion-report-content .bg-muted\/80 { /* Used for table header */
+    background-color: #e5e7eb !important;
   }
 }
+

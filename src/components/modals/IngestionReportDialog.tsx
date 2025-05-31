@@ -38,7 +38,7 @@ interface ReportSummaryInfo {
   id: string;
   timestamp: string;
   performedBy?: ReportUser;
-  appVersion?: string; // Changed from ingestUtilityVersion for consistency with example
+  appVersion?: string;
   event?: ReportEvent;
   photographer?: ReportPhotographer;
 }
@@ -142,12 +142,14 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   if (typeof status === "boolean") text = status ? "yes" : "no";
   if (status === null || status === undefined || text === "undefined" || String(status).trim() === "") text = "n/a";
 
-
   if (["success", "verified", "passed", "true", "yes", "ingested", "completed"].includes(text)) variant = "default";
   else if (["failed", "error", "no", "excluded", "false"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
   
-  const successClass = (variant === "default") ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700 print:bg-green-100 print:text-green-800 print:border-green-500" : "print:border-gray-400 print:bg-gray-100 print:text-gray-700";
+  const successClass = (variant === "default") ? "print:badge-default" : 
+                       (variant === "destructive") ? "print:badge-destructive" :
+                       (variant === "secondary") ? "print:badge-secondary" : "print:badge-outline";
+
 
   return <Badge variant={variant} className={cn("capitalize text-xs print:text-[10px] print:px-1 print:py-0", successClass)}>{String(status === undefined || status === null || String(status).trim() === "" ? "N/A" : status)}</Badge>;
 };
@@ -168,7 +170,6 @@ export function IngestionReportDialog({
   const [reportData, setReportData] = useState<FullIngestionReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // const { toast } = useToast(); // Uncomment if using toast for errors
 
   useEffect(() => {
     if (isOpen && reportUrl) {
@@ -208,9 +209,9 @@ export function IngestionReportDialog({
       console.log("window.print() called (browser print dialog should appear).");
     } catch (e) {
       console.error("Error calling window.print():", e);
-      // toast({ title: "Print Error", description: "Could not initiate printing.", variant: "destructive" });
     }
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -221,181 +222,183 @@ export function IngestionReportDialog({
             Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl})
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0" id="ingestion-report-content">
-          {isLoading && (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="ml-2 text-muted-foreground">Loading report...</p>
-            </div>
-          )}
-          {error && (
-            <Alert variant="destructive" className="my-4 print:hidden">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Error Loading Report</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {reportData && !isLoading && (
-            <div className="space-y-3 p-1 print:space-y-1 print:p-0">
-              {reportData.reportSummary && (
-                <SectionCard title="Report Summary" icon={FileText}>
-                  <InfoPair label="Report ID" value={reportData.reportSummary.id} />
-                  <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? new Date(reportData.reportSummary.timestamp).toLocaleString() : "N/A"} />
-                  {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
-                  <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.appVersion} />
-                  {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
-                  {reportData.reportSummary.event && <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />}
-                  {reportData.reportSummary.event && <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>}
-                  {reportData.reportSummary.photographer && <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />}
-                  {reportData.reportSummary.photographer && <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />}
-                  {reportData.reportSummary.photographer && <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />}
-                </SectionCard>
-              )}
-
-              {reportData.sources && reportData.sources.length > 0 ? (
-                <SectionCard title="Sources" icon={FolderOpen}>
-                  {reportData.sources.map(source => (
-                    <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${source.selectedAt ? new Date(source.selectedAt).toLocaleTimeString() : "N/A"})`} />
-                  ))}
-                </SectionCard>
-              ) : (
-                 <SectionCard title="Sources" icon={FolderOpen} isEmpty={!reportData.sources || reportData.sources.length === 0} />
-              )}
-
-              {reportData.destinations ? (
-                <SectionCard title="Destinations" icon={HardDrive}>
-                  <InfoPair label="Working Base" value={reportData.destinations.workingBase} />
-                  <InfoPair label="Effective Working" value={reportData.destinations.effectiveWorking} />
-                  <InfoPair label="Backup Base" value={reportData.destinations.backupBase} />
-                  <InfoPair label="Effective Backup" value={reportData.destinations.effectiveBackup} />
-                </SectionCard>
-              ) : (
-                <SectionCard title="Destinations" icon={HardDrive} isEmpty={true} />
-              )}
-              
-              {reportData.phases && Object.keys(reportData.phases).length > 0 ? (
-                <SectionCard title="Ingestion Phases" icon={Settings2}>
-                  {reportData.phases.merge && (
-                    <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
-                      <h4 className="font-medium text-sm mb-1 print:text-xs">Merge Phase</h4>
-                      <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
-                      <InfoPair label="Duration" value={`${reportData.phases.merge.started ? new Date(reportData.phases.merge.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.merge.ended ? new Date(reportData.phases.merge.ended).toLocaleTimeString() : "N/A"}`} />
-                      <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
-                      <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes)} />
-                      <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
-                    </div>
-                  )}
-                  {reportData.phases.copy && (
-                    <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
-                      <h4 className="font-medium text-sm mb-1 print:text-xs">Copy Phase</h4>
-                      <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
-                      <InfoPair label="Duration" value={`${reportData.phases.copy.started ? new Date(reportData.phases.copy.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.copy.ended ? new Date(reportData.phases.copy.ended).toLocaleTimeString() : "N/A"}`} />
-                      <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
-                      <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied)} />
-                      <InfoPair label="Working Status"><StatusBadge status={reportData.phases.copy.workingStatus} /></InfoPair>
-                      <InfoPair label="Backup Status"><StatusBadge status={reportData.phases.copy.backupStatus} /></InfoPair>
-                    </div>
-                  )}
-                  {reportData.phases.checksum && (
-                    <div className="print:pt-1">
-                      <h4 className="font-medium text-sm mb-1 print:text-xs">Checksum Phase</h4>
-                      <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
-                      <InfoPair label="Duration" value={`${reportData.phases.checksum.started ? new Date(reportData.phases.checksum.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.checksum.ended ? new Date(reportData.phases.checksum.ended).toLocaleTimeString() : "N/A"}`} />
-                      <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
-                      <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
-                      <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
-                      <InfoPair label="Backup Hash" value={reportData.phases.checksum.backupHash} />
-                      <InfoPair label="Working Match"><StatusBadge status={reportData.phases.checksum.matchesWorking} /></InfoPair>
-                      <InfoPair label="Backup Match"><StatusBadge status={reportData.phases.checksum.matchesBackup} /></InfoPair>
-                    </div>
-                  )}
-                </SectionCard>
-              ) : (
-                <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0} />
-              )}
-
-              {reportData.fileDetails && reportData.fileDetails.length > 0 ? (
-                <SectionCard title="File Details" icon={Binary}>
-                  <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none print:max-h-none print:overflow-visible print:border-gray-300">
-                    <Table className="text-xs print:text-[9px]">
-                      <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm print:bg-gray-100">
-                        <TableRow>
-                          <TableHead className="p-1.5 print:p-0.5">Filename</TableHead>
-                          <TableHead className="p-1.5 text-right print:p-0.5">Size</TableHead>
-                          <TableHead className="p-1.5 print:p-0.5">Status</TableHead>
-                          <TableHead className="p-1.5 print:p-0.5">Checksum</TableHead>
-                          <TableHead className="p-1.5 print:p-0.5">Reason</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {reportData.fileDetails.map((file, index) => (
-                          <TableRow key={index} className="print:even:bg-gray-50">
-                            <TableCell className="p-1.5 font-mono truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.name}>{file.name}</TableCell>
-                            <TableCell className="p-1.5 text-right font-mono print:p-0.5">{formatBytes(file.size)}</TableCell>
-                            <TableCell className="p-1.5 print:p-0.5"><StatusBadge status={file.status} /></TableCell>
-                            <TableCell className="p-1.5 font-mono truncate max-w-[100px] print:p-0.5 print:max-w-[80px]" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
-                            <TableCell className="p-1.5 truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.reason}>{file.reason || "N/A"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </SectionCard>
-              ) : (
-                <SectionCard title="File Details" icon={Binary} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0} />
-              )}
-
-              {reportData.overallSummary ? (
-                <SectionCard title="Overall Summary" icon={CheckCircle}>
-                  <InfoPair label="Overall Status"><StatusBadge status={reportData.overallSummary.overallStatus} /></InfoPair>
-                  <InfoPair label="Files Attempted" value={reportData.overallSummary.totalFilesAttempted} />
-                  <InfoPair label="Files Ingested" value={reportData.overallSummary.totalFilesIngested} />
-                  <InfoPair label="Bytes Ingested" value={formatBytes(reportData.overallSummary.totalBytesIngested)} />
-                  <InfoPair label="Excluded Files">
-                      {(reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0) ? (
-                          <ul className="list-disc list-inside">
-                            {reportData.overallSummary.excludedFiles.map((ef, idx) => (
-                                <li key={`${ef.name}-${idx}`}>{ef.name} <span className="text-muted-foreground/80 print:text-gray-600">({ef.reason})</span></li>
-                            ))}
-                          </ul>
-                      ) : (<span className="italic text-muted-foreground/70">None</span>) }
-                  </InfoPair>
-                  <InfoPair label="Notes">
-                      {(reportData.overallSummary.notes && reportData.overallSummary.notes.length > 0) ? (
-                          <ul className="list-disc list-inside">{reportData.overallSummary.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
-                      ) : (<span className="italic text-muted-foreground/70">None</span>) }
-                  </InfoPair>
-                </SectionCard>
-              ) : (
-                <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={true} />
-              )}
-
-              <div className="grid md:grid-cols-2 gap-3 print:grid-cols-2">
-                {reportData.environment ? (
-                  <SectionCard title="Ingest Utility Environment" icon={Laptop}>
-                    <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
-                    <InfoPair label="Node.js Version" value={reportData.environment.nodeVersion} />
-                    <InfoPair label="Electron Version" value={reportData.environment.electronVersion} />
-                    <InfoPair label="Operating System" value={reportData.environment.osVersion} />
-                    <InfoPair label="Locale" value={reportData.environment.locale} />
-                    <InfoPair label="Network" value={reportData.environment.network} />
-                  </SectionCard>
-                ) : (
-                   <SectionCard title="Ingest Utility Environment" icon={Laptop} isEmpty={!reportData.environment} />
-                )}
-                {reportData.security ? (
-                  <SectionCard title="Security" icon={ShieldCheck}>
-                    <InfoPair label="Encrypted"><StatusBadge status={reportData.security.encrypted} /></InfoPair>
-                    <InfoPair label="Algorithm" value={reportData.security.algorithm} />
-                    <InfoPair label="Checksum" value={reportData.security.checksum} />
-                    <InfoPair label="Signed By" value={reportData.security.signedBy} />
-                  </SectionCard>
-                ) : (
-                   <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security} />
-                )}
+        <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0">
+          <div id="ingestion-report-content"> {/* Added ID for print styling */}
+            {isLoading && (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="ml-2 text-muted-foreground">Loading report...</p>
               </div>
-            </div>
-          )}
+            )}
+            {error && (
+              <Alert variant="destructive" className="my-4 print:hidden">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Error Loading Report</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {reportData && !isLoading && (
+              <div className="space-y-3 p-1 print:space-y-1 print:p-0">
+                {reportData.reportSummary && (
+                  <SectionCard title="Report Summary" icon={FileText}>
+                    <InfoPair label="Report ID" value={reportData.reportSummary.id} />
+                    <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? new Date(reportData.reportSummary.timestamp).toLocaleString() : "N/A"} />
+                    {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
+                    <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.appVersion} />
+                    {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
+                    {reportData.reportSummary.event && <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />}
+                    {reportData.reportSummary.event && <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>}
+                    {reportData.reportSummary.photographer && <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />}
+                    {reportData.reportSummary.photographer && <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />}
+                    {reportData.reportSummary.photographer && <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />}
+                  </SectionCard>
+                )}
+
+                {reportData.sources && reportData.sources.length > 0 ? (
+                  <SectionCard title="Sources" icon={FolderOpen}>
+                    {reportData.sources.map(source => (
+                      <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${source.selectedAt ? new Date(source.selectedAt).toLocaleTimeString() : "N/A"})`} />
+                    ))}
+                  </SectionCard>
+                ) : (
+                  <SectionCard title="Sources" icon={FolderOpen} isEmpty={!reportData.sources || reportData.sources.length === 0} />
+                )}
+
+                {reportData.destinations ? (
+                  <SectionCard title="Destinations" icon={HardDrive}>
+                    <InfoPair label="Working Base" value={reportData.destinations.workingBase} />
+                    <InfoPair label="Effective Working" value={reportData.destinations.effectiveWorking} />
+                    <InfoPair label="Backup Base" value={reportData.destinations.backupBase} />
+                    <InfoPair label="Effective Backup" value={reportData.destinations.effectiveBackup} />
+                  </SectionCard>
+                ) : (
+                  <SectionCard title="Destinations" icon={HardDrive} isEmpty={true} />
+                )}
+                
+                {reportData.phases && Object.keys(reportData.phases).length > 0 ? (
+                  <SectionCard title="Ingestion Phases" icon={Settings2}>
+                    {reportData.phases.merge && (
+                      <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
+                        <h4 className="font-medium text-sm mb-1 print:text-xs">Merge Phase</h4>
+                        <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
+                        <InfoPair label="Duration" value={`${reportData.phases.merge.started ? new Date(reportData.phases.merge.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.merge.ended ? new Date(reportData.phases.merge.ended).toLocaleTimeString() : "N/A"}`} />
+                        <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
+                        <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes)} />
+                        <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
+                      </div>
+                    )}
+                    {reportData.phases.copy && (
+                      <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
+                        <h4 className="font-medium text-sm mb-1 print:text-xs">Copy Phase</h4>
+                        <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
+                        <InfoPair label="Duration" value={`${reportData.phases.copy.started ? new Date(reportData.phases.copy.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.copy.ended ? new Date(reportData.phases.copy.ended).toLocaleTimeString() : "N/A"}`} />
+                        <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
+                        <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied)} />
+                        <InfoPair label="Working Status"><StatusBadge status={reportData.phases.copy.workingStatus} /></InfoPair>
+                        <InfoPair label="Backup Status"><StatusBadge status={reportData.phases.copy.backupStatus} /></InfoPair>
+                      </div>
+                    )}
+                    {reportData.phases.checksum && (
+                      <div className="print:pt-1">
+                        <h4 className="font-medium text-sm mb-1 print:text-xs">Checksum Phase</h4>
+                        <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
+                        <InfoPair label="Duration" value={`${reportData.phases.checksum.started ? new Date(reportData.phases.checksum.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.checksum.ended ? new Date(reportData.phases.checksum.ended).toLocaleTimeString() : "N/A"}`} />
+                        <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
+                        <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
+                        <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
+                        <InfoPair label="Backup Hash" value={reportData.phases.checksum.backupHash} />
+                        <InfoPair label="Working Match"><StatusBadge status={reportData.phases.checksum.matchesWorking} /></InfoPair>
+                        <InfoPair label="Backup Match"><StatusBadge status={reportData.phases.checksum.matchesBackup} /></InfoPair>
+                      </div>
+                    )}
+                  </SectionCard>
+                ) : (
+                  <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0} />
+                )}
+
+                {reportData.fileDetails && reportData.fileDetails.length > 0 ? (
+                  <SectionCard title="File Details" icon={Binary}>
+                    <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none print:max-h-none print:overflow-visible print:border-gray-300">
+                      <Table className="text-xs print:text-[9px]">
+                        <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm print:bg-gray-100">
+                          <TableRow>
+                            <TableHead className="p-1.5 print:p-0.5">Filename</TableHead>
+                            <TableHead className="p-1.5 text-right print:p-0.5">Size</TableHead>
+                            <TableHead className="p-1.5 print:p-0.5">Status</TableHead>
+                            <TableHead className="p-1.5 print:p-0.5">Checksum</TableHead>
+                            <TableHead className="p-1.5 print:p-0.5">Reason</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reportData.fileDetails.map((file, index) => (
+                            <TableRow key={index} className="print:even:bg-gray-50">
+                              <TableCell className="p-1.5 font-mono truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.name}>{file.name}</TableCell>
+                              <TableCell className="p-1.5 text-right font-mono print:p-0.5">{formatBytes(file.size)}</TableCell>
+                              <TableCell className="p-1.5 print:p-0.5"><StatusBadge status={file.status} /></TableCell>
+                              <TableCell className="p-1.5 font-mono truncate max-w-[100px] print:p-0.5 print:max-w-[80px]" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
+                              <TableCell className="p-1.5 truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.reason}>{file.reason || "N/A"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </SectionCard>
+                ) : (
+                  <SectionCard title="File Details" icon={Binary} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0} />
+                )}
+
+                {reportData.overallSummary ? (
+                  <SectionCard title="Overall Summary" icon={CheckCircle}>
+                    <InfoPair label="Overall Status"><StatusBadge status={reportData.overallSummary.overallStatus} /></InfoPair>
+                    <InfoPair label="Files Attempted" value={reportData.overallSummary.totalFilesAttempted} />
+                    <InfoPair label="Files Ingested" value={reportData.overallSummary.totalFilesIngested} />
+                    <InfoPair label="Bytes Ingested" value={formatBytes(reportData.overallSummary.totalBytesIngested)} />
+                    <InfoPair label="Excluded Files">
+                        {(reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0) ? (
+                            <ul className="list-disc list-inside">
+                              {reportData.overallSummary.excludedFiles.map((ef, idx) => (
+                                  <li key={`${ef.name}-${idx}`}>{ef.name} <span className="text-muted-foreground/80 print:text-gray-600">({ef.reason})</span></li>
+                              ))}
+                            </ul>
+                        ) : (<span className="italic text-muted-foreground/70">None</span>) }
+                    </InfoPair>
+                    <InfoPair label="Notes">
+                        {(reportData.overallSummary.notes && reportData.overallSummary.notes.length > 0) ? (
+                            <ul className="list-disc list-inside">{reportData.overallSummary.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
+                        ) : (<span className="italic text-muted-foreground/70">None</span>) }
+                    </InfoPair>
+                  </SectionCard>
+                ) : (
+                  <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={true} />
+                )}
+
+                <div className="grid md:grid-cols-2 gap-3 print:grid-cols-2">
+                  {reportData.environment ? (
+                    <SectionCard title="Ingest Utility Environment" icon={Laptop}>
+                      <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
+                      <InfoPair label="Node.js Version" value={reportData.environment.nodeVersion} />
+                      <InfoPair label="Electron Version" value={reportData.environment.electronVersion} />
+                      <InfoPair label="Operating System" value={reportData.environment.osVersion} />
+                      <InfoPair label="Locale" value={reportData.environment.locale} />
+                      <InfoPair label="Network" value={reportData.environment.network} />
+                    </SectionCard>
+                  ) : (
+                    <SectionCard title="Ingest Utility Environment" icon={Laptop} isEmpty={!reportData.environment} />
+                  )}
+                  {reportData.security ? (
+                    <SectionCard title="Security" icon={ShieldCheck}>
+                      <InfoPair label="Encrypted"><StatusBadge status={reportData.security.encrypted} /></InfoPair>
+                      <InfoPair label="Algorithm" value={reportData.security.algorithm} />
+                      <InfoPair label="Checksum" value={reportData.security.checksum} />
+                      <InfoPair label="Signed By" value={reportData.security.signedBy} />
+                    </SectionCard>
+                  ) : (
+                    <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security} />
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </ScrollArea>
         <Alert variant="default" className="mt-2 print:hidden">
           <Info className="h-4 w-4" />
@@ -415,4 +418,3 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
-
