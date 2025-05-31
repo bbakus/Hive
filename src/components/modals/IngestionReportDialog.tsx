@@ -37,7 +37,7 @@ interface ReportSummaryInfo {
   id: string;
   timestamp: string;
   performedBy: ReportUser;
-  appVersion: string; // HIVE App Version (if Ingest is integrated) or Ingest Utility version
+  appVersion: string;
   event: ReportEvent;
   photographer: ReportPhotographer;
 }
@@ -97,35 +97,35 @@ interface ReportSecurity {
 }
 interface FullIngestionReport {
   reportSummary: ReportSummaryInfo;
-  sources: ReportSource[];
-  destinations: ReportDestinations;
-  phases: ReportPhases;
-  fileDetails: ReportFileDetail[];
-  overallSummary: ReportOverallSummary;
-  environment: ReportEnvironment;
-  security: ReportSecurity;
+  sources?: ReportSource[];
+  destinations?: ReportDestinations;
+  phases?: ReportPhases;
+  fileDetails?: ReportFileDetail[];
+  overallSummary?: ReportOverallSummary;
+  environment?: ReportEnvironment;
+  security?: ReportSecurity;
 }
 
 // --- Helper Components & Functions ---
-const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string }> = ({ title, icon: Icon, children, className }) => (
+const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
   <div className={cn("border rounded-none p-4 mb-4 bg-card", className)}>
     <h3 className="text-md font-semibold mb-3 flex items-center">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent" />}
       {title}
     </h3>
-    <div className="space-y-2 text-xs">{children}</div>
+    {isEmpty ? <p className="text-xs text-muted-foreground italic">No data provided for this section.</p> : <div className="space-y-2 text-xs">{children}</div>}
   </div>
 );
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
   <div className={cn("flex flex-col sm:flex-row sm:items-start", className)}>
     <p className="font-medium text-muted-foreground sm:w-1/3">{label}:</p>
-    {children ? <div className="sm:w-2/3">{children}</div> : <p className="sm:w-2/3 break-words">{value === undefined || value === null ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
+    {children ? <div className="sm:w-2/3">{children}</div> : <p className="sm:w-2/3 break-words">{value === undefined || value === null || value === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
 );
 
 const formatBytes = (bytes?: number, decimals = 2) => {
-  if (bytes === undefined || bytes === null || isNaN(bytes)) return 'N/A Bytes';
+  if (bytes === undefined || bytes === null || isNaN(bytes)) return 'N/A';
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
@@ -139,16 +139,16 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   let text = String(status).toLowerCase();
 
   if (typeof status === "boolean") text = status ? "yes" : "no";
-  if (status === null || status === undefined || status === "undefined") text = "N/A";
+  if (status === null || status === undefined || text === "undefined" || text === "") text = "N/A";
 
 
   if (["success", "verified", "passed", "true", "yes", "ingested", "completed"].includes(text)) variant = "default";
-  else if (["failed", "error", "no", "excluded"].includes(text)) variant = "destructive";
+  else if (["failed", "error", "no", "excluded", "false"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
   
   const successClass = (variant === "default") ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700" : "";
 
-  return <Badge variant={variant} className={cn("capitalize text-xs", successClass)}>{String(status)}</Badge>;
+  return <Badge variant={variant} className={cn("capitalize text-xs", successClass)}>{String(status === undefined || status === null || status === "" ? "N/A" : status)}</Badge>;
 };
 
 
@@ -177,7 +177,7 @@ export function IngestionReportDialog({
         .then(async (response) => {
           if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Failed to fetch report: ${response.status} ${response.statusText}. ${errorText}`);
+            throw new Error(`Failed to fetch report: ${response.status} ${response.statusText}. Details: ${errorText.substring(0, 200)}`);
           }
           return response.json();
         })
@@ -223,34 +223,38 @@ export function IngestionReportDialog({
           )}
           {reportData && !isLoading && (
             <div className="space-y-3 p-1">
-              <SectionCard title="Report Summary" icon={FileText}>
-                <InfoPair label="Report ID" value={reportData.reportSummary.id} />
-                <InfoPair label="Timestamp" value={new Date(reportData.reportSummary.timestamp).toLocaleString()} />
-                <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />
-                <InfoPair label="App Version (HIVE)" value={reportData.reportSummary.appVersion} />
-                <InfoPair label="Event" value={reportData.reportSummary.event.name} />
-                <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />
-                <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>
-                <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />
-                <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />
-                <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />
-              </SectionCard>
+              {reportData.reportSummary && (
+                <SectionCard title="Report Summary" icon={FileText}>
+                  <InfoPair label="Report ID" value={reportData.reportSummary.id} />
+                  <InfoPair label="Timestamp" value={new Date(reportData.reportSummary.timestamp).toLocaleString()} />
+                  {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
+                  <InfoPair label="App Version (Ingest Utility)" value={reportData.reportSummary.appVersion} />
+                  {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
+                  {reportData.reportSummary.event && <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />}
+                  {reportData.reportSummary.event && <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>}
+                  {reportData.reportSummary.photographer && <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />}
+                  {reportData.reportSummary.photographer && <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />}
+                  {reportData.reportSummary.photographer && <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />}
+                </SectionCard>
+              )}
 
-              <SectionCard title="Sources" icon={Server}>
-                {reportData.sources.map(source => (
+              <SectionCard title="Sources" icon={Server} isEmpty={!reportData.sources || reportData.sources.length === 0}>
+                {reportData.sources?.map(source => (
                   <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${new Date(source.selectedAt).toLocaleTimeString()})`} />
                 ))}
               </SectionCard>
 
-              <SectionCard title="Destinations" icon={HardDrive}>
-                <InfoPair label="Working Base" value={reportData.destinations.workingBase} />
-                <InfoPair label="Effective Working" value={reportData.destinations.effectiveWorking} />
-                <InfoPair label="Backup Base" value={reportData.destinations.backupBase} />
-                <InfoPair label="Effective Backup" value={reportData.destinations.effectiveBackup} />
-              </SectionCard>
+              {reportData.destinations && (
+                <SectionCard title="Destinations" icon={HardDrive}>
+                  <InfoPair label="Working Base" value={reportData.destinations.workingBase} />
+                  <InfoPair label="Effective Working" value={reportData.destinations.effectiveWorking} />
+                  <InfoPair label="Backup Base" value={reportData.destinations.backupBase} />
+                  <InfoPair label="Effective Backup" value={reportData.destinations.effectiveBackup} />
+                </SectionCard>
+              )}
               
-              <SectionCard title="Ingestion Phases" icon={Settings2}>
-                {reportData.phases.merge && (
+              <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0}>
+                {reportData.phases?.merge && (
                   <div className="border-b pb-2 mb-2">
                     <h4 className="font-medium text-sm mb-1">Merge Phase</h4>
                     <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
@@ -260,7 +264,7 @@ export function IngestionReportDialog({
                     <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
                   </div>
                 )}
-                {reportData.phases.copy && (
+                {reportData.phases?.copy && (
                    <div className="border-b pb-2 mb-2">
                     <h4 className="font-medium text-sm mb-1">Copy Phase</h4>
                      <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
@@ -271,7 +275,7 @@ export function IngestionReportDialog({
                     <InfoPair label="Backup Status"><StatusBadge status={reportData.phases.copy.backupStatus} /></InfoPair>
                   </div>
                 )}
-                {reportData.phases.checksum && (
+                {reportData.phases?.checksum && (
                   <div>
                     <h4 className="font-medium text-sm mb-1">Checksum Phase</h4>
                     <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
@@ -286,7 +290,7 @@ export function IngestionReportDialog({
                 )}
               </SectionCard>
 
-              <SectionCard title="File Details" icon={FileText}>
+              <SectionCard title="File Details" icon={FileText} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0}>
                 <div className="max-h-96 overflow-y-auto border rounded-none">
                   <Table className="text-xs">
                     <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
@@ -299,7 +303,7 @@ export function IngestionReportDialog({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reportData.fileDetails.map((file, index) => (
+                      {reportData.fileDetails?.map((file, index) => (
                         <TableRow key={index}>
                           <TableCell className="p-1.5 font-mono truncate max-w-xs" title={file.name}>{file.name}</TableCell>
                           <TableCell className="p-1.5 text-right font-mono">{formatBytes(file.size)}</TableCell>
@@ -308,50 +312,53 @@ export function IngestionReportDialog({
                           <TableCell className="p-1.5 truncate max-w-xs" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
                       ))}
-                       {reportData.fileDetails.length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground p-3">No individual file details provided.</TableCell></TableRow>
-                      )}
                     </TableBody>
                   </Table>
                 </div>
               </SectionCard>
 
-              <SectionCard title="Overall Summary" icon={CheckCircle}>
-                <InfoPair label="Overall Status"><StatusBadge status={reportData.overallSummary.overallStatus} /></InfoPair>
-                <InfoPair label="Files Attempted" value={reportData.overallSummary.totalFilesAttempted} />
-                <InfoPair label="Files Ingested" value={reportData.overallSummary.totalFilesIngested} />
-                <InfoPair label="Bytes Ingested" value={formatBytes(reportData.overallSummary.totalBytesIngested)} />
-                 {reportData.overallSummary.excludedFiles.length > 0 && (
-                   <InfoPair label="Excluded Files">
-                      <ul className="list-disc list-inside">
-                        {reportData.overallSummary.excludedFiles.map(ef => (
-                            <li key={ef.name}>{ef.name} <span className="text-muted-foreground/80">({ef.reason})</span></li>
-                        ))}
-                      </ul>
-                   </InfoPair>
-                 )}
-                <InfoPair label="Notes">
-                    {reportData.overallSummary.notes.length > 0 ? (
-                        <ul className="list-disc list-inside">{reportData.overallSummary.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
-                    ) : (<span className="italic text-muted-foreground/70">None</span>) }
-                </InfoPair>
-              </SectionCard>
+              {reportData.overallSummary && (
+                <SectionCard title="Overall Summary" icon={CheckCircle}>
+                  <InfoPair label="Overall Status"><StatusBadge status={reportData.overallSummary.overallStatus} /></InfoPair>
+                  <InfoPair label="Files Attempted" value={reportData.overallSummary.totalFilesAttempted} />
+                  <InfoPair label="Files Ingested" value={reportData.overallSummary.totalFilesIngested} />
+                  <InfoPair label="Bytes Ingested" value={formatBytes(reportData.overallSummary.totalBytesIngested)} />
+                  {reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0 && (
+                    <InfoPair label="Excluded Files">
+                        <ul className="list-disc list-inside">
+                          {reportData.overallSummary.excludedFiles.map(ef => (
+                              <li key={ef.name}>{ef.name} <span className="text-muted-foreground/80">({ef.reason})</span></li>
+                          ))}
+                        </ul>
+                    </InfoPair>
+                  )}
+                  <InfoPair label="Notes">
+                      {(reportData.overallSummary.notes && reportData.overallSummary.notes.length > 0) ? (
+                          <ul className="list-disc list-inside">{reportData.overallSummary.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
+                      ) : (<span className="italic text-muted-foreground/70">None</span>) }
+                  </InfoPair>
+                </SectionCard>
+              )}
 
               <div className="grid md:grid-cols-2 gap-3">
-                <SectionCard title="Ingest Utility Environment" icon={Laptop}>
-                  <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
-                  <InfoPair label="Node.js Version" value={reportData.environment.nodeVersion} />
-                  <InfoPair label="Electron Version" value={reportData.environment.electronVersion} />
-                  <InfoPair label="Operating System" value={reportData.environment.osVersion} />
-                  <InfoPair label="Locale" value={reportData.environment.locale} />
-                  <InfoPair label="Network" value={reportData.environment.network} />
-                </SectionCard>
-                <SectionCard title="Security" icon={ShieldCheck}>
-                  <InfoPair label="Encrypted"><StatusBadge status={reportData.security.encrypted} /></InfoPair>
-                  <InfoPair label="Algorithm" value={reportData.security.algorithm} />
-                  <InfoPair label="Checksum" value={reportData.security.checksum} />
-                  <InfoPair label="Signed By" value={reportData.security.signedBy} />
-                </SectionCard>
+                {reportData.environment && (
+                  <SectionCard title="Ingest Utility Environment" icon={Laptop}>
+                    <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
+                    <InfoPair label="Node.js Version" value={reportData.environment.nodeVersion} />
+                    <InfoPair label="Electron Version" value={reportData.environment.electronVersion} />
+                    <InfoPair label="Operating System" value={reportData.environment.osVersion} />
+                    <InfoPair label="Locale" value={reportData.environment.locale} />
+                    <InfoPair label="Network" value={reportData.environment.network} />
+                  </SectionCard>
+                )}
+                {reportData.security && (
+                  <SectionCard title="Security" icon={ShieldCheck}>
+                    <InfoPair label="Encrypted"><StatusBadge status={reportData.security.encrypted} /></InfoPair>
+                    <InfoPair label="Algorithm" value={reportData.security.algorithm} />
+                    <InfoPair label="Checksum" value={reportData.security.checksum} />
+                    <InfoPair label="Signed By" value={reportData.security.signedBy} />
+                  </SectionCard>
+                )}
               </div>
             </div>
           )}
@@ -373,3 +380,4 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
+
