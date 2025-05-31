@@ -108,7 +108,7 @@ interface FullIngestionReport {
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("border rounded-none p-4 mb-4 bg-card", className)}>
+  <div className={cn("rounded-none p-4 mb-4 bg-card", className)}> {/* Removed 'border' class */}
     <h3 className="text-md font-semibold mb-3 flex items-center">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent" />}
       {title}
@@ -255,7 +255,7 @@ export function IngestionReportDialog({
               
               <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0}>
                 {reportData.phases?.merge && (
-                  <div className="border-b pb-2 mb-2">
+                  <div className="border-b border-border/50 pb-2 mb-2">
                     <h4 className="font-medium text-sm mb-1">Merge Phase</h4>
                     <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
                     <InfoPair label="Duration" value={`${new Date(reportData.phases.merge.started).toLocaleTimeString()} - ${new Date(reportData.phases.merge.ended).toLocaleTimeString()}`} />
@@ -265,7 +265,7 @@ export function IngestionReportDialog({
                   </div>
                 )}
                 {reportData.phases?.copy && (
-                   <div className="border-b pb-2 mb-2">
+                   <div className="border-b border-border/50 pb-2 mb-2">
                     <h4 className="font-medium text-sm mb-1">Copy Phase</h4>
                      <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
                     <InfoPair label="Duration" value={`${new Date(reportData.phases.copy.started).toLocaleTimeString()} - ${new Date(reportData.phases.copy.ended).toLocaleTimeString()}`} />
@@ -291,7 +291,7 @@ export function IngestionReportDialog({
               </SectionCard>
 
               <SectionCard title="File Details" icon={FileText} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0}>
-                <div className="max-h-96 overflow-y-auto border rounded-none">
+                <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none">
                   <Table className="text-xs">
                     <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm">
                       <TableRow>
@@ -312,6 +312,11 @@ export function IngestionReportDialog({
                           <TableCell className="p-1.5 truncate max-w-xs" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
                       ))}
+                      {(!reportData.fileDetails || reportData.fileDetails.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground p-4">No file details available in this report.</TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -323,15 +328,15 @@ export function IngestionReportDialog({
                   <InfoPair label="Files Attempted" value={reportData.overallSummary.totalFilesAttempted} />
                   <InfoPair label="Files Ingested" value={reportData.overallSummary.totalFilesIngested} />
                   <InfoPair label="Bytes Ingested" value={formatBytes(reportData.overallSummary.totalBytesIngested)} />
-                  {reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0 && (
-                    <InfoPair label="Excluded Files">
-                        <ul className="list-disc list-inside">
-                          {reportData.overallSummary.excludedFiles.map(ef => (
-                              <li key={ef.name}>{ef.name} <span className="text-muted-foreground/80">({ef.reason})</span></li>
-                          ))}
-                        </ul>
-                    </InfoPair>
-                  )}
+                  <InfoPair label="Excluded Files">
+                      {(reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0) ? (
+                          <ul className="list-disc list-inside">
+                            {reportData.overallSummary.excludedFiles.map(ef => (
+                                <li key={ef.name}>{ef.name} <span className="text-muted-foreground/80">({ef.reason})</span></li>
+                            ))}
+                          </ul>
+                      ) : (<span className="italic text-muted-foreground/70">None</span>) }
+                  </InfoPair>
                   <InfoPair label="Notes">
                       {(reportData.overallSummary.notes && reportData.overallSummary.notes.length > 0) ? (
                           <ul className="list-disc list-inside">{reportData.overallSummary.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
@@ -360,6 +365,9 @@ export function IngestionReportDialog({
                   </SectionCard>
                 )}
               </div>
+              {(!reportData.environment && !reportData.security) && (
+                 <SectionCard title="Additional Information" icon={Info} isEmpty={true} />
+              )}
             </div>
           )}
         </ScrollArea>
@@ -370,7 +378,7 @@ export function IngestionReportDialog({
             The "Download PDF" button will use your browser's print functionality. Choose "Save as PDF" or "Print to PDF" as the destination in the print dialog.
           </AlertDescription>
         </Alert>
-        <DialogFooter className="mt-auto pt-4 border-t print:hidden">
+        <DialogFooter className="mt-auto pt-4 border-t border-border/50 print:hidden">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           <Button onClick={handleDownloadPdf} variant="accent" disabled={!reportData || isLoading}>
             <Download className="mr-2 h-4 w-4"/> Download PDF
