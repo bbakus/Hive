@@ -260,7 +260,7 @@ export default function ShootPage() {
       </div>
 
        <Card className="p-3 px-4 shadow-sm border bg-card/50">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-center">
             <div>
                 <Label htmlFor="filter-time-status" className="text-xs text-muted-foreground">Event Status</Label>
                 <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
@@ -275,21 +275,19 @@ export default function ShootPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center space-x-2 pt-2 sm:pt-0 sm:justify-start">
+            <div className="flex items-center space-x-2">
                 <Checkbox
                     id="filter-quick-turnaround"
                     checked={filterQuickTurnaround}
                     onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-                    className="border-accent data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
                 />
                 <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
             </div>
-            <div className="flex items-center space-x-2 pt-2 sm:pt-0 sm:justify-start md:justify-end">
+            <div className="flex items-center space-x-2">
                 <Checkbox
                     id="filter-hide-past"
                     checked={filterHidePastEvents}
                     onCheckedChange={(checked) => setFilterHidePastEvents(!!checked)}
-                    className="border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                 />
                 <Label htmlFor="filter-hide-past" className="font-normal text-sm whitespace-nowrap">Hide Past Events</Label>
             </div>
