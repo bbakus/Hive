@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+// import { useToast } from "@/hooks/use-toast"; // Uncomment if using toast for errors
 
 // --- Report Data Structure Interfaces ---
 interface ReportUser {
@@ -26,18 +27,18 @@ interface ReportUser {
 interface ReportEvent {
   id: string;
   name: string;
-  folderHint?: string; // Made optional
+  folderHint?: string;
 }
 interface ReportPhotographer {
   id: string;
   name: string;
-  initials?: string; // Made optional
+  initials?: string;
 }
 interface ReportSummaryInfo {
   id: string;
   timestamp: string;
-  performedBy?: ReportUser; // Made optional
-  appVersion?: string;
+  performedBy?: ReportUser;
+  appVersion?: string; // Changed from ingestUtilityVersion for consistency with example
   event?: ReportEvent;
   photographer?: ReportPhotographer;
 }
@@ -56,7 +57,7 @@ interface ReportPhase {
   started: string;
   ended: string;
   status: string;
-  [key: string]: any; 
+  [key: string]: any;
 }
 interface ReportPhases {
   merge?: ReportPhase & { filesMerged?: number; totalBytes?: number; tempPath?: string };
@@ -125,7 +126,7 @@ const InfoPair: React.FC<{ label: string; value?: string | number | boolean | nu
 );
 
 const formatBytes = (bytes?: number, decimals = 2) => {
-  if (bytes === undefined || bytes === null || isNaN(bytes)) return 'N/A';
+  if (bytes === undefined || bytes === null || isNaN(bytes) || bytes < 0) return 'N/A';
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
@@ -167,6 +168,7 @@ export function IngestionReportDialog({
   const [reportData, setReportData] = useState<FullIngestionReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // const { toast } = useToast(); // Uncomment if using toast for errors
 
   useEffect(() => {
     if (isOpen && reportUrl) {
@@ -195,12 +197,24 @@ export function IngestionReportDialog({
   }, [isOpen, reportUrl]);
 
   const handlePrintReport = () => {
-    window.print();
+    console.log("handlePrintReport called. reportData exists:", !!reportData, "isLoading:", isLoading);
+    if (!reportData || isLoading) {
+      console.warn("Print button clicked but reportData not ready or still loading. Button should be disabled.");
+      return;
+    }
+    try {
+      console.log("Attempting window.print()...");
+      window.print();
+      console.log("window.print() called (browser print dialog should appear).");
+    } catch (e) {
+      console.error("Error calling window.print():", e);
+      // toast({ title: "Print Error", description: "Could not initiate printing.", variant: "destructive" });
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none">
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none print:dialog-content-reset">
         <DialogHeader className="print:hidden">
           <DialogTitle>Ingestion Report Details</DialogTitle>
           <DialogDescription>
@@ -228,7 +242,7 @@ export function IngestionReportDialog({
                   <InfoPair label="Report ID" value={reportData.reportSummary.id} />
                   <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? new Date(reportData.reportSummary.timestamp).toLocaleString() : "N/A"} />
                   {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
-                  <InfoPair label="App Version (Ingest Utility)" value={reportData.reportSummary.appVersion} />
+                  <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.appVersion} />
                   {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
                   {reportData.reportSummary.event && <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />}
                   {reportData.reportSummary.event && <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>}
@@ -239,13 +253,13 @@ export function IngestionReportDialog({
               )}
 
               {reportData.sources && reportData.sources.length > 0 ? (
-                <SectionCard title="Sources" icon={Server}>
+                <SectionCard title="Sources" icon={FolderOpen}>
                   {reportData.sources.map(source => (
                     <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${source.selectedAt ? new Date(source.selectedAt).toLocaleTimeString() : "N/A"})`} />
                   ))}
                 </SectionCard>
               ) : (
-                 <SectionCard title="Sources" icon={Server} isEmpty={true} />
+                 <SectionCard title="Sources" icon={FolderOpen} isEmpty={!reportData.sources || reportData.sources.length === 0} />
               )}
 
               {reportData.destinations ? (
@@ -297,11 +311,11 @@ export function IngestionReportDialog({
                   )}
                 </SectionCard>
               ) : (
-                <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={true} />
+                <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0} />
               )}
 
               {reportData.fileDetails && reportData.fileDetails.length > 0 ? (
-                <SectionCard title="File Details" icon={FileText}>
+                <SectionCard title="File Details" icon={Binary}>
                   <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none print:max-h-none print:overflow-visible print:border-gray-300">
                     <Table className="text-xs print:text-[9px]">
                       <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm print:bg-gray-100">
@@ -328,7 +342,7 @@ export function IngestionReportDialog({
                   </div>
                 </SectionCard>
               ) : (
-                <SectionCard title="File Details" icon={FileText} isEmpty={true} />
+                <SectionCard title="File Details" icon={Binary} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0} />
               )}
 
               {reportData.overallSummary ? (
@@ -367,7 +381,7 @@ export function IngestionReportDialog({
                     <InfoPair label="Network" value={reportData.environment.network} />
                   </SectionCard>
                 ) : (
-                   <SectionCard title="Ingest Utility Environment" icon={Laptop} isEmpty={true} />
+                   <SectionCard title="Ingest Utility Environment" icon={Laptop} isEmpty={!reportData.environment} />
                 )}
                 {reportData.security ? (
                   <SectionCard title="Security" icon={ShieldCheck}>
@@ -377,7 +391,7 @@ export function IngestionReportDialog({
                     <InfoPair label="Signed By" value={reportData.security.signedBy} />
                   </SectionCard>
                 ) : (
-                   <SectionCard title="Security" icon={ShieldCheck} isEmpty={true} />
+                   <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security} />
                 )}
               </div>
             </div>
@@ -401,3 +415,4 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
+
