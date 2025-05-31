@@ -162,7 +162,7 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={false}>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-4 sm:px-6 print:hidden">
           <div className="flex items-center gap-4">
             {mounted && <SidebarTrigger className="md:hidden" />}
             <TopPhaseNavigation />

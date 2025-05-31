@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-// import { useToast } from "@/hooks/use-toast"; // Uncomment if using toast for errors
+import { Icons } from "@/components/icons"; // Import HIVE Icons
 
 // --- Report Data Structure Interfaces ---
 interface ReportUser {
@@ -109,7 +109,7 @@ interface FullIngestionReport {
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("p-4 mb-0 bg-card/50 print:p-0 print:mb-2 print:bg-transparent", className)}>
+  <div className={cn("p-4 mb-0 print:p-0 print:mb-4 print:bg-transparent", className)}> {/* Increased print:mb-4 */}
     <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
@@ -203,12 +203,26 @@ export function IngestionReportDialog({
       console.warn("Print button clicked but reportData not ready or still loading. Button should be disabled.");
       return;
     }
+
+    const originalTitle = document.title;
+    if (reportData?.reportSummary?.id) {
+      document.title = `IngestionReport_${reportData.reportSummary.id}`;
+    } else {
+      document.title = "HIVE_Ingestion_Report";
+    }
+
     try {
       console.log("Attempting window.print()...");
       window.print();
       console.log("window.print() called (browser print dialog should appear).");
     } catch (e) {
       console.error("Error calling window.print():", e);
+    } finally {
+      // Restore the original title after a short delay.
+      setTimeout(() => {
+        document.title = originalTitle;
+        console.log("Original document title restored.");
+      }, 1000); 
     }
   };
 
@@ -223,7 +237,18 @@ export function IngestionReportDialog({
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0">
-          <div id="ingestion-report-content"> {/* Added ID for print styling */}
+          <div id="ingestion-report-content">
+            {/* Printable Header with Logo */}
+            <div className="hidden print:block print:mb-6 print:pt-2">
+              <div className="flex items-center justify-between">
+                <Icons.HiveLogo className="h-8 w-auto text-accent" />
+                {reportData?.reportSummary?.id && (
+                  <p className="text-xs text-foreground">Report ID: {reportData.reportSummary.id}</p>
+                )}
+              </div>
+              <hr className="my-2 border-border" />
+            </div>
+
             {isLoading && (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -418,3 +443,4 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
+
