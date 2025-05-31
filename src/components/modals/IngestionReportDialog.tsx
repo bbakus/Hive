@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2, FolderOpen, UserCircle, PowerSquare, Binary, Laptop } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2, FolderOpen, UserCircle, PowerSquare, Binary, Laptop, CalendarClock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Icons } from "@/components/icons";
+import { format } from "date-fns";
 
 // --- Report Data Structure Interfaces ---
 interface ReportUser {
@@ -38,7 +39,7 @@ interface ReportSummaryInfo {
   id: string;
   timestamp: string;
   performedBy?: ReportUser;
-  appVersion?: string;
+  ingestUtilityVersion?: string;
   event?: ReportEvent;
   photographer?: ReportPhotographer;
 }
@@ -110,7 +111,7 @@ interface FullIngestionReport {
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("section-card-print mb-0 print:p-0 print:mb-4", className)}>
+  <div className={cn("section-card-print print:p-0 print:mb-4", className)}>
     <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
@@ -121,8 +122,8 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
   <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start print:flex-row", className)}>
-    <p className="font-medium text-muted-foreground sm:w-1/3 print:w-1/4 print:font-normal">{label}:</p>
-    {children ? <div className="sm:w-2/3 print:w-3/4">{children}</div> : <p className="sm:w-2/3 break-words print:w-3/4">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
+    <p className="font-medium text-muted-foreground sm:w-1/3 print:w-[30%] print:min-w-[130px] print:pr-4 print:font-normal">{label}:</p>
+    {children ? <div className="sm:w-2/3 print:w-[70%]">{children}</div> : <p className="sm:w-2/3 break-words print:w-[70%]">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
 );
 
@@ -173,7 +174,7 @@ export function IngestionReportDialog({
     if (isOpen && reportUrl) {
       setIsLoading(true);
       setError(null);
-      setReportData(null);
+      setReportData(null); // Ensure previous data is cleared
       fetch(reportUrl)
         .then(async (response) => {
           if (!response.ok) {
@@ -192,38 +193,38 @@ export function IngestionReportDialog({
         .finally(() => {
           setIsLoading(false);
         });
+    } else if (!isOpen) { // Reset states when dialog closes
+      setReportData(null);
+      setIsLoading(false);
+      setError(null);
     }
   }, [isOpen, reportUrl]);
 
   const handlePrintReport = () => {
     console.log("handlePrintReport called. reportData exists:", !!reportData, "isLoading:", isLoading);
     if (!reportData || isLoading) {
-      console.warn("Print button clicked but reportData not ready or still loading. Button should be disabled.");
+      console.warn("Print button clicked but reportData not ready or still loading.");
       return;
     }
-
-    const originalTitle = document.title;
-    if (reportData?.reportSummary?.id) {
-      document.title = `IngestionReport_${reportData.reportSummary.id}`;
-    } else {
-      document.title = "HIVE_Ingestion_Report";
-    }
-
     try {
       console.log("Attempting window.print()...");
+      const originalTitle = document.title;
+      if (reportData?.reportSummary?.id) {
+        document.title = `IngestionReport_${reportData.reportSummary.id}`;
+      } else {
+        document.title = "HIVE_Ingestion_Report";
+      }
       window.print();
-      console.log("window.print() called (browser print dialog should appear).");
-    } catch (e) {
-      console.error("Error calling window.print():", e);
-    } finally {
       setTimeout(() => {
         document.title = originalTitle;
         console.log("Original document title restored.");
-      }, 1000); 
+      }, 1000);
+    } catch (e) {
+      console.error("Error calling window.print():", e);
     }
-  };
+  }; // Ensured semicolon and clean termination
 
-
+  // END OF JS LOGIC
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none print:dialog-content-reset">
@@ -233,12 +234,21 @@ export function IngestionReportDialog({
             Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl})
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0">
-          <div id="ingestion-report-content">
-            {/* Printable Header - Replicates DialogHeader for print */}
+        <ScrollArea id="ingestion-report-content" className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0 print:my-0">
             <div className="hidden print:block printable-dialog-header">
-              <h2>Ingestion Report Details</h2>
-              <p>Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl})</p>
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2">
+                    <Icons.HiveLogo className="h-8 w-8 text-accent" />
+                    <div>
+                        <h2 className="!mb-0">Ingestion Report</h2>
+                        <p className="!text-xs !text-muted-foreground">Report ID: {reportData?.reportSummary?.id || "N/A"}</p>
+                    </div>
+                </div>
+                <p className="text-xs text-muted-foreground text-right">
+                  {reportData?.reportSummary?.timestamp ? format(new Date(reportData.reportSummary.timestamp), "M/d/yy, p") : "N/A"}
+                </p>
+              </div>
+              <hr className="print:mt-2 print:mb-4 print:border-border/50" />
             </div>
 
             {isLoading && (
@@ -255,19 +265,26 @@ export function IngestionReportDialog({
               </Alert>
             )}
             {reportData && !isLoading && (
-              <div className="space-y-3 p-1 print:space-y-1 print:p-0">
+              <div className="space-y-3 p-1 print:space-y-2 print:p-0">
+                {reportData.reportSummary?.photographer && (
+                    <div className="print-photographer-info print:mb-4">
+                         <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />
+                         <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />
+                    </div>
+                )}
+
                 {reportData.reportSummary && (
                   <SectionCard title="Report Summary" icon={FileText}>
                     <InfoPair label="Report ID" value={reportData.reportSummary.id} />
                     <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? new Date(reportData.reportSummary.timestamp).toLocaleString() : "N/A"} />
                     {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
-                    <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.appVersion} />
+                    <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.ingestUtilityVersion} />
                     {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
                     {reportData.reportSummary.event && <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />}
                     {reportData.reportSummary.event && <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>}
-                    {reportData.reportSummary.photographer && <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />}
-                    {reportData.reportSummary.photographer && <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />}
-                    {reportData.reportSummary.photographer && <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />}
+                    {reportData.reportSummary.photographer && <InfoPair className="print:hidden" label="Photographer" value={reportData.reportSummary.photographer.name} />}
+                    {reportData.reportSummary.photographer && <InfoPair className="print:hidden" label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />}
+                    {reportData.reportSummary.photographer && <InfoPair className="print:hidden" label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />}
                   </SectionCard>
                 )}
 
@@ -349,11 +366,11 @@ export function IngestionReportDialog({
                         <TableBody>
                           {reportData.fileDetails.map((file, index) => (
                             <TableRow key={index} className="print:even:bg-gray-50">
-                              <TableCell className="p-1.5 font-mono truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.name}>{file.name}</TableCell>
+                              <TableCell className="p-1.5 font-mono print:p-0.5 print:max-w-none print:truncate-none" title={file.name}>{file.name}</TableCell>
                               <TableCell className="p-1.5 text-right font-mono print:p-0.5">{formatBytes(file.size)}</TableCell>
                               <TableCell className="p-1.5 print:p-0.5"><StatusBadge status={file.status} /></TableCell>
-                              <TableCell className="p-1.5 font-mono truncate max-w-[100px] print:p-0.5 print:max-w-[80px]" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
-                              <TableCell className="p-1.5 truncate max-w-xs print:p-0.5 print:max-w-[150px]" title={file.reason}>{file.reason || "N/A"}</TableCell>
+                              <TableCell className="p-1.5 font-mono print:p-0.5 print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
+                              <TableCell className="p-1.5 print:p-0.5 print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -422,7 +439,8 @@ export function IngestionReportDialog({
           <AlertTitle>Exporting This Report</AlertTitle>
           <AlertDescription className="text-xs">
             To save this report as a PDF, click the "Download PDF" button. This will use your browser&apos;s print functionality.
-            Ensure you select "Save as PDF" as the destination in the print preview dialog. Adjust layout options (e.g., "Portrait", "Fit to page", disable headers/footers) in the print dialog for best results.
+            Ensure you select "Save as PDF" as the destination in the print preview dialog.
+            Adjust layout options (e.g., "Portrait", "Fit to page", and **disable "Headers and footers"**) in the print dialog for best results.
           </AlertDescription>
         </Alert>
         <DialogFooter className="mt-auto pt-4 border-t border-border/50 print:hidden">
