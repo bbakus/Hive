@@ -137,12 +137,15 @@ export default function PostProductionPage() {
         ? 'reopen_completed_task'
         : 'request_revision_from_review';
       
+      // When requesting revisions or reopening, the task becomes unassigned
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, actionType, reason);
     }
     setIsRevisionDialogOpen(false);
     setRevisionTaskDetails(null);
   };
 
+  // This function simulates new tasks coming into the ingestion queue
+  // In a real app, this would be triggered by backend notifications from the ingestion utility
   const handleSimulateNewIngestion = () => {
     const newTaskId = `task_sim_${Date.now()}`;
     const randomEventNames = ["Charity Gala Dinner", "Music Festival - Day 2", "Corporate Retreat", "Tech Startup Launch"];
@@ -257,7 +260,7 @@ export default function PostProductionPage() {
                                 <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'color', task.assignedEditorId, 'complete_culling')} className="text-xs text-accent">
                                   Mark Culling Complete
                                 </Button>
-                                <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => handleTaskAction(task.id, 'ingestion', null, 'release_from_culling')}>
+                                <Button size="xs" variant="ghost" className="text-xs text-destructive" onClick={() => handleTaskAction(task.id, 'ingestion', null, 'release_from_culling')}>
                                   Release Task
                                 </Button>
                               </>
@@ -272,7 +275,7 @@ export default function PostProductionPage() {
                                 <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'complete_color')} className="text-xs text-accent">
                                   Mark Color Complete
                                 </Button>
-                                <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color')}>
+                                <Button size="xs" variant="ghost" className="text-xs text-destructive" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color')}>
                                   Release Task
                                 </Button>
                               </>
@@ -280,7 +283,7 @@ export default function PostProductionPage() {
                             {task.status === 'review' && (
                                 <>
                                   <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'completed', MOCK_CURRENT_USER_ID, 'approve_review')} className="text-xs text-green-600 dark:text-green-400"> 
-                                      Approve &amp; Complete
+                                      Approve & Complete
                                   </Button>
                                   <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
                                       <RotateCcw className="mr-1 h-3 w-3" /> Request Revisions
