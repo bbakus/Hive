@@ -8,7 +8,7 @@ import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, Gallery
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog"; // Import the new dialog
+import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog";
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
@@ -16,7 +16,7 @@ export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'complet
 interface KanbanTask {
   id: string;
   title: string;
-  content: string; // e.g., "75 Images"
+  content: string; 
   status: TaskStatus;
   assignedEditorId?: string | null;
   lastActivity?: string;
@@ -33,18 +33,18 @@ interface KanbanColumnDef {
 const MOCK_EDITORS: Editor[] = [
   { id: 'editor1', name: 'Alice Editor' },
   { id: 'editor2', name: 'Bob Retoucher' },
-  { id: 'editor_current_user', name: 'Charlie CurrentUser' }, // Current simulated user
+  { id: 'editor_current_user', name: 'Charlie CurrentUser' }, 
 ];
 
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
 
 const initialTasksData: KanbanTask[] = [
-  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting processing' },
-  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting processing' },
+  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling' },
+  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling' },
   { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
   { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color grading by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
   { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval from ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
-  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'ingestion', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: 'Awaiting processing'},
+  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'ingestion', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: 'Awaiting culling'},
   { id: 'task7', title: 'Team Headshots - Batch 1 (Color)', content: '25 Images', status: 'color', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Internal Photoshoot', photographerName: 'Diana P.', lastActivity: `Color grading by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
   { id: 'task8', title: 'Summer Fest - Day Highlights', content: '500 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Summer Music Fest', photographerName: 'Alice W.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
@@ -75,28 +75,30 @@ export default function PostProductionPage() {
   const handleTaskAction = (
     taskId: string,
     newStatus: TaskStatus,
-    newAssignedEditorId?: string | null | undefined, // undefined means don't change, null means unassign
+    newAssignedEditorId?: string | null | undefined, 
     specificAction?: string,
-    revisionReason?: string // New optional parameter for revision reason
+    revisionReason?: string
   ) => {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
           const editorForLog = newAssignedEditorId === undefined ? task.assignedEditorId : newAssignedEditorId;
-          const editorName = getEditorName(editorForLog) || getEditorName(MOCK_CURRENT_USER_ID) || 'System'; // Fallback to current user for logs
+          const editorName = getEditorName(editorForLog) || getEditorName(MOCK_CURRENT_USER_ID) || 'System'; 
           let newActivity = task.lastActivity;
 
-          if (specificAction === "claim_culling") newActivity = `Culling started by ${editorName}`;
-          else if (specificAction === "culling_complete") newActivity = `Culling completed by ${editorName}, moved to Color`;
-          else if (specificAction === "release_to_ingestion") newActivity = `Released back to Ingestion Queue by ${editorName}`;
-          else if (specificAction === "release_from_color_to_culling") newActivity = `Released from Color Treatment by ${editorName}, back to Culling`;
-          else if (specificAction === "color_complete") newActivity = `Color treatment completed by ${editorName}, moved to Review`;
-          else if (specificAction === "back_to_culling_from_color") newActivity = `Sent back to Culling from Color by ${editorName}`;
-          else if (specificAction === "approve_complete") newActivity = `Approved and completed by ${editorName}`;
-          else if (specificAction === "submit_revisions" && revisionReason) {
-            newActivity = `Revisions requested by ${editorName}: "${revisionReason}". Moved to ${KANBAN_COLUMNS.find(c => c.id === newStatus)?.title || newStatus}.`;
-          } else {
-             newActivity = `${KANBAN_COLUMNS.find(c => c.id === newStatus)?.title || 'Task'} updated by ${editorName}.`;
+          switch(specificAction) {
+            case "claim_ingestion": newActivity = `Culling started by ${editorName}`; break;
+            case "claim_culling_task": newActivity = `Culling claimed by ${editorName}`; break;
+            case "culling_complete": newActivity = `Culling completed by ${editorName}, moved to Color`; break;
+            case "release_from_culling": newActivity = `Released from Culling by ${editorName}, back to Ingestion Queue`; break;
+            case "color_complete": newActivity = `Color treatment completed by ${editorName}, moved to Review`; break;
+            case "release_from_color": newActivity = `Released from Color by ${editorName}, back to Culling`; break;
+            case "approve_complete": newActivity = `Approved and completed by ${editorName}`; break;
+            case "submit_revisions": 
+              newActivity = `Revisions requested by ${editorName}${revisionReason ? `: "${revisionReason}"` : ''}. Moved to ${KANBAN_COLUMNS.find(c => c.id === newStatus)?.title || newStatus}.`;
+              break;
+            default:
+              newActivity = `${KANBAN_COLUMNS.find(c => c.id === newStatus)?.title || 'Task'} updated by ${editorName}.`;
           }
           
           const assignmentUpdate = newAssignedEditorId === undefined 
@@ -191,8 +193,13 @@ export default function PostProductionPage() {
                           <p className="text-muted-foreground/80 italic">Last Activity: {task.lastActivity}</p>
                           <div className="mt-2.5 flex flex-wrap gap-1.5">
                             {task.status === 'ingestion' && !task.assignedEditorId && (
-                              <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling')} className="text-xs">
+                              <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_ingestion')} className="text-xs">
                                 Start Culling
+                              </Button>
+                            )}
+                            {task.status === 'culling' && !task.assignedEditorId && (
+                               <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling_task')} className="text-xs">
+                                Claim Culling Task
                               </Button>
                             )}
                             {task.status === 'culling' && isCurrentUserAssigned && (
@@ -200,7 +207,7 @@ export default function PostProductionPage() {
                                 <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'color', task.assignedEditorId, 'culling_complete')} className="text-xs">
                                   Culling Complete
                                 </Button>
-                                <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'ingestion', null, 'release_to_ingestion')}>
+                                <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'ingestion', null, 'release_from_culling')}>
                                   Release Task
                                 </Button>
                               </>
@@ -210,7 +217,7 @@ export default function PostProductionPage() {
                                 <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'color_complete')} className="text-xs">
                                   Color Complete
                                 </Button>
-                                <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color_to_culling')}>
+                                <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color')}>
                                   Release Task
                                 </Button>
                               </>
