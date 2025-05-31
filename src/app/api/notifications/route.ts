@@ -2,21 +2,45 @@
 // src/app/api/notifications/route.ts
 import { NextResponse } from 'next/server';
 
-interface NotificationPayload {
-  userId: string;
-  type: "ingest-complete" | "ingest-error" | string; // Allow other types
+interface NotificationPayloadBase {
+  userId: string; // ID of user running Ingest, or a system ID
+  type: string;   // e.g., "ingest-error", "ingest-warning", "general-info"
   message: string;
-  jobId?: string;
+  jobId?: string; // Optional, but highly recommended for ingest-related notifications
+}
+
+// Example of a more specific payload for ingest errors
+interface IngestErrorNotificationPayload extends NotificationPayloadBase {
+  type: "ingest-error" | "ingest-warning";
+  details?: {
+    filePath?: string;
+    errorCode?: string;
+    sourcePath?: string;
+    destinationPath?: string;
+    expectedChecksum?: string;
+    actualChecksum?: string;
+    [key: string]: any; // Other context-specific details
+  };
 }
 
 export async function POST(request: Request) {
   try {
-    const payload: NotificationPayload = await request.json();
-    console.log(`POST /api/notifications received for User ID ${payload.userId}:`, payload);
+    // It's good practice to type the expected payload, even if it's generic here.
+    const payload: NotificationPayloadBase | IngestErrorNotificationPayload = await request.json();
+    
+    console.log(`POST /api/notifications received. Type: ${payload.type}, User ID: ${payload.userId}, Job ID: ${payload.jobId || 'N/A'}`);
+    if (payload.type === "ingest-error" && (payload as IngestErrorNotificationPayload).details) {
+      console.log("Error Details:", (payload as IngestErrorNotificationPayload).details);
+    } else {
+      console.log("Message:", payload.message);
+    }
+
 
     // TODO: Implement authentication and authorization
-    // TODO: Store this notification
-    // TODO: Push notification to the user via WebSockets or other real-time mechanism
+    // TODO: Store this notification (e.g., in a database)
+    // TODO: Link to user and/or job if applicable
+    // TODO: Potentially trigger real-time updates to connected HIVE clients (e.g., via WebSockets)
+    //       so the HIVE UI can display these notifications.
 
     // For now, just acknowledge receipt
     return NextResponse.json({ ok: true, message: "Notification received by HIVE" });
@@ -28,3 +52,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to process notification.", details: errorMessage }, { status: 500 });
   }
 }
+
