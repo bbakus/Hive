@@ -16,12 +16,12 @@ export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'complet
 interface KanbanTask {
   id: string;
   title: string;
-  content: string;
+  content: string; // e.g., image count
   status: TaskStatus;
   assignedEditorId?: string | null;
   lastActivity?: string;
-  eventName?: string;
-  photographerName?: string;
+  eventName?: string; // Added for more context
+  photographerName?: string; // Added for more context
 }
 
 interface KanbanColumnDef {
@@ -33,7 +33,7 @@ interface KanbanColumnDef {
 const MOCK_EDITORS: Editor[] = [
   { id: 'editor1', name: 'Alice Editor' },
   { id: 'editor2', name: 'Bob Retoucher' },
-  { id: 'editor_current_user', name: 'Charlie CurrentUser' },
+  { id: 'editor_current_user', name: 'Charlie CurrentUser' }, // Current user
 ];
 
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
@@ -48,6 +48,7 @@ const initialTasksData: KanbanTask[] = [
   { id: 'task7', title: 'Team Headshots - Batch 1 (Color)', content: '25 Images', status: 'color', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Internal Photoshoot', photographerName: 'Diana P.', lastActivity: `Color claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
   { id: 'task8', title: 'Summer Fest - Day Highlights', content: '500 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Summer Music Fest', photographerName: 'Alice W.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
+
 
 const KANBAN_COLUMNS: KanbanColumnDef[] = [
   { id: 'ingestion', title: 'Ingestion Queue', icon: Inbox },
@@ -75,22 +76,25 @@ export default function PostProductionPage() {
   const handleTaskAction = (
     taskId: string,
     newStatus: TaskStatus,
-    newAssignedEditorId?: string | null | undefined,
+    newAssignedEditorId?: string | null | undefined, // undefined means no change to assignee
     specificAction?: string,
     revisionReason?: string
   ) => {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
-          const editorForLog = newAssignedEditorId === undefined ? task.assignedEditorId : newAssignedEditorId;
+          const editorForLog = newAssignedEditorId === undefined 
+                               ? task.assignedEditorId 
+                               : (newAssignedEditorId === null ? task.assignedEditorId : newAssignedEditorId); // If unassigning, use current assignee for log
           const editorName = getEditorName(editorForLog) || getEditorName(MOCK_CURRENT_USER_ID) || 'System';
           let newActivity = task.lastActivity;
 
           switch(specificAction) {
-            case "claim_culling_task": newActivity = `Culling started by ${editorName}`; break;
+            case "claim_ingestion_task": newActivity = `Ingestion task claimed by ${editorName}`; break;
+            case "claim_culling_task": newActivity = `Culling claimed by ${editorName}`; break;
             case "complete_culling": newActivity = `Culling completed by ${editorName}, sent to Color Treatment`; break;
             case "release_from_culling": newActivity = `Released from Culling by ${editorName}, back to Ingestion Queue`; break;
-            case "claim_color_task": newActivity = `Color Treatment started by ${editorName}`; break;
+            case "claim_color_task": newActivity = `Color Treatment claimed by ${editorName}`; break;
             case "complete_color": newActivity = `Color Treatment completed by ${editorName}, sent to Review`; break;
             case "release_from_color": newActivity = `Released from Color Treatment by ${editorName}, back to Culling`; break;
             case "approve_review": newActivity = `Approved and completed by ${editorName}`; break;
@@ -105,8 +109,8 @@ export default function PostProductionPage() {
           }
 
           const assignmentUpdate = newAssignedEditorId === undefined
-            ? { assignedEditorId: task.assignedEditorId }
-            : { assignedEditorId: newAssignedEditorId };
+            ? {} // No change to assignedEditorId
+            : { assignedEditorId: newAssignedEditorId }; // Explicitly set (can be null for unassigning)
 
           return { ...task, status: newStatus, ...assignmentUpdate, lastActivity: newActivity };
         }
@@ -122,7 +126,9 @@ export default function PostProductionPage() {
 
   const handleRevisionSubmit = (targetStage: TaskStatus, reason: string) => {
     if (revisionTaskDetails) {
-      const actionType = tasks.find(t => t.id === revisionTaskDetails.taskId)?.status === 'completed'
+      const taskToRevise = tasks.find(t => t.id === revisionTaskDetails.taskId);
+      if (!taskToRevise) return;
+      const actionType = taskToRevise.status === 'completed'
         ? 'reopen_completed_task'
         : 'request_revision_from_review';
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, actionType, reason);
@@ -143,7 +149,7 @@ export default function PostProductionPage() {
     <div className="flex flex-col gap-6 h-full">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ImageIcon className="h-8 w-8 text-primary" /> Photo Editing Workflow
+          <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
         </h1>
         <p className="text-muted-foreground">Manage photo editing tasks through different stages.</p>
       </div>
@@ -181,7 +187,13 @@ export default function PostProductionPage() {
                     const isCurrentUserAssigned = task.assignedEditorId === MOCK_CURRENT_USER_ID;
 
                     return (
-                      <Card key={task.id} className="border-0 shadow-none hover:shadow-sm transition-shadow bg-background">
+                      <Card 
+                        key={task.id} 
+                        className={cn(
+                          "shadow-none bg-background", 
+                          isCurrentUserAssigned ? "border border-accent" : "border-0"
+                        )}
+                      >
                         <CardHeader className="p-3 pb-2">
                           <CardTitle className="text-sm font-medium leading-tight">{task.title}</CardTitle>
                           <CardDescription className="text-xs text-muted-foreground">
@@ -218,7 +230,7 @@ export default function PostProductionPage() {
                                 </Button>
                               </>
                             )}
-                            {task.status === 'color' && !task.assignedEditorId && (
+                             {task.status === 'color' && !task.assignedEditorId && (
                                <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'color', MOCK_CURRENT_USER_ID, 'claim_color_task')} className="text-xs">
                                 Start Color Treatment
                               </Button>
@@ -235,7 +247,7 @@ export default function PostProductionPage() {
                             )}
                             {task.status === 'review' && (
                                 <>
-                                  <Button size="xs" variant="accent" onClick={() => handleTaskAction(task.id, 'completed', task.assignedEditorId, 'approve_review')} className="text-xs">
+                                  <Button size="xs" variant="accent" onClick={() => handleTaskAction(task.id, 'completed', MOCK_CURRENT_USER_ID, 'approve_review')} className="text-xs"> 
                                       Approve & Complete
                                   </Button>
                                   <Button size="xs" variant="ghost" className="text-muted-foreground text-xs" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
@@ -245,9 +257,6 @@ export default function PostProductionPage() {
                             )}
                              {task.status === 'completed' && (
                                 <>
-                                  <Badge variant="default" className="pointer-events-none mr-2">
-                                      <CheckCircle className="mr-1 h-3 w-3 text-primary-foreground"/> Completed
-                                  </Badge>
                                    <Button size="xs" variant="ghost" className="text-muted-foreground text-xs" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
                                       <RotateCcw className="mr-1 h-3 w-3" /> Reopen Task
                                   </Button>
@@ -268,9 +277,3 @@ export default function PostProductionPage() {
     </div>
   );
 }
-
-declare module "@/components/ui/button" {
-    interface ButtonProps {
-      size?: "default" | "sm" | "lg" | "icon" | "xs";
-    }
-  }
