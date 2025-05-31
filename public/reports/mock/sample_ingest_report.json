@@ -1,0 +1,84 @@
+
+{
+  "reportId": "ingest_2025-05-07T14:22:31Z_abc123",
+  "timestamp": "2025-05-07T14:22:31Z",
+  "performedBy": {
+    "userId": "editor_42",
+    "name": "Andrew Herrold"
+  },
+  "appVersion": "CaptureHive v1.2.3 on macOS 13.4",
+  "event": {
+    "id": "EVT_Japan2025_01",
+    "name": "Japan Regional Experience Day 1",
+    "targetFolder": "Day_01/D1_JapanRegional"
+  },
+  "photographer": {
+    "id": "PHOT_17",
+    "name": "Damion Hamilton",
+    "initials": "DH"
+  },
+  "sources": [
+    { "id": 1, "path": "/Users/shared/dev/projects/hive/source_media/SOURCE 1", "selectedAt": "14:20:12 UTC" },
+    { "id": 2, "path": "/Users/shared/dev/projects/hive/source_media/SOURCE 2", "selectedAt": "14:20:15 UTC" }
+  ],
+  "destinations": {
+    "workingBase": "/Users/shared/dev/projects/hive/output_media/WORKING",
+    "effectiveWorking": "/Users/shared/dev/projects/hive/output_media/WORKING/Day_01/D1_JapanRegional/DH",
+    "backupBase": "/Users/shared/dev/projects/hive/output_media/BACKUP",
+    "effectiveBackup": "/Users/shared/dev/projects/hive/output_media/BACKUP/Day_01/D1_JapanRegional/DH"
+  },
+  "mergePhase": {
+    "tempPath": "/Users/shared/dev/projects/hive/output_media/tmp/merged_temp_abc123",
+    "started": "2025-05-07T14:20:30Z",
+    "ended": "2025-05-07T14:21:02Z",
+    "status": "success",
+    "filesMerged": 10,
+    "totalBytes": 583427902
+  },
+  "copyPhase": {
+    "started": "2025-05-07T14:21:05Z",
+    "ended": "2025-05-07T14:21:20Z",
+    "filesCopied": 10,
+    "bytesCopied": 583427902,
+    "workingStatus": "success",
+    "backupStatus": "success"
+  },
+  "checksumPhase": {
+    "started": "2025-05-07T14:21:23Z",
+    "ended": "2025-05-07T14:21:45Z",
+    "algorithm": "SHA256",
+    "tempHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tempBytes": 583427902,
+    "workingHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "backupHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "matches": "true/true"
+  },
+  "fileDetails": [
+    { "name": "_AH10005.NEF", "size": 58234903, "checksum": "6f1e...", "copiedToWorking": true, "matchedEvent": true, "status": "ingested" },
+    { "name": "_AH10004.NEF", "size": 58211728, "checksum": "52ad07...", "copiedToWorking": true, "matchedEvent": true, "status": "ingested"},
+    { "name": "DJI_0001.MP4", "size": 350789210, "checksum": "a1b2...", "copiedToWorking": true, "matchedEvent": true, "status": "ingested" },
+    { "name": "DJI_0002.MP4", "size": 116234123, "checksum": "c3d4...", "copiedToWorking": true, "matchedEvent": true, "status": "ingested" },
+    { "name": ".DS_Store", "size": 6148, "checksum": "b1946a...", "status": "excluded", "reason": "extension not allowed" }
+  ],
+  "summary": {
+    "totalFilesAttempted": 11,
+    "totalFilesIngested": 10,
+    "totalBytesIngested": 583427902,
+    "excludedFiles": [{ "name": ".DS_Store", "reason": "extension not allowed" }],
+    "overallStatus": "verified",
+    "notes": ["All NEF and MP4 files processed successfully."]
+  },
+  "environment": {
+    "swiftVersion": "5.8.1",
+    "ingestionManagerVersion": "2.0.4",
+    "locale": "en_US",
+    "networkStatus": "offline",
+    "osVersion": "macOS 13.4"
+  },
+  "security": {
+    "encrypted": true,
+    "algorithm": "AES-256-GCM",
+    "checksum": "4b2277...",
+    "signedBy": "CTDSigningKey_v1"
+  }
+}

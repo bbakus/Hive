@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog";
+import { IngestionReportDialog } from "@/components/modals/IngestionReportDialog"; // New Import
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -47,11 +48,13 @@ const MOCK_CURRENT_USER_ID = 'editor_current_user';
 // Initial mock data for tasks. In a real application, tasks in the 'ingestion'
 // queue would be populated dynamically based on completed ingestion jobs reported by a local utility
 // to HIVE's backend (e.g., via POST /api/ingestion/notify-completion).
+// The reportUrl should point to a publicly accessible JSON file if it's to be fetched.
+// For this prototype, we'll assume a mock report file in public/reports/mock/
 const initialTasksData: KanbanTask[] = [
-  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC', reportUrl: '/reports/mock/Job_ABC_report.json' },
-  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF', reportUrl: '/reports/mock/Job_DEF_report.json'},
+  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC', reportUrl: '/reports/mock/sample_ingest_report.json' },
+  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF', reportUrl: '/reports/mock/sample_ingest_report.json'},
   { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_GHI' },
-  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}`, ingestionJobId: 'Job_JKL', reportUrl: '/reports/mock/Job_JKL_report.json' },
+  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}`, ingestionJobId: 'Job_JKL', reportUrl: '/reports/mock/sample_ingest_report.json' },
   { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
   { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
@@ -74,6 +77,9 @@ export default function PostProductionPage() {
   const [tasks, setTasks] = useState<KanbanTask[]>(initialTasksData);
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
   const [revisionTaskDetails, setRevisionTaskDetails] = useState<{ taskId: string; taskTitle: string; currentAssigneeId?: string | null } | null>(null);
+
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [currentReportUrl, setCurrentReportUrl] = useState<string | undefined>(undefined);
 
   const getEditorName = (editorId?: string | null) => {
     if (!editorId) return null;
@@ -140,16 +146,12 @@ export default function PostProductionPage() {
         ? 'reopen_completed_task'
         : 'request_revision_from_review';
       
-      // When requesting revisions or reopening, the task becomes unassigned
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, actionType, reason);
     }
     setIsRevisionDialogOpen(false);
     setRevisionTaskDetails(null);
   };
 
-  // This function simulates new tasks coming into the ingestion queue
-  // In a real app, this would be triggered by backend notifications from the ingestion utility
-  // via POST /api/ingestion/notify-completion
   const handleSimulateNewIngestion = () => {
     const newTaskId = `task_sim_${Date.now()}`;
     const randomEventNames = ["Charity Gala Dinner", "Music Festival - Day 2", "Corporate Retreat", "Tech Startup Launch"];
@@ -167,9 +169,16 @@ export default function PostProductionPage() {
       photographerName: randomPhotographerNames[Math.floor(Math.random() * randomPhotographerNames.length)],
       lastActivity: `Awaiting culling (Simulated Ingestion - ${new Date().toLocaleTimeString()})`,
       ingestionJobId: jobSimId,
-      reportUrl: `/reports/mock/${jobSimId}_report.json` // Mock report URL
+      reportUrl: '/reports/mock/sample_ingest_report.json' // Points to the sample report
     };
     setTasks(prevTasks => [newSimulatedTask, ...prevTasks]);
+  };
+  
+  const handleOpenReportModal = (reportUrl?: string) => {
+    if (reportUrl) {
+      setCurrentReportUrl(reportUrl);
+      setIsReportModalOpen(true);
+    }
   };
 
   const tasksByColumn = useMemo(() => {
@@ -186,7 +195,8 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
-            <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated from ingestion utility reports via HIVE's backend.</p>
+            {/* Comment about task origination */}
+            <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated based on completion reports from local ingestion utilities (via POST to `/api/ingestion/notify-completion`).</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
             <PlusCircle className="mr-2 h-4 w-4" /> Simulate New Ingested Task
@@ -203,6 +213,15 @@ export default function PostProductionPage() {
           availableStages={REVISION_TARGET_STAGES}
         />
       )}
+      
+      {currentReportUrl && (
+        <IngestionReportDialog
+          isOpen={isReportModalOpen}
+          onOpenChange={setIsReportModalOpen}
+          reportUrl={currentReportUrl}
+        />
+      )}
+
 
       <ScrollArea className="flex-grow pb-4">
         <div className="flex gap-4 items-start">
@@ -247,11 +266,14 @@ export default function PostProductionPage() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button asChild variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 ml-2">
-                                    <Link href={task.reportUrl} target="_blank" rel="noopener noreferrer">
-                                      <Settings className="h-4 w-4" />
-                                      <span className="sr-only">View Ingestion Report</span>
-                                    </Link>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 flex-shrink-0 ml-2"
+                                    onClick={() => handleOpenReportModal(task.reportUrl)}
+                                   >
+                                    <Settings className="h-4 w-4" />
+                                    <span className="sr-only">View Ingestion Report</span>
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
