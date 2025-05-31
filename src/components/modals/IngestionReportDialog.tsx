@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2 } from "lucide-react";
+import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2, FolderOpen, UserCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -122,7 +122,8 @@ const InfoPair: React.FC<{ label: string; value?: string | number | boolean | nu
   </div>
 );
 
-const formatBytes = (bytes: number, decimals = 2) => {
+const formatBytes = (bytes?: number, decimals = 2) => {
+  if (bytes === undefined || bytes === null) return 'N/A Bytes';
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
@@ -143,7 +144,6 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   else if (["failed", "error", "no", "excluded"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
   
-  // For default variant, we can use a class that results in a green-like badge
   const successClass = (variant === "default") ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/50 dark:text-green-300 dark:border-green-700" : "";
 
   return <Badge variant={variant} className={cn("capitalize text-xs", successClass)}>{String(status)}</Badge>;
@@ -226,13 +226,17 @@ export function IngestionReportDialog({
                 <InfoPair label="Timestamp" value={new Date(reportData.reportSummary.timestamp).toLocaleString()} />
                 <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />
                 <InfoPair label="App Version" value={reportData.reportSummary.appVersion} />
-                <InfoPair label="Event" value={`${reportData.reportSummary.event.name} (ID: ${reportData.reportSummary.event.id}, Hint: ${reportData.reportSummary.event.folderHint})`} />
-                <InfoPair label="Photographer" value={`${reportData.reportSummary.photographer.name} (ID: ${reportData.reportSummary.photographer.id}, Initials: ${reportData.reportSummary.photographer.initials})`} />
+                <InfoPair label="Event" value={reportData.reportSummary.event.name} />
+                <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />
+                <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint} icon={FolderOpen} />
+                <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />
+                <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />
+                <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} icon={UserCircle} />
               </SectionCard>
 
               <SectionCard title="Sources" icon={Server}>
                 {reportData.sources.map(source => (
-                  <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${source.selectedAt})`} />
+                  <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${new Date(source.selectedAt).toLocaleTimeString()})`} />
                 ))}
               </SectionCard>
 
@@ -248,9 +252,9 @@ export function IngestionReportDialog({
                   <div className="border-b pb-2 mb-2">
                     <h4 className="font-medium text-sm mb-1">Merge Phase</h4>
                     <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
-                    <InfoPair label="Duration" value={`${reportData.phases.merge.started} - ${reportData.phases.merge.ended}`} />
+                    <InfoPair label="Duration" value={`${new Date(reportData.phases.merge.started).toLocaleTimeString()} - ${new Date(reportData.phases.merge.ended).toLocaleTimeString()}`} />
                     <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
-                    <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes || 0)} />
+                    <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes)} />
                     <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
                   </div>
                 )}
@@ -258,9 +262,9 @@ export function IngestionReportDialog({
                    <div className="border-b pb-2 mb-2">
                     <h4 className="font-medium text-sm mb-1">Copy Phase</h4>
                      <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
-                    <InfoPair label="Duration" value={`${reportData.phases.copy.started} - ${reportData.phases.copy.ended}`} />
+                    <InfoPair label="Duration" value={`${new Date(reportData.phases.copy.started).toLocaleTimeString()} - ${new Date(reportData.phases.copy.ended).toLocaleTimeString()}`} />
                     <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
-                    <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied || 0)} />
+                    <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied)} />
                     <InfoPair label="Working Status"><StatusBadge status={reportData.phases.copy.workingStatus} /></InfoPair>
                     <InfoPair label="Backup Status"><StatusBadge status={reportData.phases.copy.backupStatus} /></InfoPair>
                   </div>
@@ -269,7 +273,7 @@ export function IngestionReportDialog({
                   <div>
                     <h4 className="font-medium text-sm mb-1">Checksum Phase</h4>
                     <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
-                    <InfoPair label="Duration" value={`${reportData.phases.checksum.started} - ${reportData.phases.checksum.ended}`} />
+                    <InfoPair label="Duration" value={`${new Date(reportData.phases.checksum.started).toLocaleTimeString()} - ${new Date(reportData.phases.checksum.ended).toLocaleTimeString()}`} />
                     <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
                     <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
                     <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
