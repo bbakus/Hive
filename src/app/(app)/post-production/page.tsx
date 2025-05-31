@@ -4,11 +4,13 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle } from "lucide-react";
+import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog";
+import Link from "next/link";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
@@ -25,6 +27,7 @@ interface KanbanTask {
   eventName?: string; // Derived from ingestion report or folder structure
   photographerName?: string; // Derived from ingestion report or folder structure
   ingestionJobId?: string; // Link back to the ingestion job
+  reportUrl?: string; // URL to the detailed ingestion report
 }
 
 interface KanbanColumnDef {
@@ -45,10 +48,10 @@ const MOCK_CURRENT_USER_ID = 'editor_current_user';
 // queue would be populated dynamically based on completed ingestion jobs reported by a local utility
 // to HIVE's backend (e.g., via POST /api/ingestion/notify-completion).
 const initialTasksData: KanbanTask[] = [
-  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC' },
-  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF'},
-  { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
-  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
+  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC', reportUrl: '/reports/mock/Job_ABC_report.json' },
+  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF', reportUrl: '/reports/mock/Job_DEF_report.json'},
+  { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_GHI' },
+  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}`, ingestionJobId: 'Job_JKL', reportUrl: '/reports/mock/Job_JKL_report.json' },
   { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
   { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
@@ -146,11 +149,13 @@ export default function PostProductionPage() {
 
   // This function simulates new tasks coming into the ingestion queue
   // In a real app, this would be triggered by backend notifications from the ingestion utility
+  // via POST /api/ingestion/notify-completion
   const handleSimulateNewIngestion = () => {
     const newTaskId = `task_sim_${Date.now()}`;
     const randomEventNames = ["Charity Gala Dinner", "Music Festival - Day 2", "Corporate Retreat", "Tech Startup Launch"];
     const randomPhotographerNames = ["Greg Adams", "Laura Chen", "Mike Davis", "Sarah Bell"];
     const randomImageCount = Math.floor(Math.random() * 150) + 50; // 50-200 images
+    const jobSimId = `SIM_JOB_${Date.now()}`;
 
     const newSimulatedTask: KanbanTask = {
       id: newTaskId,
@@ -161,7 +166,8 @@ export default function PostProductionPage() {
       eventName: randomEventNames[Math.floor(Math.random() * randomEventNames.length)],
       photographerName: randomPhotographerNames[Math.floor(Math.random() * randomPhotographerNames.length)],
       lastActivity: `Awaiting culling (Simulated Ingestion - ${new Date().toLocaleTimeString()})`,
-      ingestionJobId: `SIM_JOB_${Date.now()}`
+      ingestionJobId: jobSimId,
+      reportUrl: `/reports/mock/${jobSimId}_report.json` // Mock report URL
     };
     setTasks(prevTasks => [newSimulatedTask, ...prevTasks]);
   };
@@ -180,7 +186,6 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
-            {/* Updated description to mention auto-population */}
             <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated from ingestion utility reports via HIVE's backend.</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
@@ -229,13 +234,32 @@ export default function PostProductionPage() {
                           isCurrentUserAssigned ? "border border-accent" : "border-0"
                         )}
                       >
-                        <CardHeader className="p-3 pb-2">
-                          <CardTitle className="text-sm font-medium leading-tight">{task.title}</CardTitle>
-                          <CardDescription className="text-xs text-muted-foreground">
-                            {task.eventName && <p>Event: {task.eventName}</p>}
-                            {task.photographerName && <p>Photographer: {task.photographerName}</p>}
-                            <p>{task.content}</p>
-                          </CardDescription>
+                        <CardHeader className="p-3 pb-2 flex flex-row justify-between items-start">
+                           <div className="flex-grow">
+                            <CardTitle className="text-sm font-medium leading-tight">{task.title}</CardTitle>
+                            <CardDescription className="text-xs text-muted-foreground">
+                              {task.eventName && <p>Event: {task.eventName}</p>}
+                              {task.photographerName && <p>Photographer: {task.photographerName}</p>}
+                              <p>{task.content}</p>
+                            </CardDescription>
+                          </div>
+                          {task.reportUrl && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button asChild variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 ml-2">
+                                    <Link href={task.reportUrl} target="_blank" rel="noopener noreferrer">
+                                      <Settings className="h-4 w-4" />
+                                      <span className="sr-only">View Ingestion Report</span>
+                                    </Link>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View Ingestion Report</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                         </CardHeader>
                         <CardContent className="p-3 pt-1 text-xs">
                           {assignedEditorName && (
