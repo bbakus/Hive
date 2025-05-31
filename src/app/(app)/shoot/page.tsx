@@ -259,8 +259,8 @@ export default function ShootPage() {
         </p>
       </div>
 
-       <Card className="p-3 px-4 shadow-sm border bg-card/50">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+       <Card className="p-4 shadow-sm border bg-card/50">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div>
                 <Label htmlFor="filter-time-status" className="text-xs text-muted-foreground">Event Status</Label>
                 <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
@@ -275,21 +275,23 @@ export default function ShootPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center justify-end space-x-2">
-                <Checkbox
-                    id="filter-quick-turnaround"
-                    checked={filterQuickTurnaround}
-                    onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
-                />
-                <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
-            </div>
-            <div className="flex items-center justify-end space-x-2">
-                <Checkbox
-                    id="filter-hide-past"
-                    checked={filterHidePastEvents}
-                    onCheckedChange={(checked) => setFilterHidePastEvents(!!checked)}
-                />
-                <Label htmlFor="filter-hide-past" className="font-normal text-sm whitespace-nowrap">Hide Past Events</Label>
+            <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-end sm:justify-end gap-x-6 gap-y-2">
+              <div className="flex items-center space-x-2">
+                  <Checkbox
+                      id="filter-quick-turnaround"
+                      checked={filterQuickTurnaround}
+                      onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
+                  />
+                  <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                  <Checkbox
+                      id="filter-hide-past"
+                      checked={filterHidePastEvents}
+                      onCheckedChange={(checked) => setFilterHidePastEvents(!!checked)}
+                  />
+                  <Label htmlFor="filter-hide-past" className="font-normal text-sm whitespace-nowrap">Hide Past Events</Label>
+              </div>
             </div>
         </div>
       </Card>
