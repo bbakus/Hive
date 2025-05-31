@@ -50,6 +50,10 @@ const initialTasksData: KanbanTask[] = [
   { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}`, ingestionJobId: 'Job_JKL', reportUrl: '/reports/mock/sample_ingest_report.json' },
   { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}`, reportUrl: '/reports/mock/sample_ingest_report.json' },
   { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}`, reportUrl: '/reports/mock/sample_ingest_report.json' },
+  { id: 'task7', title: 'Team Headshots - Batch A', content: '50 Images', status: 'ingestion', eventName: 'Company Wide Headshots', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_MNO)', ingestionJobId: 'Job_MNO', reportUrl: '/reports/mock/sample_ingest_report.json' },
+  { id: 'task8', title: 'Behind the Scenes - Setup', content: '75 Images', status: 'culling', assignedEditorId: null, eventName: 'Music Festival Pre-Event', photographerName: 'Bob B.', lastActivity: 'Ready for culling', ingestionJobId: 'Job_PQR', reportUrl: '/reports/mock/sample_ingest_report.json' },
+  { id: 'task9', title: 'Aerial Venue Shots', content: '20 Images', status: 'color', assignedEditorId: null, eventName: 'Outdoor Expo Opening', photographerName: 'Diana P.', lastActivity: 'Ready for color treatment', ingestionJobId: 'Job_STU', reportUrl: '/reports/mock/sample_ingest_report.json' },
+  { id: 'task10', title: 'Client Testimonials - Video Stills', content: '100 Images', status: 'review', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Marketing Campaign Shoot', photographerName: 'Fiona G.', lastActivity: `Awaiting final review by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_VWX', reportUrl: '/reports/mock/sample_ingest_report.json' },
 ];
 
 
@@ -219,7 +223,7 @@ export default function PostProductionPage() {
         <div className="flex gap-4 items-start">
           {KANBAN_COLUMNS.map((column) => (
             <div key={column.id} className="w-72 min-w-[18rem] flex-shrink-0">
-              <Card className="border-0 bg-muted/30 h-full">
+              <Card className="border-0 bg-transparent h-full">
                 <CardHeader className="pb-3 pt-4 px-4 border-b">
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
                     <column.icon className="h-5 w-5 text-muted-foreground" />
