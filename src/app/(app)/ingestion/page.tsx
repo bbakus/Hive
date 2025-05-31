@@ -20,9 +20,8 @@ import { cn } from '@/lib/utils';
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-
-
-type AgentConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
+// The LocalAgentStatusIndicator is now global in the header, no need to import/use it here separately
+// unless a secondary, page-specific indicator is desired.
 
 export default function IngestionUtilityPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -38,43 +37,11 @@ export default function IngestionUtilityPage() {
 
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [ingestionJobs, setIngestionJobs] = useState<IngestJobStatus[]>([]);
-  const [agentConnectionStatus, setAgentConnectionStatus] = useState<AgentConnectionStatus>('unknown');
   const [hiveActivityLog, setHiveActivityLog] = useState<string[]>([]);
 
   const logHiveActivity = useCallback((message: string, type: 'info' | 'error' | 'success' = 'info') => {
     const prefix = type === 'error' ? 'ERROR: ' : type === 'success' ? 'SUCCESS: ' : 'LOG: ';
     setHiveActivityLog(prev => [`${new Date().toLocaleTimeString()}: ${prefix}${message}`, ...prev].slice(0, 100));
-  }, []);
-  
-  const verifyAgentConnection = useCallback(async (showToast = false) => {
-    setAgentConnectionStatus('checking');
-    logHiveActivity("Verifying connection to local agent (http://localhost:8765/available-drives)...");
-    try {
-      await localUtility.getAvailableDrives(); 
-      setAgentConnectionStatus('connected');
-      logHiveActivity("Successfully connected to local agent.", 'success');
-      if (showToast) toast({ title: "Local Agent Connected", description: "HIVE can communicate with the local ingestion agent." });
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setAgentConnectionStatus('disconnected');
-      logHiveActivity(`Failed to connect to local agent: ${errorMessage}`, 'error');
-      let toastDescription = `Error: ${errorMessage}`;
-      if (errorMessage.toLowerCase().includes("failed to fetch") || errorMessage.toLowerCase().includes("networkerror") || errorMessage.toLowerCase().includes("connection refused")) {
-        toastDescription = "Could not reach local agent. Ensure it's running on http://localhost:8765 and CORS is correctly configured.";
-      } else if (errorMessage.includes("status: 404")) {
-        toastDescription = "Agent connected, but '/available-drives' endpoint not found (404). Check agent API routes.";
-      } else if (errorMessage.includes("status:")) {
-        toastDescription = `Agent responded with an error: ${errorMessage}. Check agent logs.`;
-      }
-      if (showToast) toast({ title: "Agent Connection Failed", description: toastDescription, variant: "destructive", duration: 10000 });
-      return false;
-    }
-  }, [logHiveActivity, toast]);
-
-  useEffect(() => {
-    verifyAgentConnection();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getPersonnelName = useCallback((personnelId?: string) => {
@@ -149,39 +116,6 @@ export default function IngestionUtilityPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useDemoData, isLoadingSettings]); // Fetch on initial load if demo data is on
-
-  const AgentStatusIndicator = () => {
-    let IconComponent = HelpCircle; 
-    let textColor = "text-muted-foreground";
-    let statusText = "Unknown";
-
-    switch (agentConnectionStatus) {
-      case 'connected':
-        IconComponent = CheckCircle;
-        textColor = "text-green-600 dark:text-green-400";
-        statusText = "Connected";
-        break;
-      case 'disconnected':
-        IconComponent = XCircle;
-        textColor = "text-red-600 dark:text-red-400";
-        statusText = "Disconnected";
-        break;
-      case 'checking':
-        IconComponent = Loader2;
-        textColor = "text-yellow-600 dark:text-yellow-400";
-        statusText = "Checking...";
-        break;
-    }
-    return (
-      <div className="flex items-center gap-2 text-sm">
-        <IconComponent className={cn("h-5 w-5", textColor, agentConnectionStatus === 'checking' && "animate-spin")} />
-        <span className={textColor}>{statusText}</span>
-        <Button variant="ghost" size="sm" onClick={() => verifyAgentConnection(true)} className="h-7 px-2 py-1 text-xs" title="Refresh Connection Status" disabled={agentConnectionStatus === 'checking'}>
-           <RefreshCw className={cn("h-3.5 w-3.5", agentConnectionStatus === 'checking' && "animate-spin")} />
-        </Button>
-      </div>
-    );
-  };
   
   const isLoadingContexts = isLoadingSettings || isLoadingEvents || isLoadingProjects;
   
@@ -195,7 +129,7 @@ export default function IngestionUtilityPage() {
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <UploadCloud className="h-8 w-8 text-accent" /> Ingestion Job Monitor
         </h1>
-        <AgentStatusIndicator />
+        {/* The LocalAgentStatusIndicator is now globally available in the app header */}
       </div>
       
       <Alert variant="default">
@@ -313,3 +247,4 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
+

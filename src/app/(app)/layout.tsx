@@ -28,6 +28,8 @@ import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray } from "@/co
 import { EventProvider } from "@/contexts/EventContext";
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
+import { LocalAgentStatusIndicator } from "@/components/local-agent-status-indicator"; 
+import { LocalAgentProvider } from "@/contexts/LocalAgentContext"; 
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
 
@@ -168,7 +170,8 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
             <TopPhaseNavigation />
           </div>
           <div className="flex-1"></div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for responsiveness */}
+            <LocalAgentStatusIndicator />
             <OrganizationSelector />
             <ProjectSelector />
             <UserNav />
@@ -185,15 +188,17 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsProvider>
-      <OrganizationProvider>
-        <ProjectProvider>
-          <EventProvider>
-            <PhaseProvider>
-              <AppLayoutInternal>{children}</AppLayoutInternal>
-            </PhaseProvider>
-          </EventProvider>
-        </ProjectProvider>
-      </OrganizationProvider>
+      <LocalAgentProvider>
+        <OrganizationProvider>
+          <ProjectProvider>
+            <EventProvider>
+              <PhaseProvider>
+                <AppLayoutInternal>{children}</AppLayoutInternal>
+              </PhaseProvider>
+            </EventProvider>
+          </ProjectProvider>
+        </OrganizationProvider>
+      </LocalAgentProvider>
     </SettingsProvider>
   );
 }
