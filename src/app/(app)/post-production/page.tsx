@@ -4,7 +4,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle, Settings } from "lucide-react";
+import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle, Settings, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -220,7 +220,7 @@ export default function PostProductionPage() {
 
 
       <ScrollArea className="flex-grow pb-4">
-        <div className="flex gap-4 items-start">
+        <div className="flex justify-center gap-4 items-start">
           {KANBAN_COLUMNS.map((column) => (
             <div key={column.id} className="w-72 min-w-[18rem] flex-shrink-0">
               <Card className="border-0 bg-transparent h-full">
