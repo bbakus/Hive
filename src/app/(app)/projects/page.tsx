@@ -96,8 +96,9 @@ export default function ProjectsPage() {
   if (isLoadingProjects || isLoadingOrganizations) {
     return <div className="p-4">Loading projects and organizations...</div>;
   }
-
+  
   return (
+   
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>

@@ -121,7 +121,7 @@ export default function ShootPage() {
     };
   }, [getShotRequestsForEvent]);
 
-  const handleShotAction = (eventId: string, shotId: string, actionType: "toggleCapture" | "toggleBlock") => {
+  const handleShotAction = useCallback((eventId: string, shotId: string, actionType: "toggleCapture" | "toggleBlock") => {
     const shots = getShotRequestsForEvent(eventId);
     const shotToUpdate = shots.find(s => s.id === shotId);
     if (!shotToUpdate) return;
@@ -161,9 +161,9 @@ export default function ShootPage() {
         setIsBlockedReasonDialogOpen(true);
       }
     }
-  };
+  }, [getShotRequestsForEvent, updateShotRequest, toast, setIsBlockedReasonDialogOpen, setShotForBlockedReasonDialog]);
   
-  const handleSaveBlockedReason = (reason: string) => {
+  const handleSaveBlockedReason = useCallback((reason: string) => {
     if (!shotForBlockedReasonDialog) return;
     const { eventId, shotId, description } = shotForBlockedReasonDialog;
     
@@ -181,10 +181,10 @@ export default function ShootPage() {
     });
     setIsBlockedReasonDialogOpen(false);
     setShotForBlockedReasonDialog(null);
-  };
+  }, [shotForBlockedReasonDialog, updateShotRequest, toast, setIsBlockedReasonDialogOpen, setShotForBlockedReasonDialog]);
 
 
-  const handleCheckIn = (eventId: string, personnelId: string) => {
+  const handleCheckIn = useCallback((eventId: string, personnelId: string) => {
     checkInUserToEvent(eventId, personnelId);
     const personName = getPersonnelNameById(personnelId);
     const eventName = eventsForSelectedProjectAndOrg.find(e => e.id === eventId)?.name || "the event";
@@ -192,9 +192,9 @@ export default function ShootPage() {
       title: "Checked In",
       description: `${personName} successfully checked in to ${eventName}.`,
     });
-  };
+  }, [checkInUserToEvent, getPersonnelNameById, eventsForSelectedProjectAndOrg, toast]);
 
-  const handleCheckOut = (eventId: string, personnelId: string) => {
+  const handleCheckOut = useCallback((eventId: string, personnelId: string) => {
     checkOutUserFromEvent(eventId, personnelId);
     const personName = getPersonnelNameById(personnelId);
     const eventName = eventsForSelectedProjectAndOrg.find(e => e.id === eventId)?.name || "the event";
@@ -202,7 +202,7 @@ export default function ShootPage() {
       title: "Checked Out",
       description: `${personName} successfully checked out from ${eventName}.`,
     });
-  };
+  }, [checkOutUserFromEvent, getPersonnelNameById, eventsForSelectedProjectAndOrg, toast]);
 
   if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
     return (

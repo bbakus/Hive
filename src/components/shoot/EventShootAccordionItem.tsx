@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from "react"; // Import React for React.memo
 import type { Event, ShotRequest } from "@/contexts/EventContext";
 import type { Personnel } from "@/app/(app)/personnel/page";
 import {
@@ -38,7 +39,7 @@ interface EventShootAccordionItemProps {
   };
 }
 
-export function EventShootAccordionItem({
+export const EventShootAccordionItem = React.memo(function EventShootAccordionItemComponent({
   event,
   personnelList,
   shotRequests,
@@ -271,6 +272,7 @@ export function EventShootAccordionItem({
       </AccordionContent>
     </AccordionItem>
   );
-}
+});
 
+EventShootAccordionItem.displayName = 'EventShootAccordionItemComponent';
     

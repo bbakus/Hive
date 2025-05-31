@@ -2,7 +2,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 type SettingsContextType = {
   useDemoData: boolean;
@@ -38,7 +38,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const value = { useDemoData, setUseDemoData, isLoading };
+  const value = useMemo(() => ({ 
+    useDemoData, 
+    setUseDemoData, 
+    isLoading 
+  }), [useDemoData, setUseDemoData, isLoading]);
 
   return (
     <SettingsContext.Provider value={value}>
@@ -54,3 +58,4 @@ export function useSettingsContext() {
   }
   return context;
 }
+
