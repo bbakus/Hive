@@ -4,18 +4,18 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox } from "lucide-react";
+import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 type Editor = { id: string; name: string };
-type TaskStatus = 'todo' | 'inProgress' | 'review' | 'completed';
+type TaskStatus = 'inbox' | 'culling' | 'color' | 'review' | 'completed';
 
 interface KanbanTask {
   id: string;
   title: string;
-  content: string;
+  content: string; // e.g., "75 Images"
   status: TaskStatus;
   assignedEditorId?: string | null;
   lastActivity?: string;
@@ -38,19 +38,21 @@ const MOCK_EDITORS: Editor[] = [
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
 
 const initialTasksData: KanbanTask[] = [
-  { id: 'task1', title: 'Keynote Speaker Closeups', content: '75 Images', status: 'todo', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Ingested yesterday' },
-  { id: 'task2', title: 'Networking Candids - Evening Reception', content: '120 Images', status: 'todo', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Ingested 2 hours ago' },
-  { id: 'task3', title: 'Workshop Alpha - Group Photos', content: '50 Images', status: 'inProgress', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
-  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images', status: 'review', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Marked for review by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
-  { id: 'task5', title: 'VIP Portraits - Gala Dinner', content: '90 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
-  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'todo', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: 'Ingested this morning'},
-  { id: 'task7', title: 'Team Headshots - Batch 1', content: '25 Images', status: 'inProgress', assignedEditorId: 'editor2', eventName: 'Internal Photoshoot', photographerName: 'Diana P.', lastActivity: `Claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
+  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'inbox', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Ingested yesterday' },
+  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'inbox', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Ingested 2 hours ago' },
+  { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
+  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color grading by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
+  { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval from ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
+  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'inbox', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: 'Ingested this morning'},
+  { id: 'task7', title: 'Team Headshots - Batch 1 (Color)', content: '25 Images', status: 'color', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Internal Photoshoot', photographerName: 'Diana P.', lastActivity: `Color grading by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
+  { id: 'task8', title: 'Summer Fest - Day Highlights', content: '500 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Summer Music Fest', photographerName: 'Alice W.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
 
 const KANBAN_COLUMNS: KanbanColumnDef[] = [
-  { id: 'todo', title: 'To Edit', icon: Inbox },
-  { id: 'inProgress', title: 'In Progress', icon: Edit3 },
-  { id: 'review', title: 'Needs Review', icon: User },
+  { id: 'inbox', title: 'Standby / Inbox', icon: Inbox },
+  { id: 'culling', title: 'Culling', icon: GalleryThumbnails },
+  { id: 'color', title: 'Color Treatment', icon: Palette },
+  { id: 'review', title: 'Review / Upload', icon: UserCheck },
   { id: 'completed', title: 'Completed', icon: CheckCircle },
 ];
 
@@ -62,18 +64,25 @@ export default function PostProductionPage() {
     return MOCK_EDITORS.find(e => e.id === editorId)?.name || 'Unknown Editor';
   };
 
-  const handleTaskAction = (taskId: string, newStatus: TaskStatus, newAssignedEditorId?: string | null) => {
+  const handleTaskAction = (taskId: string, newStatus: TaskStatus, newAssignedEditorId?: string | null | undefined, specificAction?: string) => {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
-          const editorName = getEditorName(newAssignedEditorId === undefined ? task.assignedEditorId : newAssignedEditorId);
+          const editorForLog = newAssignedEditorId === undefined ? task.assignedEditorId : newAssignedEditorId;
+          const editorName = getEditorName(editorForLog);
           let newActivity = task.lastActivity;
-          if (newStatus === 'inProgress' && editorName) newActivity = `Claimed by ${editorName}`;
-          else if (newStatus === 'review' && editorName) newActivity = `Marked for Review by ${editorName}`;
-          else if (newStatus === 'completed' && editorName) newActivity = `Completed by ${editorName}`;
-          else if (newStatus === 'todo' && newAssignedEditorId === null) newActivity = 'Released to queue'; // Ensure assignedEditorId is explicitly null for release
+
+          if (specificAction === "claim_culling") newActivity = `Culling started by ${editorName}`;
+          else if (specificAction === "culling_complete") newActivity = `Culling completed by ${editorName}, moved to Color`;
+          else if (specificAction === "release_to_inbox") newActivity = `Released back to Inbox by ${editorName || 'System'}`;
+          else if (specificAction === "color_complete") newActivity = `Color treatment completed by ${editorName}, moved to Review`;
+          else if (specificAction === "back_to_culling") newActivity = `Sent back to Culling by ${editorName}`;
+          else if (specificAction === "approve_complete") newActivity = `Approved and completed by ${editorName}`;
+          else if (specificAction === "request_revisions") newActivity = `Revisions requested by ${editorName}, moved to Culling`;
           
-          return { ...task, status: newStatus, assignedEditorId: newAssignedEditorId === undefined ? task.assignedEditorId : newAssignedEditorId, lastActivity: newActivity };
+          const assignmentUpdate = newAssignedEditorId === undefined ? { assignedEditorId: task.assignedEditorId } : { assignedEditorId: newAssignedEditorId };
+
+          return { ...task, status: newStatus, ...assignmentUpdate, lastActivity: newActivity };
         }
         return task;
       })
@@ -91,7 +100,7 @@ export default function PostProductionPage() {
     <div className="flex flex-col gap-6 h-full">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
+          <ImageIcon className="h-8 w-8 text-primary" /> Photo Editing Workflow
         </h1>
         <p className="text-muted-foreground">Manage photo editing tasks through different stages. (Prototype)</p>
       </div>
@@ -134,38 +143,44 @@ export default function PostProductionPage() {
                           )}
                           <p className="text-muted-foreground/80 italic">Last Activity: {task.lastActivity}</p>
                           <div className="mt-2.5 flex flex-wrap gap-1.5">
-                            {task.status === 'todo' && !task.assignedEditorId && (
-                              <Button size="sm" variant="outline" onClick={() => handleTaskAction(task.id, 'inProgress', MOCK_CURRENT_USER_ID)} className="text-xs">
-                                Claim Task
+                            {task.status === 'inbox' && !task.assignedEditorId && (
+                              <Button size="sm" variant="outline" onClick={() => handleTaskAction(task.id, 'culling', MOCK_CURRENT_USER_ID, 'claim_culling')} className="text-xs">
+                                Start Culling
                               </Button>
                             )}
-                            {task.status === 'inProgress' && task.assignedEditorId === MOCK_CURRENT_USER_ID && (
+                            {task.status === 'culling' && task.assignedEditorId === MOCK_CURRENT_USER_ID && (
                               <>
-                                <Button size="sm" variant="outline" onClick={() => handleTaskAction(task.id, 'review')} className="text-xs">
-                                  Mark for Review
+                                <Button size="sm" variant="outline" onClick={() => handleTaskAction(task.id, 'color', task.assignedEditorId, 'culling_complete')} className="text-xs">
+                                  Culling Complete
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'todo', null)}>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'inbox', null, 'release_to_inbox')}>
                                   Release Task
+                                </Button>
+                              </>
+                            )}
+                             {task.status === 'color' && task.assignedEditorId === MOCK_CURRENT_USER_ID && (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'color_complete')} className="text-xs">
+                                  Color Complete
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', task.assignedEditorId, 'back_to_culling')}>
+                                  Back to Culling
                                 </Button>
                               </>
                             )}
                             {task.status === 'review' && (
                                 <>
-                                {task.assignedEditorId === MOCK_CURRENT_USER_ID || !task.assignedEditorId ? (
-                                    <Button size="sm" variant="accent" onClick={() => handleTaskAction(task.id, 'completed')} className="text-xs">
-                                        Mark Completed
-                                    </Button>
-                                ) : <Badge variant="outline">Reviewing (by {assignedEditorName})</Badge>}
-                                {(task.assignedEditorId === MOCK_CURRENT_USER_ID || MOCK_CURRENT_USER_ID === "editor_current_user") && (
-                                    <Button size="sm" variant="ghost" className="text-muted-foreground text-xs" onClick={() => handleTaskAction(task.id, 'inProgress')}>
-                                        <RotateCcw className="mr-1 h-3 w-3" /> Revert
-                                    </Button>
-                                )}
+                                  <Button size="sm" variant="accent" onClick={() => handleTaskAction(task.id, 'completed', task.assignedEditorId, 'approve_complete')} className="text-xs">
+                                      Approve & Complete
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="text-muted-foreground text-xs" onClick={() => handleTaskAction(task.id, 'culling', task.assignedEditorId, 'request_revisions')}>
+                                      <RotateCcw className="mr-1 h-3 w-3" /> Request Revisions
+                                  </Button>
                                 </>
                             )}
                              {task.status === 'completed' && (
                                 <Badge variant="default" className="pointer-events-none">
-                                    <CheckCircle className="mr-1 h-3 w-3 text-green-500"/> Completed
+                                    <CheckCircle className="mr-1 h-3 w-3 text-primary-foreground"/> Completed
                                 </Badge>
                             )}
                           </div>
@@ -185,10 +200,13 @@ export default function PostProductionPage() {
 }
 
 // Extend ButtonProps to include a size 'xs' if it doesn't exist
-declare module "@/components/ui/button" {
-  interface ButtonProps {
-    size?: "default" | "sm" | "lg" | "icon" | "xs";
-  }
-}
 // For the prototype, assuming 'xs' would be added to buttonVariants or simulated with 'sm' and className="text-xs".
 // Used size="sm" and className="text-xs" for buttons inside Kanban cards.
+
+declare module "@/components/ui/button" {
+    interface ButtonProps {
+      size?: "default" | "sm" | "lg" | "icon" | "xs"; // Added xs for type consistency if needed
+    }
+  }
+
+    
