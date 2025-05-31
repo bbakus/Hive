@@ -4,7 +4,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud } from "lucide-react";
+import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -13,15 +13,18 @@ import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
 
+// This interface represents a task on the Kanban board.
+// In a real system, these tasks would be created based on reports from the ingestion utility.
 interface KanbanTask {
   id: string;
-  title: string;
-  content: string; // e.g., image count
+  title: string; // e.g., "Keynote Speaker Candids", "Ingested Batch XYZ"
+  content: string; // e.g., "150 Images", "Source: Card_A"
   status: TaskStatus;
   assignedEditorId?: string | null;
   lastActivity?: string;
-  eventName?: string; // Added for more context
-  photographerName?: string; // Added for more context
+  eventName?: string; // Derived from ingestion report or folder structure
+  photographerName?: string; // Derived from ingestion report or folder structure
+  ingestionJobId?: string; // Link back to the ingestion job
 }
 
 interface KanbanColumnDef {
@@ -38,15 +41,15 @@ const MOCK_EDITORS: Editor[] = [
 
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
 
+// Initial mock data for tasks. In a real application, tasks in the 'ingestion'
+// queue would be populated dynamically based on completed ingestion jobs.
 const initialTasksData: KanbanTask[] = [
-  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling' },
-  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling' },
+  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC' },
+  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF'},
   { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
   { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}` },
   { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
-  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'ingestion', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: 'Awaiting culling'},
-  { id: 'task7', title: 'Team Headshots - Batch 1 (Color)', content: '25 Images', status: 'color', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Internal Photoshoot', photographerName: 'Diana P.', lastActivity: `Color claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}` },
-  { id: 'task8', title: 'Summer Fest - Day Highlights', content: '500 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Summer Music Fest', photographerName: 'Alice W.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
+  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}` },
 ];
 
 
@@ -76,7 +79,7 @@ export default function PostProductionPage() {
   const handleTaskAction = (
     taskId: string,
     newStatus: TaskStatus,
-    newAssignedEditorId?: string | null | undefined, // undefined means no change to assignee
+    newAssignedEditorId?: string | null | undefined,
     specificAction?: string,
     revisionReason?: string
   ) => {
@@ -85,7 +88,7 @@ export default function PostProductionPage() {
         if (task.id === taskId) {
           const editorForLog = newAssignedEditorId === undefined 
                                ? task.assignedEditorId 
-                               : (newAssignedEditorId === null ? task.assignedEditorId : newAssignedEditorId); // If unassigning, use current assignee for log
+                               : (newAssignedEditorId === null ? task.assignedEditorId : newAssignedEditorId);
           const editorName = getEditorName(editorForLog) || getEditorName(MOCK_CURRENT_USER_ID) || 'System';
           let newActivity = task.lastActivity;
 
@@ -109,8 +112,8 @@ export default function PostProductionPage() {
           }
 
           const assignmentUpdate = newAssignedEditorId === undefined
-            ? {} // No change to assignedEditorId
-            : { assignedEditorId: newAssignedEditorId }; // Explicitly set (can be null for unassigning)
+            ? {} 
+            : { assignedEditorId: newAssignedEditorId }; 
 
           return { ...task, status: newStatus, ...assignmentUpdate, lastActivity: newActivity };
         }
@@ -137,6 +140,25 @@ export default function PostProductionPage() {
     setRevisionTaskDetails(null);
   };
 
+  const handleSimulateNewIngestion = () => {
+    const newTaskId = `task_sim_${Date.now()}`;
+    const randomEventNames = ["Charity Gala Dinner", "Music Festival - Day 2", "Corporate Retreat", "Tech Startup Launch"];
+    const randomPhotographerNames = ["Greg Adams", "Laura Chen", "Mike Davis", "Sarah Bell"];
+    const randomImageCount = Math.floor(Math.random() * 150) + 50; // 50-200 images
+
+    const newSimulatedTask: KanbanTask = {
+      id: newTaskId,
+      title: `Ingested: ${randomEventNames[Math.floor(Math.random() * randomEventNames.length)]}`,
+      content: `${randomImageCount} Images`,
+      status: 'ingestion',
+      assignedEditorId: null,
+      eventName: randomEventNames[Math.floor(Math.random() * randomEventNames.length)],
+      photographerName: randomPhotographerNames[Math.floor(Math.random() * randomPhotographerNames.length)],
+      lastActivity: `Awaiting culling (Simulated Ingestion - ${new Date().toLocaleTimeString()})`,
+      ingestionJobId: `SIM_JOB_${Date.now()}`
+    };
+    setTasks(prevTasks => [newSimulatedTask, ...prevTasks]);
+  };
 
   const tasksByColumn = useMemo(() => {
     return KANBAN_COLUMNS.reduce((acc, column) => {
@@ -147,12 +169,18 @@ export default function PostProductionPage() {
 
   return (
     <div className="flex flex-col gap-6 h-full">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
-        </h1>
-        <p className="text-muted-foreground">Manage photo editing tasks through different stages.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
+            </h1>
+            <p className="text-muted-foreground">Manage photo editing tasks through different stages. Tasks in 'Ingestion Queue' would typically auto-populate from ingestion utility reports.</p>
+        </div>
+        <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
+            <PlusCircle className="mr-2 h-4 w-4" /> Simulate New Ingested Task
+        </Button>
       </div>
+
 
       {revisionTaskDetails && (
         <RevisionRequestDialog
