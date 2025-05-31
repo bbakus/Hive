@@ -49,10 +49,10 @@ const initialTasksData: KanbanTask[] = [
 ];
 
 const KANBAN_COLUMNS: KanbanColumnDef[] = [
-  { id: 'ingestion', title: 'Ingestion Queue', icon: Inbox }, // Changed from 'inbox'
+  { id: 'ingestion', title: 'Ingestion Queue', icon: Inbox },
   { id: 'culling', title: 'Culling', icon: GalleryThumbnails },
   { id: 'color', title: 'Color Treatment', icon: Palette },
-  { id: 'review', title: 'Review', icon: UserCheck }, // Kept as Review
+  { id: 'review', title: 'Review', icon: UserCheck },
   { id: 'completed', title: 'Completed', icon: CheckCircle },
 ];
 
@@ -69,14 +69,15 @@ export default function PostProductionPage() {
       prevTasks.map(task => {
         if (task.id === taskId) {
           const editorForLog = newAssignedEditorId === undefined ? task.assignedEditorId : newAssignedEditorId;
-          const editorName = getEditorName(editorForLog);
+          const editorName = getEditorName(editorForLog) || 'System';
           let newActivity = task.lastActivity;
 
           if (specificAction === "claim_culling") newActivity = `Culling started by ${editorName}`;
           else if (specificAction === "culling_complete") newActivity = `Culling completed by ${editorName}, moved to Color`;
-          else if (specificAction === "release_to_ingestion") newActivity = `Released back to Ingestion Queue by ${editorName || 'System'}`;
+          else if (specificAction === "release_to_ingestion") newActivity = `Released back to Ingestion Queue by ${editorName}`;
+          else if (specificAction === "release_from_color_to_culling") newActivity = `Released from Color Treatment by ${editorName}, back to Culling`;
           else if (specificAction === "color_complete") newActivity = `Color treatment completed by ${editorName}, moved to Review`;
-          else if (specificAction === "back_to_culling") newActivity = `Sent back to Culling by ${editorName}`;
+          else if (specificAction === "back_to_culling_from_color") newActivity = `Sent back to Culling from Color by ${editorName}`;
           else if (specificAction === "approve_complete") newActivity = `Approved and completed by ${editorName}`;
           else if (specificAction === "request_revisions") newActivity = `Revisions requested by ${editorName}, moved to Culling`;
           
@@ -163,7 +164,10 @@ export default function PostProductionPage() {
                                 <Button size="sm" variant="outline" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'color_complete')} className="text-xs">
                                   Color Complete
                                 </Button>
-                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', task.assignedEditorId, 'back_to_culling')}>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', null, 'release_from_color_to_culling')}>
+                                  Release Task
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => handleTaskAction(task.id, 'culling', task.assignedEditorId, 'back_to_culling_from_color')}>
                                   Back to Culling
                                 </Button>
                               </>
@@ -199,12 +203,8 @@ export default function PostProductionPage() {
   );
 }
 
-// Extend ButtonProps to include a size 'xs' if it doesn't exist
-// For the prototype, assuming 'xs' would be added to buttonVariants or simulated with 'sm' and className="text-xs".
-// Used size="sm" and className="text-xs" for buttons inside Kanban cards.
-
 declare module "@/components/ui/button" {
     interface ButtonProps {
-      size?: "default" | "sm" | "lg" | "icon" | "xs"; // Added xs for type consistency if needed
+      size?: "default" | "sm" | "lg" | "icon" | "xs"; 
     }
   }
