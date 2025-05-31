@@ -26,20 +26,20 @@ interface ReportUser {
 interface ReportEvent {
   id: string;
   name: string;
-  folderHint: string;
+  folderHint?: string; // Made optional
 }
 interface ReportPhotographer {
   id: string;
   name: string;
-  initials: string;
+  initials?: string; // Made optional
 }
 interface ReportSummaryInfo {
   id: string;
   timestamp: string;
-  performedBy: ReportUser;
-  appVersion: string;
-  event: ReportEvent;
-  photographer: ReportPhotographer;
+  performedBy?: ReportUser; // Made optional
+  appVersion?: string;
+  event?: ReportEvent;
+  photographer?: ReportPhotographer;
 }
 interface ReportSource {
   id: string;
@@ -47,16 +47,16 @@ interface ReportSource {
   selectedAt: string;
 }
 interface ReportDestinations {
-  workingBase: string;
-  effectiveWorking: string;
-  backupBase: string;
-  effectiveBackup: string;
+  workingBase?: string;
+  effectiveWorking?: string;
+  backupBase?: string;
+  effectiveBackup?: string;
 }
 interface ReportPhase {
   started: string;
   ended: string;
   status: string;
-  [key: string]: any; // for other phase-specific fields
+  [key: string]: any; 
 }
 interface ReportPhases {
   merge?: ReportPhase & { filesMerged?: number; totalBytes?: number; tempPath?: string };
@@ -108,7 +108,7 @@ interface FullIngestionReport {
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("p-4 mb-4 bg-card/50 print:p-0 print:mb-2 print:bg-transparent", className)}>
+  <div className={cn("p-4 mb-0 bg-card/50 print:p-0 print:mb-2 print:bg-transparent", className)}>
     <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
@@ -120,7 +120,7 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
   <div className={cn("flex flex-col sm:flex-row sm:items-start print:flex-row", className)}>
     <p className="font-medium text-muted-foreground sm:w-1/3 print:w-1/4 print:font-normal">{label}:</p>
-    {children ? <div className="sm:w-2/3 print:w-3/4">{children}</div> : <p className="sm:w-2/3 break-words print:w-3/4">{String(value ?? "").trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
+    {children ? <div className="sm:w-2/3 print:w-3/4">{children}</div> : <p className="sm:w-2/3 break-words print:w-3/4">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
 );
 
@@ -226,7 +226,7 @@ export function IngestionReportDialog({
               {reportData.reportSummary && (
                 <SectionCard title="Report Summary" icon={FileText}>
                   <InfoPair label="Report ID" value={reportData.reportSummary.id} />
-                  <InfoPair label="Timestamp" value={new Date(reportData.reportSummary.timestamp).toLocaleString()} />
+                  <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? new Date(reportData.reportSummary.timestamp).toLocaleString() : "N/A"} />
                   {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
                   <InfoPair label="App Version (Ingest Utility)" value={reportData.reportSummary.appVersion} />
                   {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
@@ -241,7 +241,7 @@ export function IngestionReportDialog({
               {reportData.sources && reportData.sources.length > 0 ? (
                 <SectionCard title="Sources" icon={Server}>
                   {reportData.sources.map(source => (
-                    <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${new Date(source.selectedAt).toLocaleTimeString()})`} />
+                    <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${source.selectedAt ? new Date(source.selectedAt).toLocaleTimeString() : "N/A"})`} />
                   ))}
                 </SectionCard>
               ) : (
@@ -265,7 +265,7 @@ export function IngestionReportDialog({
                     <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
                       <h4 className="font-medium text-sm mb-1 print:text-xs">Merge Phase</h4>
                       <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
-                      <InfoPair label="Duration" value={`${new Date(reportData.phases.merge.started).toLocaleTimeString()} - ${new Date(reportData.phases.merge.ended).toLocaleTimeString()}`} />
+                      <InfoPair label="Duration" value={`${reportData.phases.merge.started ? new Date(reportData.phases.merge.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.merge.ended ? new Date(reportData.phases.merge.ended).toLocaleTimeString() : "N/A"}`} />
                       <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
                       <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes)} />
                       <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
@@ -275,7 +275,7 @@ export function IngestionReportDialog({
                     <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
                       <h4 className="font-medium text-sm mb-1 print:text-xs">Copy Phase</h4>
                       <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
-                      <InfoPair label="Duration" value={`${new Date(reportData.phases.copy.started).toLocaleTimeString()} - ${new Date(reportData.phases.copy.ended).toLocaleTimeString()}`} />
+                      <InfoPair label="Duration" value={`${reportData.phases.copy.started ? new Date(reportData.phases.copy.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.copy.ended ? new Date(reportData.phases.copy.ended).toLocaleTimeString() : "N/A"}`} />
                       <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
                       <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied)} />
                       <InfoPair label="Working Status"><StatusBadge status={reportData.phases.copy.workingStatus} /></InfoPair>
@@ -286,7 +286,7 @@ export function IngestionReportDialog({
                     <div className="print:pt-1">
                       <h4 className="font-medium text-sm mb-1 print:text-xs">Checksum Phase</h4>
                       <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
-                      <InfoPair label="Duration" value={`${new Date(reportData.phases.checksum.started).toLocaleTimeString()} - ${new Date(reportData.phases.checksum.ended).toLocaleTimeString()}`} />
+                      <InfoPair label="Duration" value={`${reportData.phases.checksum.started ? new Date(reportData.phases.checksum.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.checksum.ended ? new Date(reportData.phases.checksum.ended).toLocaleTimeString() : "N/A"}`} />
                       <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
                       <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
                       <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
