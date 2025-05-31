@@ -81,18 +81,7 @@ export const EventShootAccordionItem = React.memo(function EventShootAccordionIt
             </p>
           </div>
           <div className="flex flex-col items-start sm:items-end sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2 sm:mt-0">
-            <Badge
-              variant={
-                event.priority === "Critical"
-                  ? "destructive"
-                  : event.priority === "High"
-                  ? "secondary"
-                  : "outline"
-              }
-              className="text-xs"
-            >
-              {event.priority}
-            </Badge>
+            {/* Priority Badge Removed */}
             <Badge variant={eventStatusBadge.variant} className="text-xs">
               {eventStatusBadge.label}
             </Badge>
