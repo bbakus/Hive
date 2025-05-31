@@ -88,7 +88,8 @@ export default function PostProductionPage() {
 
           switch(specificAction) {
             case "claim_ingestion": newActivity = `Culling started by ${editorName}`; break;
-            case "claim_culling_task": newActivity = `Culling claimed by ${editorName}`; break;
+            case "claim_culling_task": newActivity = `Culling task claimed by ${editorName}`; break;
+            case "claim_color_task": newActivity = `Color task claimed by ${editorName}`; break;
             case "culling_complete": newActivity = `Culling completed by ${editorName}, moved to Color`; break;
             case "release_from_culling": newActivity = `Released from Culling by ${editorName}, back to Ingestion Queue`; break;
             case "color_complete": newActivity = `Color treatment completed by ${editorName}, moved to Review`; break;
@@ -119,6 +120,7 @@ export default function PostProductionPage() {
 
   const handleRevisionSubmit = (targetStage: TaskStatus, reason: string) => {
     if (revisionTaskDetails) {
+      // When submitting revisions, the task becomes unassigned for the target stage
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, 'submit_revisions', reason);
     }
     setIsRevisionDialogOpen(false);
@@ -212,6 +214,11 @@ export default function PostProductionPage() {
                                 </Button>
                               </>
                             )}
+                            {task.status === 'color' && !task.assignedEditorId && (
+                               <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'color', MOCK_CURRENT_USER_ID, 'claim_color_task')} className="text-xs">
+                                Claim Color Task
+                              </Button>
+                            )}
                              {task.status === 'color' && isCurrentUserAssigned && (
                               <>
                                 <Button size="xs" variant="outline" onClick={() => handleTaskAction(task.id, 'review', task.assignedEditorId, 'color_complete')} className="text-xs">
@@ -233,9 +240,14 @@ export default function PostProductionPage() {
                                 </>
                             )}
                              {task.status === 'completed' && (
-                                <Badge variant="default" className="pointer-events-none">
-                                    <CheckCircle className="mr-1 h-3 w-3 text-primary-foreground"/> Completed
-                                </Badge>
+                                <>
+                                  <Badge variant="default" className="pointer-events-none mr-2">
+                                      <CheckCircle className="mr-1 h-3 w-3 text-primary-foreground"/> Completed
+                                  </Badge>
+                                   <Button size="xs" variant="ghost" className="text-muted-foreground hover:text-destructive text-xs" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
+                                      <RotateCcw className="mr-1 h-3 w-3" /> Reopen Task
+                                  </Button>
+                                </>
                             )}
                           </div>
                         </CardContent>
