@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEffect, useState } from "react";
-import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2, FolderOpen, UserCircle } from "lucide-react";
+import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2, FolderOpen, UserCircle, PowerSquare, Binary, Laptop } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,7 +37,7 @@ interface ReportSummaryInfo {
   id: string;
   timestamp: string;
   performedBy: ReportUser;
-  appVersion: string;
+  appVersion: string; // HIVE App Version (if Ingest is integrated) or Ingest Utility version
   event: ReportEvent;
   photographer: ReportPhotographer;
 }
@@ -81,8 +81,10 @@ interface ReportOverallSummary {
   notes: string[];
 }
 interface ReportEnvironment {
-  swiftVersion?: string;
-  ingestionManagerVersion?: string;
+  ingestUtilityVersion?: string;
+  nodeVersion?: string;
+  electronVersion?: string;
+  osVersion?: string;
   locale?: string;
   network?: string;
   [key: string]: any;
@@ -123,7 +125,7 @@ const InfoPair: React.FC<{ label: string; value?: string | number | boolean | nu
 );
 
 const formatBytes = (bytes?: number, decimals = 2) => {
-  if (bytes === undefined || bytes === null) return 'N/A Bytes';
+  if (bytes === undefined || bytes === null || isNaN(bytes)) return 'N/A Bytes';
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
@@ -137,10 +139,10 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   let text = String(status).toLowerCase();
 
   if (typeof status === "boolean") text = status ? "yes" : "no";
-  if (status === null || status === undefined) text = "N/A";
+  if (status === null || status === undefined || status === "undefined") text = "N/A";
 
 
-  if (["success", "verified", "passed", "true", "yes", "ingested"].includes(text)) variant = "default"; // Green-ish in ShadCN (depends on theme's "default" if it's primary or accent)
+  if (["success", "verified", "passed", "true", "yes", "ingested", "completed"].includes(text)) variant = "default";
   else if (["failed", "error", "no", "excluded"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
   
@@ -225,13 +227,13 @@ export function IngestionReportDialog({
                 <InfoPair label="Report ID" value={reportData.reportSummary.id} />
                 <InfoPair label="Timestamp" value={new Date(reportData.reportSummary.timestamp).toLocaleString()} />
                 <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />
-                <InfoPair label="App Version" value={reportData.reportSummary.appVersion} />
+                <InfoPair label="App Version (HIVE)" value={reportData.reportSummary.appVersion} />
                 <InfoPair label="Event" value={reportData.reportSummary.event.name} />
                 <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />
-                <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint} icon={FolderOpen} />
+                <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>
                 <InfoPair label="Photographer" value={reportData.reportSummary.photographer.name} />
                 <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />
-                <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} icon={UserCircle} />
+                <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />
               </SectionCard>
 
               <SectionCard title="Sources" icon={Server}>
@@ -336,9 +338,11 @@ export function IngestionReportDialog({
               </SectionCard>
 
               <div className="grid md:grid-cols-2 gap-3">
-                <SectionCard title="Environment" icon={Server}>
-                  <InfoPair label="Swift Version" value={reportData.environment.swiftVersion} />
-                  <InfoPair label="Ingestion Manager" value={reportData.environment.ingestionManagerVersion} />
+                <SectionCard title="Ingest Utility Environment" icon={Laptop}>
+                  <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
+                  <InfoPair label="Node.js Version" value={reportData.environment.nodeVersion} />
+                  <InfoPair label="Electron Version" value={reportData.environment.electronVersion} />
+                  <InfoPair label="Operating System" value={reportData.environment.osVersion} />
                   <InfoPair label="Locale" value={reportData.environment.locale} />
                   <InfoPair label="Network" value={reportData.environment.network} />
                 </SectionCard>
@@ -369,4 +373,3 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
-

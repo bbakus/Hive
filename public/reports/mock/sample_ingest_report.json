@@ -7,11 +7,11 @@
       "userId": "editor_42",
       "name": "Andrew Herrold"
     },
-    "appVersion": "CaptureHive v1.2.3 on macOS 13.4",
+    "appVersion": "CaptureHive v1.2.3",
     "event": {
       "id": "EVT_Japan2025_01",
       "name": "Japan Regional Experience Day 1",
-      "folderHint": "Day_01 / D1_JapanRegional"
+      "folderHint": "Day_01/D1_JapanRegional"
     },
     "photographer": {
       "id": "PHOT_17",
@@ -20,68 +20,132 @@
     }
   },
   "sources": [
-    { "id": "Source 1", "path": "/Users/shared/source_media/CARD_A_PHOTOS", "selectedAt": "2025-05-07T14:20:12Z" },
-    { "id": "Source 2", "path": "/Volumes/EXTERNAL_SSD/ARCHIVE_BATCH_002", "selectedAt": "2025-05-07T14:20:15Z" }
+    {
+      "id": "Source 1",
+      "path": "/Users/andrew/Documents/Photography/Source_Card_A",
+      "selectedAt": "2025-05-07T14:20:12Z"
+    },
+    {
+      "id": "Source 2",
+      "path": "/Volumes/ExternalSSD/Backup_Card_B",
+      "selectedAt": "2025-05-07T14:20:15Z"
+    }
   ],
   "destinations": {
-    "workingBase": "/Volumes/RAID_STORAGE/ACTIVE_PROJECTS_WORKING",
-    "effectiveWorking": "/Volumes/RAID_STORAGE/ACTIVE_PROJECTS_WORKING/Day_01/D1_JapanRegional/DH",
-    "backupBase": "/Volumes/BACKUP_NAS/PROJECT_ARCHIVES",
-    "effectiveBackup": "/Volumes/BACKUP_NAS/PROJECT_ARCHIVES/Day_01/D1_JapanRegional/DH"
+    "workingBase": "/Users/andrew/Documents/Projects/HIVE_Working",
+    "effectiveWorking": "/Users/andrew/Documents/Projects/HIVE_Working/Japan2025/Day_01/D1_JapanRegional/DH",
+    "backupBase": "/Volumes/RAID_Backup/HIVE_Backup",
+    "effectiveBackup": "/Volumes/RAID_Backup/HIVE_Backup/Japan2025/Day_01/D1_JapanRegional/DH"
   },
   "phases": {
     "merge": {
-      "started": "2025-05-07T14:20:30Z", "ended": "2025-05-07T14:21:02Z", "status": "success",
-      "filesMerged": 10, "totalBytes": 583427902, "tempPath": "/private/var/tmp/hive_ingest/merged_temp_xyz789"
+      "started": "2025-05-07T14:20:30Z",
+      "ended": "2025-05-07T14:21:02Z",
+      "status": "success",
+      "filesMerged": 10,
+      "totalBytes": 583427902,
+      "tempPath": "/private/var/folders/xyz/merged_temp_dir_123"
     },
     "copy": {
-      "started": "2025-05-07T14:21:05Z", "ended": "2025-05-07T14:21:20Z", "status": "success",
-      "filesCopied": 10, "bytesCopied": 583427902,
-      "workingStatus": "success", "backupStatus": "success"
+      "started": "2025-05-07T14:21:05Z",
+      "ended": "2025-05-07T14:21:20Z",
+      "status": "success",
+      "filesCopied": 10,
+      "bytesCopied": 583427902,
+      "workingStatus": "success",
+      "backupStatus": "success"
     },
     "checksum": {
-      "started": "2025-05-07T14:21:23Z", "ended": "2025-05-07T14:21:45Z", "status": "passed", "algorithm": "SHA256",
-      "tempHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "tempHashBytes": 583427902,
-      "workingHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 
+      "started": "2025-05-07T14:21:23Z",
+      "ended": "2025-05-07T14:21:45Z",
+      "status": "passed",
+      "algorithm": "SHA256",
+      "tempHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tempHashBytes": 583427902,
+      "workingHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "backupHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "matchesWorking": true, "matchesBackup": true
+      "matchesWorking": true,
+      "matchesBackup": true
     }
   },
   "fileDetails": [
-    { "name": "_AH10005.NEF", "size": 58234903, "checksum": "6f1e...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "_AH10004.NEF", "size": 58211728, "checksum": "52ad07...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "_AH10003.JPG", "size": 12054321, "checksum": "a1b2c3...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "IMG_0056.CR3", "size": 35000000, "checksum": "d4e5f6...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "another_image.ARW", "size": 42500000, "checksum": "g7h8i9...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "video_clip_01.MP4", "size": 250123456, "checksum": "j0k1l2...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "photo_007.DNG", "size": 28300000, "checksum": "m3n4o5...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "pic_008.HEIC", "size": 3000000, "checksum": "p6q7r8...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "image_009.RAF", "size": 55000000, "checksum": "s9t0u1...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": "final_shot.ORF", "size": 41000000, "checksum": "v2w3x4...", "copiedToWorking": true, "matchedEvent": true, "status": "Ingested" },
-    { "name": ".DS_Store", "size": 6148, "checksum": "b1946a...", "copiedToWorking": false, "matchedEvent": false, "status": "Excluded", "reason": "File extension .DS_Store not allowed" },
-    { "name": "Thumbs.db", "size": 12288, "checksum": "c5d6e7...", "copiedToWorking": false, "matchedEvent": false, "status": "Excluded", "reason": "System file Thumbs.db" }
+    {
+      "name": "_AH10005.NEF",
+      "size": 58234903,
+      "checksum": "6f1e2d3c...",
+      "copiedToWorking": true,
+      "matchedEvent": true,
+      "status": "Ingested"
+    },
+    {
+      "name": "_AH10004.NEF",
+      "size": 58211728,
+      "checksum": "52ad07b8...",
+      "copiedToWorking": true,
+      "matchedEvent": true,
+      "status": "Ingested"
+    },
+    {
+      "name": ".DS_Store",
+      "size": 6148,
+      "checksum": "b1946ac9...",
+      "copiedToWorking": false,
+      "matchedEvent": false,
+      "status": "Excluded",
+      "reason": "System file, extension not allowed"
+    },
+    {
+      "name": "IMG_001.CR3",
+      "size": 30123456,
+      "checksum": "a1b2c3d4...",
+      "copiedToWorking": true,
+      "matchedEvent": true,
+      "status": "Ingested"
+    },
+    {
+      "name": "IMG_002.CR3",
+      "size": 30234567,
+      "checksum": "e5f6g7h8...",
+      "copiedToWorking": true,
+      "matchedEvent": true,
+      "status": "Ingested"
+    },
+    {
+      "name": "corrupted_image.jpg",
+      "size": 1024,
+      "checksum": null,
+      "copiedToWorking": false,
+      "matchedEvent": false,
+      "status": "Excluded",
+      "reason": "File read error during copy"
+    }
   ],
   "overallSummary": {
-    "totalFilesAttempted": 12, "totalFilesIngested": 10, "totalBytesIngested": 583427902,
+    "totalFilesAttempted": 11,
+    "totalFilesIngested": 8,
+    "totalBytesIngested": 523427902,
     "excludedFiles": [
-      { "name": ".DS_Store", "reason": "File extension .DS_Store not allowed" },
-      { "name": "Thumbs.db", "reason": "System file Thumbs.db" }
+      { "name": ".DS_Store", "reason": "System file, extension not allowed" },
+      { "name": "corrupted_image.jpg", "reason": "File read error during copy" }
     ],
     "overallStatus": "verified",
-    "notes": ["All critical images accounted for.", "Minor delay during Source 2 access."]
+    "notes": [
+      "All primary media ingested and verified.",
+      "Backup successful."
+    ]
   },
   "environment": {
-    "swiftVersion": "Swift 5.8.1",
-    "ingestionManagerVersion": "IngestionManager 2.0.4",
+    "ingestUtilityVersion": "IngestManager v2.0.4",
+    "nodeVersion": "v18.17.0",
+    "electronVersion": "v25.0.0",
+    "osVersion": "macOS Ventura 13.4",
     "locale": "en_US",
-    "network": "offline",
-    "os": "macOS 13.4 Ventura",
-    "hostname": "Andrews-MacBook-Pro.local"
+    "network": "offline"
   },
   "security": {
-    "encrypted": true,
-    "algorithm": "AES-256-GCM",
-    "checksum": "4b2277a8a725efelynq99817abf89a36797b58a10236007a5581d955f7f69830",
-    "signedBy": "CTDSigningKey_v1"
+    "encrypted": false,
+    "algorithm": null,
+    "checksum": null,
+    "signedBy": null
   }
 }
