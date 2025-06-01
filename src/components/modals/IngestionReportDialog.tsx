@@ -58,6 +58,7 @@ interface ReportPhase {
   started: string;
   ended: string;
   status: string;
+  duration?: string; // For Merge Phase in image
   [key: string]: any;
 }
 interface ReportPhases {
@@ -121,11 +122,12 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
 );
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
-  <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start print:flex-row", className)}>
-    <p className="font-medium text-muted-foreground sm:w-1/3 print:w-[30%] print:min-w-[130px] print:pr-4 print:font-normal">{label}:</p>
-    {children ? <div className="sm:w-2/3 print:w-[70%]">{children}</div> : <p className="sm:w-2/3 break-words print:w-[70%]">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
+  <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start print:flex-row print:items-baseline", className)}>
+    <p className="font-medium text-muted-foreground sm:w-1/3 print:w-auto print:pr-2 print:font-normal print:flex-shrink-0">{label}:</p>
+    {children ? <div className="sm:w-2/3 print:w-auto print:flex-grow">{children}</div> : <p className="sm:w-2/3 break-words print:w-auto print:flex-grow">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
 );
+
 
 const formatBytes = (bytes?: number, decimals = 2) => {
   if (bytes === undefined || bytes === null || isNaN(bytes) || bytes < 0) return 'N/A';
@@ -218,37 +220,18 @@ export function IngestionReportDialog({
     } catch (e) {
       console.error("Error calling window.print():", e);
     }
-  }
+  };
   
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none print:dialog-content-reset">
-        <DialogHeader className="print:hidden">
-          <DialogTitle>Ingestion Report Details</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="print:header-for-print">
+          <DialogTitle className="print:title-for-print">Ingestion Report Details</DialogTitle>
+          <DialogDescription className="print:description-for-print">
             Report ID: {isLoading ? "Loading..." : (reportData?.reportSummary?.id || "N/A")} (From: {reportUrl})
           </DialogDescription>
         </DialogHeader>
         <ScrollArea id="ingestion-report-content" className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0 print:my-0">
-            {/* Printable Header - Only rendered when reportData is available */}
-            {reportData && (
-              <div className="hidden print:block printable-dialog-header">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
-                      <Icons.HiveLogo className="h-8 w-8 text-accent" />
-                      <div>
-                          <h2 className="!mb-0">Ingestion Report</h2>
-                          <p className="!text-xs !text-muted-foreground">Report ID: {reportData.reportSummary.id}</p>
-                      </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-right">
-                    Generated: {format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, p")}
-                  </p>
-                </div>
-                <hr className="print:mt-2 print:mb-4 print:border-border/50" />
-              </div>
-            )}
-
             {isLoading && (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -264,32 +247,26 @@ export function IngestionReportDialog({
             )}
             {reportData && !isLoading && (
               <div className="space-y-3 p-1 print:space-y-2 print:p-0">
-                {/* Photographer Info for Print */}
-                {reportData.reportSummary?.photographer && (
-                    <div className="print-photographer-info print:mb-4">
-                         <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />
-                         <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />
-                    </div>
-                )}
-
                 {/* --- Report Summary Section --- */}
                 <SectionCard title="Report Summary" icon={Info}>
                   <InfoPair label="Report ID" value={reportData.reportSummary.id} />
-                  <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, h:mm:ss a") : "N/A"} />
-                  <InfoPair label="Event Name" value={reportData.reportSummary.event?.name} />
+                  <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? format(parseISO(reportData.reportSummary.timestamp), "M/d/yyyy, h:mm:ss a") : "N/A"} />
+                  <InfoPair label="Performed By" value={reportData.reportSummary.performedBy ? `${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})` : "N/A"} />
+                  <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.ingestUtilityVersion} />
+                  <InfoPair label="Event" value={reportData.reportSummary.event?.name} />
+                  <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event?.id} />
                   <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event?.folderHint} />
-                  <InfoPair label="Performed By (User ID)" value={reportData.reportSummary.performedBy?.userId} />
-                  <InfoPair label="Performed By (Name)" value={reportData.reportSummary.performedBy?.name} />
+                  <InfoPair label="Photographer" value={reportData.reportSummary.photographer?.name} />
+                  <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer?.id} />
+                  <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer?.initials} />
                 </SectionCard>
 
                 {/* --- Sources Section --- */}
                 {reportData.sources && reportData.sources.length > 0 && (
                     <SectionCard title="Sources" icon={HardDrive} isEmpty={!reportData.sources || reportData.sources.length === 0}>
                         {reportData.sources.map((source, index) => (
-                        <div key={source.id || index} className="border-b border-border/50 pb-2 mb-2 last:border-b-0 last:mb-0">
-                            <InfoPair label={`Source ${index + 1} ID`} value={source.id} />
-                            <InfoPair label="Path" value={source.path} />
-                            <InfoPair label="Selected At" value={source.selectedAt ? format(parseISO(source.selectedAt), "M/d/yy, h:mm:ss a") : "N/A"} />
+                        <div key={source.id || index} className="border-b border-border/50 pb-2 mb-2 last:border-b-0 last:mb-0 print:border-0 print:pb-0 print:mb-0">
+                            <InfoPair label={`Source ${index + 1}`} value={`${source.path} (Selected at: ${source.selectedAt ? format(parseISO(source.selectedAt), "h:mm:ss a") : "N/A"})`} />
                         </div>
                         ))}
                     </SectionCard>
@@ -297,31 +274,29 @@ export function IngestionReportDialog({
                 
                 {/* --- Destinations Section --- */}
                 <SectionCard title="Destinations" icon={FolderOpen} isEmpty={!reportData.destinations}>
-                  <InfoPair label="Working Base Path" value={reportData.destinations?.workingBase} />
-                  <InfoPair label="Effective Working Path" value={reportData.destinations?.effectiveWorking} />
-                  <InfoPair label="Backup Base Path" value={reportData.destinations?.backupBase} />
-                  <InfoPair label="Effective Backup Path" value={reportData.destinations?.effectiveBackup} />
+                  <InfoPair label="Working Base" value={reportData.destinations?.workingBase} />
+                  <InfoPair label="Effective Working" value={reportData.destinations?.effectiveWorking} />
+                  <InfoPair label="Backup Base" value={reportData.destinations?.backupBase} />
+                  <InfoPair label="Effective Backup" value={reportData.destinations?.effectiveBackup} />
                 </SectionCard>
 
                 {/* --- Phases Section --- */}
-                <SectionCard title="Processing Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0}>
+                <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0}>
                     {reportData.phases?.merge && (
-                        <div className="border-b border-border/50 pb-2 mb-2">
-                            <h4 className="font-semibold text-sm">Merge Phase</h4>
-                            <InfoPair label="Started" value={reportData.phases.merge.started ? format(parseISO(reportData.phases.merge.started), "h:mm:ss.SSS a") : "N/A"} />
-                            <InfoPair label="Ended" value={reportData.phases.merge.ended ? format(parseISO(reportData.phases.merge.ended), "h:mm:ss.SSS a") : "N/A"} />
+                        <div className="border-b border-border/50 pb-2 mb-2 print:border-0 print:pb-1 print:mb-1">
+                            <h4 className="font-semibold text-sm print:text-sm">Merge Phase</h4>
                             <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
+                            <InfoPair label="Duration" value={reportData.phases.merge.duration || `${reportData.phases.merge.started ? format(parseISO(reportData.phases.merge.started), "h:mm:ss a") : "N/A"} - ${reportData.phases.merge.ended ? format(parseISO(reportData.phases.merge.ended), "h:mm:ss a") : "N/A"}`} />
                             <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
                             <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes)} />
-                            <InfoPair label="Temporary Path" value={reportData.phases.merge.tempPath} />
+                            <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
                         </div>
                     )}
                     {reportData.phases?.copy && (
-                        <div className="border-b border-border/50 pb-2 mb-2">
-                            <h4 className="font-semibold text-sm">Copy Phase</h4>
-                            <InfoPair label="Started" value={reportData.phases.copy.started ? format(parseISO(reportData.phases.copy.started), "h:mm:ss.SSS a") : "N/A"} />
-                            <InfoPair label="Ended" value={reportData.phases.copy.ended ? format(parseISO(reportData.phases.copy.ended), "h:mm:ss.SSS a") : "N/A"} />
+                        <div className="border-b border-border/50 pb-2 mb-2 print:border-0 print:pb-1 print:mb-1">
+                            <h4 className="font-semibold text-sm print:text-sm">Copy Phase</h4>
                             <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
+                            <InfoPair label="Duration" value={reportData.phases.copy.duration || `${reportData.phases.copy.started ? format(parseISO(reportData.phases.copy.started), "h:mm:ss a") : "N/A"} - ${reportData.phases.copy.ended ? format(parseISO(reportData.phases.copy.ended), "h:mm:ss a") : "N/A"}`} />
                             <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
                             <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied)} />
                             <InfoPair label="Working Copy Status"><StatusBadge status={reportData.phases.copy.workingStatus} /></InfoPair>
@@ -329,14 +304,12 @@ export function IngestionReportDialog({
                         </div>
                     )}
                     {reportData.phases?.checksum && (
-                        <div>
-                            <h4 className="font-semibold text-sm">Checksum Phase</h4>
-                            <InfoPair label="Started" value={reportData.phases.checksum.started ? format(parseISO(reportData.phases.checksum.started), "h:mm:ss.SSS a") : "N/A"} />
-                            <InfoPair label="Ended" value={reportData.phases.checksum.ended ? format(parseISO(reportData.phases.checksum.ended), "h:mm:ss.SSS a") : "N/A"} />
+                        <div className="print:border-0 print:pb-1 print:mb-1">
+                            <h4 className="font-semibold text-sm print:text-sm">Checksum Phase</h4>
                             <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status} /></InfoPair>
+                            <InfoPair label="Duration" value={reportData.phases.checksum.duration || `${reportData.phases.checksum.started ? format(parseISO(reportData.phases.checksum.started), "h:mm:ss a") : "N/A"} - ${reportData.phases.checksum.ended ? format(parseISO(reportData.phases.checksum.ended), "h:mm:ss a") : "N/A"}`} />
                             <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
                             <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
-                            <InfoPair label="Temp Hash Bytes" value={formatBytes(reportData.phases.checksum.tempHashBytes)} />
                             <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
                             <InfoPair label="Matches Working"><StatusBadge status={reportData.phases.checksum.matchesWorking} /></InfoPair>
                             <InfoPair label="Backup Hash" value={reportData.phases.checksum.backupHash} />
@@ -446,5 +419,3 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
-
-    
