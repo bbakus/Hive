@@ -356,7 +356,7 @@ export function IngestionReportDialog({
                                <StatusBadge status={file.status} />}
                             </TableCell>
                             <TableCell className="font-mono max-w-[100px] truncate print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
+                            <TableCell className="text-muted-foreground max-w-[150px] truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
