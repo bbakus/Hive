@@ -133,11 +133,11 @@ body {
 }
 
 #ingestion-report-content .section-card-print {
-  margin-bottom: 1.75rem; /* More space between sections */
+  margin-bottom: 1.5rem; /* Increased space between sections */
   padding: 1rem;
-  /* border: 1px solid hsl(var(--border)); /* REMOVED */
   background-color: hsl(var(--card));
   border-radius: var(--radius);
+  border: none; /* Removed border for on-screen sections */
 }
 
 #ingestion-report-content .section-card-print h3 {
@@ -156,10 +156,11 @@ body {
 
 #ingestion-report-content .info-pair-print {
   display: flex;
-  flex-direction: row; /* Ensure items are in a row for on-screen */
-  align-items: baseline; /* Align text along the baseline */
-  margin-bottom: 0.75rem; /* Spacing between label-value pairs */
-  font-size: 0.875rem; /* Consistent font size for InfoPair itself */
+  flex-direction: row;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem; /* Consistent font size */
+  line-height: 1.6;
 }
 
 #ingestion-report-content .info-pair-print > p:first-child { /* Label */
@@ -167,8 +168,9 @@ body {
   padding-right: 1em; /* Space after label */
   font-weight: 500;
   color: hsl(var(--muted-foreground));
-  flex-shrink: 0; /* Prevent label from shrinking */
-  /* font-size: 0.875rem; /* Inherited from .info-pair-print */
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
 }
 
 #ingestion-report-content .info-pair-print > p:last-child,
@@ -176,7 +178,8 @@ body {
   flex-grow: 1;
   word-break: break-word;
   color: hsl(var(--foreground));
-  /* font-size: 0.875rem; /* Inherited from .info-pair-print */
+  font-size: 0.875rem;
+  line-height: 1.6;
 }
 
 #ingestion-report-content .info-pair-print ul {
@@ -187,6 +190,7 @@ body {
 #ingestion-report-content .info-pair-print li {
   margin-bottom: 0.25em;
   font-size: 0.875rem; /* Ensure list items also match */
+  line-height: 1.6;
 }
 #ingestion-report-content .info-pair-print .italic {
   color: hsl(var(--muted-foreground) / 0.8);
@@ -196,32 +200,28 @@ body {
 #ingestion-report-content table {
   width: 100%;
   margin-top: 0.75rem;
-  /* font-size will be set on th/td */
 }
-#ingestion-report-content table thead th {
-  background-color: hsl(var(--muted) / 0.5);
-  text-align: left;
-  padding: 0.6rem 0.85rem;
-  font-weight: 600;
-  border-bottom: 2px solid hsl(var(--border));
-  color: hsl(var(--foreground));
-  font-size: 0.875rem; /* Ensure header font size matches dialog text */
-  line-height: 1.6;
-}
+#ingestion-report-content table thead th,
 #ingestion-report-content table tbody td {
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid hsl(var(--border));
   vertical-align: top;
   color: hsl(var(--foreground));
-  font-size: 0.875rem; /* Ensure cell font size matches dialog text */
-  line-height: 1.6;
+  font-size: 0.875rem !important; /* Force consistent font size */
+  line-height: 1.6 !important; /* Force consistent line height */
+}
+#ingestion-report-content table thead th {
+  background-color: hsl(var(--muted) / 0.5);
+  text-align: left;
+  font-weight: 600;
 }
 #ingestion-report-content table tbody tr:last-child td {
   border-bottom: none;
 }
 #ingestion-report-content table .font-mono {
   font-family: var(--font-geist-mono), monospace;
-  font-size: 0.875rem; /* Ensure mono also matches */
+  font-size: 0.875rem !important; /* Force consistent font size for mono */
+  line-height: 1.6 !important;
 }
 #ingestion-report-content table .truncate,
 #ingestion-report-content table .max-w-xs,
@@ -330,8 +330,8 @@ body {
     display: flex !important;
     justify-content: space-between !important;
     align-items: flex-start !important; /* Align items to the start for multiline titles */
-    padding-bottom: 1rem !important; /* Slightly increased padding */
-    margin-bottom: 1.5rem !important; /* Slightly increased margin */
+    padding-bottom: 1.25rem !important; /* Slightly increased padding */
+    margin-bottom: 1.75rem !important; /* Slightly increased margin */
     border-bottom: none !important; /* Removed line under header */
   }
   #printable-dialog-header .title-block { /* New wrapper for title and subtitle */
@@ -518,5 +518,3 @@ body {
   }
 }
   
-
-
