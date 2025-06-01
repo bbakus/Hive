@@ -123,8 +123,8 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
   <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start", className)}>
-    <p className="font-medium text-muted-foreground sm:w-1/3 print:font-semibold print:text-black print:mr-1">{label}:</p>
-    {children ? <div className="sm:w-2/3 print:inline">{children}</div> : <p className="sm:w-2/3 break-words print:inline">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
+    <p className="font-medium text-muted-foreground sm:w-auto print:font-semibold print:text-black print:mr-1">{label}:</p>
+    {children ? <div className="sm:w-auto break-words print:inline">{children}</div> : <p className="sm:w-auto break-words print:inline">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
 );
 
@@ -219,12 +219,17 @@ export function IngestionReportDialog({
     } catch (e) {
       console.error("Error calling window.print():", e);
     }
-  };
+  }
   
+  const renderChecksumIcon = (value?: boolean) => {
+    if (value === true) return <CheckCircle className="h-3.5 w-3.5 text-green-600 print:text-black" />;
+    if (value === false) return <XCircle className="h-3.5 w-3.5 text-red-600 print:text-black" />;
+    return <span className="italic text-muted-foreground/70">N/A</span>;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none print:dialog-content-reset">
-        {/* Standard Dialog Header for on-screen, hidden for print */}
         <DialogHeader className="print:hidden">
           <DialogTitle>Ingestion Report Details</DialogTitle>
           <DialogDescription>
@@ -233,16 +238,18 @@ export function IngestionReportDialog({
         </DialogHeader>
 
         <ScrollArea id="ingestion-report-content" className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0 print:my-0">
-            {/* Custom Printable Header */}
-            <div id="printable-dialog-header" className="hidden print:block pt-2 pb-2 mb-4">
-              <div className="flex justify-between items-start">
+            <div id="printable-dialog-header" className="hidden print:flex print:justify-between print:items-center print:pb-2 print:mb-4">
+              <div className="flex items-center">
+                <Icons.HiveLogo className="h-8 w-8 mr-3 print:h-6 print:w-6 print:mr-2" />
                 <div>
                   <h2 className="title">Ingestion Report</h2>
                   {reportData?.reportSummary?.id && <p className="subtitle">Report ID: {reportData.reportSummary.id}</p>}
                 </div>
-                {reportData?.reportSummary?.timestamp && <p className="timestamp">{format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, p")}</p>}
               </div>
+              {reportData?.reportSummary?.timestamp && <p className="timestamp">{format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, p")}</p>}
             </div>
+            <hr className="my-2 border-border/30 print:hidden" />
+
 
             {isLoading && (
               <div className="flex items-center justify-center h-full">
@@ -323,9 +330,9 @@ export function IngestionReportDialog({
                             <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
                             <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
                             <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
-                            <InfoPair label="Matches Working"><StatusBadge status={reportData.phases.checksum.matchesWorking} /></InfoPair>
+                            <InfoPair label="Matches Working">{renderChecksumIcon(reportData.phases.checksum.matchesWorking)}</InfoPair>
                             <InfoPair label="Backup Hash" value={reportData.phases.checksum.backupHash} />
-                            <InfoPair label="Matches Backup"><StatusBadge status={reportData.phases.checksum.matchesBackup} /></InfoPair>
+                            <InfoPair label="Matches Backup">{renderChecksumIcon(reportData.phases.checksum.matchesBackup)}</InfoPair>
                         </div>
                     )}
                 </SectionCard>
@@ -346,7 +353,11 @@ export function IngestionReportDialog({
                         <TableRow key={index}>
                             <TableCell className="font-mono max-w-xs truncate print:max-w-none print:truncate-none" title={file.name}>{file.name}</TableCell>
                             <TableCell className="text-right font-mono">{formatBytes(file.size)}</TableCell>
-                            <TableCell><StatusBadge status={file.status} /></TableCell>
+                            <TableCell>
+                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-3.5 w-3.5 text-green-600 print:text-black" /> :
+                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-3.5 w-3.5 text-red-600 print:text-black" /> :
+                               <StatusBadge status={file.status} />}
+                            </TableCell>
                             <TableCell className="font-mono max-w-[100px] truncate print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
                             <TableCell className="text-xs text-muted-foreground max-w-[150px] truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
@@ -396,7 +407,7 @@ export function IngestionReportDialog({
                 </SectionCard>
 
                 <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security}>
-                  <InfoPair label="Encrypted"><StatusBadge status={reportData.security?.encrypted} /></InfoPair>
+                  <InfoPair label="Encrypted">{renderChecksumIcon(reportData.security?.encrypted)}</InfoPair>
                   <InfoPair label="Algorithm" value={reportData.security?.algorithm} />
                   <InfoPair label="Overall Checksum" value={reportData.security?.checksum} />
                   <InfoPair label="Signed By" value={reportData.security?.signedBy} />
