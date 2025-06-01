@@ -11,16 +11,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react"; // Removed useCallback as it's not used temporarily
 import { Loader2, AlertTriangle, Download, CheckCircle, XCircle, Info, FileText, Server, Users, HardDrive, ShieldCheck, Settings2, FolderOpen, UserCircle, PowerSquare, Binary, Laptop, CalendarClock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Icons } from "@/components/icons";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns"; // Keep format and parseISO if used in static JSX part
 
-// --- Report Data Structure Interfaces ---
+// --- Report Data Structure Interfaces (Keep these as they define props structure if any part of JSX uses it) ---
 interface ReportUser {
   userId: string;
   name: string;
@@ -109,7 +109,7 @@ interface FullIngestionReport {
   security?: ReportSecurity;
 }
 
-// --- Helper Components & Functions ---
+// --- Helper Components & Functions (Assuming these are syntactically correct) ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
   <div className={cn("section-card-print print:p-0 print:mb-4", className)}>
     <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
@@ -147,7 +147,7 @@ const StatusBadge: React.FC<{ status?: string | boolean | null }> = ({ status })
   if (["success", "verified", "passed", "true", "yes", "ingested", "completed"].includes(text)) variant = "default";
   else if (["failed", "error", "no", "excluded", "false"].includes(text)) variant = "destructive";
   else if (["processing", "pending", "copying", "checksumming"].includes(text)) variant = "secondary";
-  
+
   const printClass = "print-status-badge";
 
   return <Badge variant={variant} className={cn("capitalize text-xs print:text-[10px] print:px-1 print:py-0", printClass)}>{String(status === undefined || status === null || String(status).trim() === "" ? "N/A" : status)}</Badge>;
@@ -166,92 +166,95 @@ export function IngestionReportDialog({
   onOpenChange,
   reportUrl,
 }: IngestionReportDialogProps) {
-  const [reportData, setReportData] = useState<FullIngestionReport | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Temporarily comment out state
+  // const [reportData, setReportData] = useState<FullIngestionReport | null>(null);
+  // const [isLoading, setIsLoading] = useState(false);
+  // const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen && reportUrl) {
-      setIsLoading(true);
-      setError(null);
-      setReportData(null); // Ensure previous data is cleared
-      fetch(reportUrl)
-        .then(async (response) => {
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to fetch report: ${response.status} ${response.statusText}. Details: ${errorText.substring(0, 200)}`);
-          }
-          return response.json();
-        })
-        .then((data: FullIngestionReport) => {
-          setReportData(data);
-        })
-        .catch((err) => {
-          console.error("Error fetching ingestion report:", err);
-          setError(err.message || "Could not load report data.");
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else if (!isOpen) { // Reset states when dialog closes
-      setReportData(null);
-      setIsLoading(false);
-      setError(null);
-    }
-  }, [isOpen, reportUrl]);
+  // Temporarily comment out useEffect
+  // useEffect(() => {
+  //   if (isOpen && reportUrl) {
+  //     setIsLoading(true);
+  //     setError(null);
+  //     setReportData(null);
+  //     fetch(reportUrl)
+  //       .then(async (response) => {
+  //         if (!response.ok) {
+  //           const errorText = await response.text();
+  //           throw new Error(`Failed to fetch report: ${response.status} ${response.statusText}. Details: ${errorText.substring(0, 200)}`);
+  //         }
+  //         return response.json();
+  //       })
+  //       .then((data: FullIngestionReport) => {
+  //         setReportData(data);
+  //       })
+  //       .catch((err) => {
+  //         console.error("Error fetching ingestion report:", err);
+  //         setError(err.message || "Could not load report data.");
+  //       })
+  //       .finally(() => {
+  //         setIsLoading(false);
+  //       });
+  //   } else if (!isOpen) {
+  //     setReportData(null);
+  //     setIsLoading(false);
+  //     setError(null);
+  //   }
+  // }, [isOpen, reportUrl]);
 
-  const handlePrintReport = () => {
-    console.log("handlePrintReport called. reportData exists:", !!reportData, "isLoading:", isLoading);
-    if (!reportData || isLoading) {
-      console.warn("Print button clicked but reportData not ready or still loading.");
-      return;
-    }
-    try {
-      console.log("Attempting window.print()...");
-      const originalTitle = document.title;
-      if (reportData?.reportSummary?.id) {
-        document.title = `IngestionReport_${reportData.reportSummary.id}`;
-      } else {
-        document.title = "HIVE_Ingestion_Report";
-      }
-      window.print();
-      setTimeout(() => {
-        document.title = originalTitle;
-        console.log("Original document title restored.");
-      }, 1000);
-    } catch (e) {
-      console.error("Error calling window.print():", e);
-    }
-  }; // Ensured semicolon and clean termination
-
-  // END OF JS LOGIC
+  // Temporarily comment out handlePrintReport
+  // function handlePrintReport() {
+  //   console.log("handlePrintReport called. reportData exists:", !!reportData, "isLoading:", isLoading);
+  //   if (!reportData || isLoading) {
+  //     console.warn("Print button clicked but reportData not ready or still loading. Button should be disabled.");
+  //     return;
+  //   }
+  //   try {
+  //     console.log("Attempting window.print()...");
+  //     const originalTitle = document.title;
+  //     if (reportData?.reportSummary?.id) {
+  //       document.title = `IngestionReport_${reportData.reportSummary.id}`;
+  //     } else {
+  //       document.title = "HIVE_Ingestion_Report";
+  //     }
+  //     window.print();
+  //     setTimeout(() => { document.title = originalTitle; }, 1000); 
+  //     console.log("window.print() called (browser print dialog should appear).");
+  //   } catch (e) {
+  //     console.error("Error calling window.print():", e);
+  //   }
+  // }
+  // END OF JS LOGIC TEMPORARILY COMMENTED OUT
+  
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none print:dialog-content-reset">
         <DialogHeader className="print:hidden">
           <DialogTitle>Ingestion Report Details</DialogTitle>
           <DialogDescription>
-            Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl})
+            {/* Report ID: {reportData?.reportSummary?.id || "Loading..."} (From: {reportUrl}) */}
+            Report ID: Loading... (From: {reportUrl})
           </DialogDescription>
         </DialogHeader>
         <ScrollArea id="ingestion-report-content" className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0 print:my-0">
+            {/* Printable Header - Rendered with placeholder data or static for now */}
             <div className="hidden print:block printable-dialog-header">
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2">
                     <Icons.HiveLogo className="h-8 w-8 text-accent" />
                     <div>
                         <h2 className="!mb-0">Ingestion Report</h2>
-                        <p className="!text-xs !text-muted-foreground">Report ID: {reportData?.reportSummary?.id || "N/A"}</p>
+                        <p className="!text-xs !text-muted-foreground">Report ID: Placeholder_Report_ID</p>
                     </div>
                 </div>
                 <p className="text-xs text-muted-foreground text-right">
-                  {reportData?.reportSummary?.timestamp ? format(new Date(reportData.reportSummary.timestamp), "M/d/yy, p") : "N/A"}
+                  Date: {format(new Date(), "M/d/yy, p")}
                 </p>
               </div>
               <hr className="print:mt-2 print:mb-4 print:border-border/50" />
             </div>
 
-            {isLoading && (
+            {/* {isLoading && (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 <p className="ml-2 text-muted-foreground">Loading report...</p>
@@ -272,167 +275,12 @@ export function IngestionReportDialog({
                          <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />
                     </div>
                 )}
-
-                {reportData.reportSummary && (
-                  <SectionCard title="Report Summary" icon={FileText}>
-                    <InfoPair label="Report ID" value={reportData.reportSummary.id} />
-                    <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? new Date(reportData.reportSummary.timestamp).toLocaleString() : "N/A"} />
-                    {reportData.reportSummary.performedBy && <InfoPair label="Performed By" value={`${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})`} />}
-                    <InfoPair label="Ingest Utility Version" value={reportData.reportSummary.ingestUtilityVersion} />
-                    {reportData.reportSummary.event && <InfoPair label="Event" value={reportData.reportSummary.event.name} />}
-                    {reportData.reportSummary.event && <InfoPair label="Event ID (HIVE)" value={reportData.reportSummary.event.id} />}
-                    {reportData.reportSummary.event && <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event.folderHint}/>}
-                    {reportData.reportSummary.photographer && <InfoPair className="print:hidden" label="Photographer" value={reportData.reportSummary.photographer.name} />}
-                    {reportData.reportSummary.photographer && <InfoPair className="print:hidden" label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer.id} />}
-                    {reportData.reportSummary.photographer && <InfoPair className="print:hidden" label="Photographer Initials" value={reportData.reportSummary.photographer.initials} />}
-                  </SectionCard>
-                )}
-
-                {reportData.sources && reportData.sources.length > 0 ? (
-                  <SectionCard title="Sources" icon={FolderOpen}>
-                    {reportData.sources.map(source => (
-                      <InfoPair key={source.id} label={source.id} value={`${source.path} (Selected at: ${source.selectedAt ? new Date(source.selectedAt).toLocaleTimeString() : "N/A"})`} />
-                    ))}
-                  </SectionCard>
-                ) : (
-                  <SectionCard title="Sources" icon={FolderOpen} isEmpty={!reportData.sources || reportData.sources.length === 0} />
-                )}
-
-                {reportData.destinations ? (
-                  <SectionCard title="Destinations" icon={HardDrive}>
-                    <InfoPair label="Working Base" value={reportData.destinations.workingBase} />
-                    <InfoPair label="Effective Working" value={reportData.destinations.effectiveWorking} />
-                    <InfoPair label="Backup Base" value={reportData.destinations.backupBase} />
-                    <InfoPair label="Effective Backup" value={reportData.destinations.effectiveBackup} />
-                  </SectionCard>
-                ) : (
-                  <SectionCard title="Destinations" icon={HardDrive} isEmpty={true} />
-                )}
-                
-                {reportData.phases && Object.keys(reportData.phases).length > 0 ? (
-                  <SectionCard title="Ingestion Phases" icon={Settings2}>
-                    {reportData.phases.merge && (
-                      <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
-                        <h4 className="font-medium text-sm mb-1 print:text-xs">Merge Phase</h4>
-                        <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
-                        <InfoPair label="Duration" value={`${reportData.phases.merge.started ? new Date(reportData.phases.merge.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.merge.ended ? new Date(reportData.phases.merge.ended).toLocaleTimeString() : "N/A"}`} />
-                        <InfoPair label="Files Merged" value={reportData.phases.merge.filesMerged} />
-                        <InfoPair label="Total Bytes" value={formatBytes(reportData.phases.merge.totalBytes)} />
-                        <InfoPair label="Temp Path" value={reportData.phases.merge.tempPath} />
-                      </div>
-                    )}
-                    {reportData.phases.copy && (
-                      <div className="border-b border-border/50 pb-2 mb-2 print:border-gray-300">
-                        <h4 className="font-medium text-sm mb-1 print:text-xs">Copy Phase</h4>
-                        <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
-                        <InfoPair label="Duration" value={`${reportData.phases.copy.started ? new Date(reportData.phases.copy.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.copy.ended ? new Date(reportData.phases.copy.ended).toLocaleTimeString() : "N/A"}`} />
-                        <InfoPair label="Files Copied" value={reportData.phases.copy.filesCopied} />
-                        <InfoPair label="Bytes Copied" value={formatBytes(reportData.phases.copy.bytesCopied)} />
-                        <InfoPair label="Working Status"><StatusBadge status={reportData.phases.copy.workingStatus} /></InfoPair>
-                        <InfoPair label="Backup Status"><StatusBadge status={reportData.phases.copy.backupStatus} /></InfoPair>
-                      </div>
-                    )}
-                    {reportData.phases.checksum && (
-                      <div className="print:pt-1">
-                        <h4 className="font-medium text-sm mb-1 print:text-xs">Checksum Phase</h4>
-                        <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status || (reportData.phases.checksum.matchesWorking && reportData.phases.checksum.matchesBackup ? "Passed" : "Failed")} /></InfoPair>
-                        <InfoPair label="Duration" value={`${reportData.phases.checksum.started ? new Date(reportData.phases.checksum.started).toLocaleTimeString() : "N/A"} - ${reportData.phases.checksum.ended ? new Date(reportData.phases.checksum.ended).toLocaleTimeString() : "N/A"}`} />
-                        <InfoPair label="Algorithm" value={reportData.phases.checksum.algorithm} />
-                        <InfoPair label="Temp Hash" value={reportData.phases.checksum.tempHash} />
-                        <InfoPair label="Working Hash" value={reportData.phases.checksum.workingHash} />
-                        <InfoPair label="Backup Hash" value={reportData.phases.checksum.backupHash} />
-                        <InfoPair label="Working Match"><StatusBadge status={reportData.phases.checksum.matchesWorking} /></InfoPair>
-                        <InfoPair label="Backup Match"><StatusBadge status={reportData.phases.checksum.matchesBackup} /></InfoPair>
-                      </div>
-                    )}
-                  </SectionCard>
-                ) : (
-                  <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0} />
-                )}
-
-                {reportData.fileDetails && reportData.fileDetails.length > 0 ? (
-                  <SectionCard title="File Details" icon={Binary}>
-                    <div className="max-h-96 overflow-y-auto border border-border/50 rounded-none print:max-h-none print:overflow-visible print:border-gray-300">
-                      <Table className="text-xs print:text-[9px]">
-                        <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm print:bg-gray-100">
-                          <TableRow>
-                            <TableHead className="p-1.5 print:p-0.5">Filename</TableHead>
-                            <TableHead className="p-1.5 text-right print:p-0.5">Size</TableHead>
-                            <TableHead className="p-1.5 print:p-0.5">Status</TableHead>
-                            <TableHead className="p-1.5 print:p-0.5">Checksum</TableHead>
-                            <TableHead className="p-1.5 print:p-0.5">Reason</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {reportData.fileDetails.map((file, index) => (
-                            <TableRow key={index} className="print:even:bg-gray-50">
-                              <TableCell className="p-1.5 font-mono print:p-0.5 print:max-w-none print:truncate-none" title={file.name}>{file.name}</TableCell>
-                              <TableCell className="p-1.5 text-right font-mono print:p-0.5">{formatBytes(file.size)}</TableCell>
-                              <TableCell className="p-1.5 print:p-0.5"><StatusBadge status={file.status} /></TableCell>
-                              <TableCell className="p-1.5 font-mono print:p-0.5 print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum || "N/A"}</TableCell>
-                              <TableCell className="p-1.5 print:p-0.5 print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </SectionCard>
-                ) : (
-                  <SectionCard title="File Details" icon={Binary} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0} />
-                )}
-
-                {reportData.overallSummary ? (
-                  <SectionCard title="Overall Summary" icon={CheckCircle}>
-                    <InfoPair label="Overall Status"><StatusBadge status={reportData.overallSummary.overallStatus} /></InfoPair>
-                    <InfoPair label="Files Attempted" value={reportData.overallSummary.totalFilesAttempted} />
-                    <InfoPair label="Files Ingested" value={reportData.overallSummary.totalFilesIngested} />
-                    <InfoPair label="Bytes Ingested" value={formatBytes(reportData.overallSummary.totalBytesIngested)} />
-                    <InfoPair label="Excluded Files">
-                        {(reportData.overallSummary.excludedFiles && reportData.overallSummary.excludedFiles.length > 0) ? (
-                            <ul className="list-disc list-inside">
-                              {reportData.overallSummary.excludedFiles.map((ef, idx) => (
-                                  <li key={`${ef.name}-${idx}`}>{ef.name} <span className="text-muted-foreground/80 print:text-gray-600">({ef.reason})</span></li>
-                              ))}
-                            </ul>
-                        ) : (<span className="italic text-muted-foreground/70">None</span>) }
-                    </InfoPair>
-                    <InfoPair label="Notes">
-                        {(reportData.overallSummary.notes && reportData.overallSummary.notes.length > 0) ? (
-                            <ul className="list-disc list-inside">{reportData.overallSummary.notes.map((note, i) => <li key={i}>{note}</li>)}</ul>
-                        ) : (<span className="italic text-muted-foreground/70">None</span>) }
-                    </InfoPair>
-                  </SectionCard>
-                ) : (
-                  <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={true} />
-                )}
-
-                <div className="grid md:grid-cols-2 gap-3 print:grid-cols-2">
-                  {reportData.environment ? (
-                    <SectionCard title="Ingest Utility Environment" icon={Laptop}>
-                      <InfoPair label="Utility Version" value={reportData.environment.ingestUtilityVersion} />
-                      <InfoPair label="Node.js Version" value={reportData.environment.nodeVersion} />
-                      <InfoPair label="Electron Version" value={reportData.environment.electronVersion} />
-                      <InfoPair label="Operating System" value={reportData.environment.osVersion} />
-                      <InfoPair label="Locale" value={reportData.environment.locale} />
-                      <InfoPair label="Network" value={reportData.environment.network} />
-                    </SectionCard>
-                  ) : (
-                    <SectionCard title="Ingest Utility Environment" icon={Laptop} isEmpty={!reportData.environment} />
-                  )}
-                  {reportData.security ? (
-                    <SectionCard title="Security" icon={ShieldCheck}>
-                      <InfoPair label="Encrypted"><StatusBadge status={reportData.security.encrypted} /></InfoPair>
-                      <InfoPair label="Algorithm" value={reportData.security.algorithm} />
-                      <InfoPair label="Checksum" value={reportData.security.checksum} />
-                      <InfoPair label="Signed By" value={reportData.security.signedBy} />
-                    </SectionCard>
-                  ) : (
-                    <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security} />
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+                {/* ... Other sections will be empty or use placeholder data ... */}
+              {/* </div>
+            )} */}
+            <div className="p-4 text-center text-muted-foreground">
+                Report content is temporarily simplified for debugging.
+            </div>
         </ScrollArea>
         <Alert variant="default" className="mt-2 print:hidden">
           <Info className="h-4 w-4" />
@@ -445,7 +293,12 @@ export function IngestionReportDialog({
         </Alert>
         <DialogFooter className="mt-auto pt-4 border-t border-border/50 print:hidden">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button onClick={handlePrintReport} variant="accent" disabled={!reportData || isLoading}>
+          <Button
+            onClick={() => console.log("Print button clicked - functionality temporarily simplified")}
+            variant="accent"
+            // disabled={!reportData || isLoading}
+            disabled={true} // Temporarily disable if data loading is commented
+          >
             <Download className="mr-2 h-4 w-4"/> Download PDF
           </Button>
         </DialogFooter>
@@ -453,3 +306,5 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
+
+    
