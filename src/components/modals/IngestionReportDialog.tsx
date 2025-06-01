@@ -117,7 +117,7 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
     </h3>
-    {isEmpty ? <p className="text-xs text-muted-foreground italic print:text-xs">No data provided for this section.</p> : <div className="space-y-2 text-xs print:space-y-1">{children}</div>}
+    {isEmpty ? <p className="text-xs text-muted-foreground italic print:text-xs">No data provided for this section.</p> : <div className="space-y-2 print:space-y-1">{children}</div>}
   </div>
 );
 
@@ -222,8 +222,8 @@ export function IngestionReportDialog({
   }
   
   const renderChecksumIcon = (value?: boolean) => {
-    if (value === true) return <CheckCircle className="h-3.5 w-3.5 text-green-600 print:text-black" />;
-    if (value === false) return <XCircle className="h-3.5 w-3.5 text-red-600 print:text-black" />;
+    if (value === true) return <CheckCircle className="h-3.5 w-3.5 icon-green print:text-black" />;
+    if (value === false) return <XCircle className="h-3.5 w-3.5 icon-red print:text-black" />;
     return <span className="italic text-muted-foreground/70">N/A</span>;
   };
 
@@ -238,17 +238,14 @@ export function IngestionReportDialog({
         </DialogHeader>
 
         <ScrollArea id="ingestion-report-content" className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0 print:my-0">
-            <div id="printable-dialog-header" className="hidden print:flex print:justify-between print:items-center print:pb-2 print:mb-4">
-              <div className="flex items-center">
-                <Icons.HiveLogo className="h-8 w-8 mr-3 print:h-6 print:w-6 print:mr-2" />
-                <div>
-                  <h2 className="title">Ingestion Report</h2>
-                  {reportData?.reportSummary?.id && <p className="subtitle">Report ID: {reportData.reportSummary.id}</p>}
-                </div>
+            <div id="printable-dialog-header" className="hidden print:flex print:justify-between print:items-start print:pb-4 print:mb-6">
+              <div className="title-block">
+                <h2 className="title">Ingestion Report</h2>
+                {reportData?.reportSummary?.id && <p className="subtitle">Report ID: {reportData.reportSummary.id}</p>}
               </div>
               {reportData?.reportSummary?.timestamp && <p className="timestamp">{format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, p")}</p>}
             </div>
-            <hr className="my-2 border-border/30 print:hidden" />
+            {/* <hr className="my-2 border-border/30 print:hidden" /> */}
 
 
             {isLoading && (
@@ -354,8 +351,8 @@ export function IngestionReportDialog({
                             <TableCell className="font-mono max-w-xs truncate print:max-w-none print:truncate-none" title={file.name}>{file.name}</TableCell>
                             <TableCell className="text-right font-mono">{formatBytes(file.size)}</TableCell>
                             <TableCell>
-                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-3.5 w-3.5 text-green-600 print:text-black" /> :
-                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-3.5 w-3.5 text-red-600 print:text-black" /> :
+                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-3.5 w-3.5 icon-green print:text-black" /> :
+                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-3.5 w-3.5 icon-red print:text-black" /> :
                                <StatusBadge status={file.status} />}
                             </TableCell>
                             <TableCell className="font-mono max-w-[100px] truncate print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
@@ -375,7 +372,7 @@ export function IngestionReportDialog({
                     {reportData.overallSummary?.excludedFiles && reportData.overallSummary.excludedFiles.length > 0 ? (
                       <ul className="list-disc list-inside mt-1">
                         {reportData.overallSummary.excludedFiles.map((file, index) => (
-                          <li key={index} className="text-xs">
+                          <li key={index}>
                             <span className="font-mono">{file.name}</span> - <span className="italic">{file.reason}</span>
                           </li>
                         ))}
@@ -388,7 +385,7 @@ export function IngestionReportDialog({
                     {reportData.overallSummary?.notes && reportData.overallSummary.notes.length > 0 ? (
                       <ul className="list-disc list-inside mt-1">
                         {reportData.overallSummary.notes.map((note, index) => (
-                          <li key={index} className="text-xs">{note}</li>
+                          <li key={index}>{note}</li>
                         ))}
                       </ul>
                     ) : (
@@ -439,3 +436,4 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
+
