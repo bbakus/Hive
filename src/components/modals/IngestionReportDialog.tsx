@@ -117,7 +117,7 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
     </h3>
-    {isEmpty ? <p className="text-xs text-muted-foreground italic print:text-xs">No data provided for this section.</p> : <div className="space-y-2 print:space-y-1">{children}</div>}
+    {isEmpty ? <p className="text-muted-foreground italic print:text-xs">No data provided for this section.</p> : <div className="space-y-2 print:space-y-1">{children}</div>}
   </div>
 );
 
@@ -245,7 +245,6 @@ export function IngestionReportDialog({
               </div>
               {reportData?.reportSummary?.timestamp && <p className="timestamp">{format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, p")}</p>}
             </div>
-            {/* <hr className="my-2 border-border/30 print:hidden" /> */}
 
 
             {isLoading && (
@@ -338,25 +337,25 @@ export function IngestionReportDialog({
                     <Table>
                     <TableHeader>
                         <TableRow>
-                        <TableHead className="w-[40%]">Name</TableHead>
-                        <TableHead className="text-right">Size</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Checksum (Truncated)</TableHead>
-                        <TableHead>Reason (if Excluded)</TableHead>
+                        <TableHead className="w-[30%]">Name</TableHead>
+                        <TableHead className="w-[10%] text-right">Size</TableHead>
+                        <TableHead className="w-[20%] text-center">Status</TableHead>
+                        <TableHead className="w-[15%]">Checksum</TableHead>
+                        <TableHead className="w-[25%]">Reason (if Excluded)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {(reportData.fileDetails || []).map((file, index) => (
                         <TableRow key={index}>
-                            <TableCell className="font-mono max-w-xs truncate print:max-w-none print:truncate-none" title={file.name}>{file.name}</TableCell>
+                            <TableCell className="font-mono max-w-sm truncate print:max-w-none print:truncate-none" title={file.name}>{file.name}</TableCell>
                             <TableCell className="text-right font-mono">{formatBytes(file.size)}</TableCell>
-                            <TableCell>
-                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-3.5 w-3.5 icon-green print:text-black" /> :
-                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-3.5 w-3.5 icon-red print:text-black" /> :
+                            <TableCell className="text-center">
+                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-3.5 w-3.5 icon-green print:text-black mx-auto" /> :
+                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-3.5 w-3.5 icon-red print:text-black mx-auto" /> :
                                <StatusBadge status={file.status} />}
                             </TableCell>
-                            <TableCell className="font-mono max-w-[100px] truncate print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
-                            <TableCell className="text-muted-foreground max-w-[150px] truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
+                            <TableCell className="font-mono max-w-[120px] truncate print:max-w-none print:truncate-none" title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
+                            <TableCell className="text-muted-foreground max-w-xs truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
