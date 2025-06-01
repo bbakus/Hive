@@ -132,42 +132,42 @@ body {
   line-height: 1.6;
 }
 
-#ingestion-report-content .section-card-print { /* Assuming this class is on the SectionCard component */
+#ingestion-report-content .section-card-print {
   margin-bottom: 1.75rem; /* More space between sections */
   padding: 1rem;
-  border: 1px solid hsl(var(--border));
+  /* border: 1px solid hsl(var(--border)); /* Removed on-screen border */
   background-color: hsl(var(--card));
-  border-radius: var(--radius); /* Use theme radius */
+  border-radius: var(--radius);
 }
 
 #ingestion-report-content .section-card-print h3 {
-  font-size: 1.125rem; /* approx 18px for section titles */
+  font-size: 1.25rem; /* approx 20px for section titles */
   font-weight: 600;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem; /* Spacing under section title */
   display: flex;
   align-items: center;
 }
 #ingestion-report-content .section-card-print h3 svg {
   margin-right: 0.5rem;
-  height: 1.125em; /* Match font size of h3 */
-  width: 1.125em;
+  height: 1.25em; /* Match font size of h3 */
+  width: 1.25em;
   color: hsl(var(--accent));
 }
 
-#ingestion-report-content .info-pair-print { /* Class used by InfoPair component */
+#ingestion-report-content .info-pair-print {
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  margin-bottom: 0.6rem; /* Spacing between label-value pairs */
+  flex-direction: row; /* Ensure items are in a row for on-screen */
+  align-items: baseline; /* Align text along the baseline */
+  margin-bottom: 0.75rem; /* Spacing between label-value pairs */
   font-size: 0.875rem; /* Consistent font size */
 }
 
 #ingestion-report-content .info-pair-print > p:first-child { /* Label */
-  min-width: 200px; /* Standardized width for labels */
+  min-width: 200px; /* Standardized width for labels for tabbed look */
   padding-right: 1em; /* Space after label */
   font-weight: 500;
   color: hsl(var(--muted-foreground));
-  flex-shrink: 0;
+  flex-shrink: 0; /* Prevent label from shrinking */
 }
 
 #ingestion-report-content .info-pair-print > p:last-child,
@@ -193,22 +193,24 @@ body {
 #ingestion-report-content table {
   width: 100%;
   margin-top: 0.75rem;
-  font-size: 0.875rem; /* Consistent with dialog text */
+  font-size: 0.875rem; /* Consistent font size with dialog text */
   border-collapse: collapse;
 }
 #ingestion-report-content table thead th {
   background-color: hsl(var(--muted) / 0.5);
   text-align: left;
-  padding: 0.6rem 0.85rem; /* Slightly more padding for on-screen */
+  padding: 0.6rem 0.85rem;
   font-weight: 600;
   border-bottom: 2px solid hsl(var(--border));
   color: hsl(var(--foreground));
+  font-size: 0.875rem; /* Ensure header font size matches */
 }
 #ingestion-report-content table tbody td {
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid hsl(var(--border));
   vertical-align: top;
   color: hsl(var(--foreground));
+  font-size: 0.875rem; /* Ensure cell font size matches */
 }
 #ingestion-report-content table tbody tr:last-child td {
   border-bottom: none;
@@ -221,7 +223,7 @@ body {
 #ingestion-report-content table .max-w-\[150px\],
 #ingestion-report-content table .max-w-\[100px\],
 #ingestion-report-content table .max-w-\[80px\] {
-  max-width: 250px; /* Adjust for on-screen readability */
+  max-width: 250px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -316,8 +318,8 @@ body {
     display: flex !important;
     justify-content: space-between !important;
     align-items: flex-start !important; /* Align items to the start for multiline titles */
-    padding-bottom: 0.75rem !important; /* Slightly increased padding */
-    margin-bottom: 1.25rem !important; /* Slightly increased margin */
+    padding-bottom: 1rem !important; /* Slightly increased padding */
+    margin-bottom: 1.5rem !important; /* Slightly increased margin */
     border-bottom: none !important; /* Removed line under header */
   }
   #printable-dialog-header .title-block { /* New wrapper for title and subtitle */
@@ -501,3 +503,4 @@ body {
   }
 }
   
+
