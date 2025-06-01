@@ -133,11 +133,11 @@ body {
 }
 
 #ingestion-report-content .section-card-print {
-  margin-bottom: 1.25rem; /* Space between sections */
+  /* border: 1px solid hsl(var(--border)); */ /* Border removed as per user request */
+  /* background-color: hsl(var(--card)); */ /* Background removed as per user request */
   padding: 1rem;
-  background-color: hsl(var(--card));
+  margin-bottom: 1.25rem; /* Space between sections */
   border-radius: var(--radius);
-  border: none; /* Removed border for on-screen sections */
 }
 
 #ingestion-report-content .section-card-print h3 {
@@ -204,8 +204,8 @@ body {
   border-bottom: 1px solid hsl(var(--border));
   vertical-align: top;
   color: hsl(var(--foreground));
-  font-size: 0.875rem; /* Default for table, specific columns may override */
-  line-height: 1.6;
+  font-size: 0.7rem !important; /* Default table font size for Status and Reason columns */
+  line-height: 1.4 !important;   /* Adjusted line height for smaller font */
 }
 #ingestion-report-content table thead th {
   background-color: hsl(var(--muted) / 0.5);
@@ -217,35 +217,34 @@ body {
 }
 #ingestion-report-content table .font-mono {
   font-family: var(--font-geist-mono), monospace;
-  font-size: 0.875rem; /* Match table cell font size for mono */
-  line-height: 1.6;
+  /* Font size will be inherited (0.7rem) or overridden by .report-table-cell-small-font */
 }
+
+/* Specific class for even smaller font in designated table cells */
+#ingestion-report-content table .report-table-cell-small-font {
+  font-size: 0.65rem !important; /* Smaller font for Name, Size, Checksum */
+  line-height: 1.3 !important;   /* Adjusted line height for smaller font */
+}
+
 #ingestion-report-content table .truncate,
 #ingestion-report-content table .max-w-xs,
 #ingestion-report-content table .max-w-\[150px\],
 #ingestion-report-content table .max-w-\[100px\],
 #ingestion-report-content table .max-w-\[80px\] {
-  max-width: 250px;
+  max-width: 250px; /* Adjust as needed based on column widths */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Specific class for smaller font in designated table cells */
-#ingestion-report-content table .report-table-cell-small-font {
-  font-size: 0.65rem !important; /* Smaller font for specific columns */
-  line-height: 1.3 !important;   /* Adjusted line height for smaller font */
-}
-
-#ingestion-report-content table svg { /* For on-screen icons in table */
-  width: 0.9em; /* Relative to current font-size */
-  height: 0.9em;
+/* On-screen specific icon colors & general SVG styling in table */
+#ingestion-report-content table svg { 
+  /* Default size for icons like status icons if not overridden by specific Tailwind classes */
+  /* Size will be explicitly set on status icons (h-4 w-4) */
   display: inline-block;
   vertical-align: middle;
-  margin-right: 0.4em;
+  margin-right: 0.4em; /* If icon is before text, typically not for status icons here */
 }
-
-/* On-screen specific icon colors */
 #ingestion-report-content .icon-green { color: hsl(145 63% 42%); }
 #ingestion-report-content .icon-red { color: hsl(0 72% 51%); }
 
@@ -523,5 +522,7 @@ body {
   }
 }
   
+
+    
 
     

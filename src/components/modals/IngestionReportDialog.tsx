@@ -337,24 +337,24 @@ export function IngestionReportDialog({
                     <Table>
                     <TableHeader>
                         <TableRow>
-                        <TableHead className="w-[30%] report-table-cell-small-font">Name</TableHead>
-                        <TableHead className="w-[10%] text-right report-table-cell-small-font">Size</TableHead>
+                        <TableHead className={cn("w-[30%]", "report-table-cell-small-font")}>Name</TableHead>
+                        <TableHead className={cn("w-[10%] text-right", "report-table-cell-small-font")}>Size</TableHead>
                         <TableHead className="w-[20%] text-center">Status</TableHead>
-                        <TableHead className="w-[15%] report-table-cell-small-font">Checksum</TableHead>
+                        <TableHead className={cn("w-[15%]", "report-table-cell-small-font")}>Checksum</TableHead>
                         <TableHead className="w-[25%]">Reason (if Excluded)</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {(reportData.fileDetails || []).map((file, index) => (
                         <TableRow key={index}>
-                            <TableCell className="font-mono max-w-sm truncate print:max-w-none print:truncate-none report-table-cell-small-font" title={file.name}>{file.name}</TableCell>
-                            <TableCell className="text-right font-mono report-table-cell-small-font">{formatBytes(file.size)}</TableCell>
+                            <TableCell className={cn("font-mono max-w-sm truncate print:max-w-none print:truncate-none", "report-table-cell-small-font")} title={file.name}>{file.name}</TableCell>
+                            <TableCell className={cn("text-right font-mono", "report-table-cell-small-font")}>{formatBytes(file.size)}</TableCell>
                             <TableCell className="text-center">
                               {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-4 w-4 icon-green print:text-black mx-auto" /> :
                                file.status.toLowerCase() === 'excluded' ? <XCircle className="h-4 w-4 icon-red print:text-black mx-auto" /> :
                                <StatusBadge status={file.status} />}
                             </TableCell>
-                            <TableCell className="font-mono max-w-[120px] truncate print:max-w-none print:truncate-none report-table-cell-small-font" title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
+                            <TableCell className={cn("font-mono max-w-[120px] truncate print:max-w-none print:truncate-none", "report-table-cell-small-font")} title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
                             <TableCell className="max-w-xs truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
                         ))}
@@ -436,3 +436,5 @@ export function IngestionReportDialog({
   );
 }
 
+
+    
