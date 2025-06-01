@@ -156,11 +156,11 @@ body {
 
 #ingestion-report-content .info-pair-print {
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
+  flex-direction: row; /* Ensure labels and values are on the same row */
+  align-items: baseline; /* Align text nicely */
   margin-bottom: 0.5rem;
-  font-size: 0.875rem; /* Consistent font size with main dialog text */
-  line-height: 1.6;
+  font-size: 0.875rem !important; /* Ensure consistent font size with main dialog text */
+  line-height: 1.6 !important;
 }
 
 #ingestion-report-content .info-pair-print > p:first-child { /* Label */
@@ -168,12 +168,12 @@ body {
   padding-right: 1em; /* Space after label */
   font-weight: 500;
   color: hsl(var(--muted-foreground));
-  flex-shrink: 0;
+  flex-shrink: 0; /* Prevent label from shrinking */
 }
 
 #ingestion-report-content .info-pair-print > p:last-child,
 #ingestion-report-content .info-pair-print > div:last-child { /* Value */
-  flex-grow: 1;
+  flex-grow: 1; /* Allow value to take remaining space */
   word-break: break-word;
   color: hsl(var(--foreground));
 }
@@ -185,8 +185,8 @@ body {
 }
 #ingestion-report-content .info-pair-print li {
   margin-bottom: 0.25em;
-  font-size: 0.875rem; /* Ensure list items also match */
-  line-height: 1.6;
+  font-size: 0.875rem !important; /* Ensure list items also match */
+  line-height: 1.6 !important;
 }
 #ingestion-report-content .info-pair-print .italic {
   color: hsl(var(--muted-foreground) / 0.8);
@@ -203,8 +203,8 @@ body {
   border-bottom: 1px solid hsl(var(--border));
   vertical-align: top;
   color: hsl(var(--foreground));
-  font-size: 0.75rem !important; /* REDUCED FONT SIZE for File Details table */
-  line-height: 1.5 !important;   /* Adjusted line-height for smaller font */
+  font-size: 0.7rem !important; /* REDUCED FONT SIZE for File Details table */
+  line-height: 1.4 !important;   /* Adjusted line-height for smaller font */
 }
 #ingestion-report-content table thead th {
   background-color: hsl(var(--muted) / 0.5);
@@ -216,8 +216,8 @@ body {
 }
 #ingestion-report-content table .font-mono {
   font-family: var(--font-geist-mono), monospace;
-  font-size: 0.75rem !important; /* Match table cell font size for mono */
-  line-height: 1.5 !important;
+  font-size: 0.7rem !important; /* Match table cell font size for mono */
+  line-height: 1.4 !important;
 }
 #ingestion-report-content table .truncate,
 #ingestion-report-content table .max-w-xs,
@@ -230,7 +230,7 @@ body {
   text-overflow: ellipsis;
 }
 #ingestion-report-content table svg { /* For on-screen icons in table */
-  width: 0.9em; /* Relative to current font-size (0.75rem) */
+  width: 0.9em; /* Relative to current font-size (0.7rem) */
   height: 0.9em;
   display: inline-block;
   vertical-align: middle;
@@ -514,3 +514,5 @@ body {
   }
 }
   
+
+    
