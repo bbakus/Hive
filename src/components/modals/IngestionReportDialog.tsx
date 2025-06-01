@@ -221,10 +221,10 @@ export function IngestionReportDialog({
     }
   }
   
-  const renderChecksumIcon = (value?: boolean) => {
-    if (value === true) return <CheckCircle className="h-4 w-4 icon-green print:text-black" />;
-    if (value === false) return <XCircle className="h-4 w-4 icon-red print:text-black" />;
-    return <span className="italic text-muted-foreground/70">N/A</span>;
+  const renderChecksumIcon = (value?: boolean | string | null) => { // Updated to handle string for file.checksum
+    if (value === true || (typeof value === 'string' && value.trim() !== '')) return <CheckCircle className="h-4 w-4 icon-green print:text-black mx-auto" />;
+    if (value === false || value === '' || value === null || value === undefined) return <XCircle className="h-4 w-4 icon-red print:text-black mx-auto" />;
+    return <span className="italic text-muted-foreground/70 mx-auto">N/A</span>;
   };
 
   return (
@@ -337,10 +337,10 @@ export function IngestionReportDialog({
                     <Table>
                     <TableHeader>
                         <TableRow>
-                        <TableHead className={cn("w-[30%]", "report-table-cell-small-font")}>Name</TableHead>
-                        <TableHead className={cn("w-[10%] text-right", "report-table-cell-small-font")}>Size</TableHead>
+                        <TableHead className={cn("w-[25%]", "report-table-cell-small-font")}>Name</TableHead>
+                        <TableHead className={cn("w-[15%] text-right", "report-table-cell-small-font")}>Size</TableHead>
                         <TableHead className="w-[20%] text-center">Status</TableHead>
-                        <TableHead className={cn("w-[15%]", "report-table-cell-small-font")}>Checksum</TableHead>
+                        <TableHead className={cn("w-[15%] text-center", "report-table-cell-small-font")}>Checksum Calc.</TableHead>
                         <TableHead className="w-[25%]">Reason (if Excluded)</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -354,7 +354,9 @@ export function IngestionReportDialog({
                                file.status.toLowerCase() === 'excluded' ? <XCircle className="h-4 w-4 icon-red print:text-black mx-auto" /> :
                                <StatusBadge status={file.status} />}
                             </TableCell>
-                            <TableCell className={cn("font-mono max-w-[120px] truncate print:max-w-none print:truncate-none", "report-table-cell-small-font")} title={file.checksum}>{file.checksum ? `${file.checksum.substring(0, 10)}...` : "N/A"}</TableCell>
+                            <TableCell className={cn("font-mono text-center", "report-table-cell-small-font")}>
+                                {renderChecksumIcon(file.checksum)}
+                            </TableCell>
                             <TableCell className="max-w-xs truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
                         </TableRow>
                         ))}
@@ -436,5 +438,3 @@ export function IngestionReportDialog({
   );
 }
 
-
-    
