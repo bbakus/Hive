@@ -112,7 +112,7 @@ export interface FullIngestionReport { // Exported for potential use in API rout
 
 // --- Helper Components & Functions ---
 const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children: React.ReactNode; className?: string; isEmpty?: boolean }> = ({ title, icon: Icon, children, className, isEmpty }) => (
-  <div className={cn("section-card-print print:p-0 print:mb-4", className)}>
+  <div className={cn("section-card-print", className)}>
     <h3 className="text-md font-semibold mb-3 flex items-center print:text-base print:mb-1">
       {Icon && <Icon className="mr-2 h-5 w-5 text-accent print:h-4 print:w-4" />}
       {title}
@@ -122,7 +122,7 @@ const SectionCard: React.FC<{ title: string; icon?: React.ElementType; children:
 );
 
 const InfoPair: React.FC<{ label: string; value?: string | number | boolean | null; className?: string; children?: React.ReactNode }> = ({ label, value, className, children }) => (
-  <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start print:block", className)}>
+  <div className={cn("info-pair-print flex flex-col sm:flex-row sm:items-start", className)}>
     <p className="font-medium text-muted-foreground sm:w-1/3 print:font-semibold print:text-black print:mr-1">{label}:</p>
     {children ? <div className="sm:w-2/3 print:inline">{children}</div> : <p className="sm:w-2/3 break-words print:inline">{value === undefined || value === null || String(value).trim() === "" ? <span className="italic text-muted-foreground/70">N/A</span> : String(value)}</p>}
   </div>
@@ -224,13 +224,26 @@ export function IngestionReportDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col print:h-auto print:max-w-full print:border-0 print:shadow-none print:dialog-content-reset">
+        {/* Standard Dialog Header for on-screen, hidden for print */}
         <DialogHeader className="print:hidden">
           <DialogTitle>Ingestion Report Details</DialogTitle>
           <DialogDescription>
             Report ID: {isLoading ? "Loading..." : (reportData?.reportSummary?.id || "N/A")} (From: {reportUrl})
           </DialogDescription>
         </DialogHeader>
+
         <ScrollArea id="ingestion-report-content" className="flex-grow my-2 pr-0 print:overflow-visible print:pr-0 print:my-0">
+            {/* Custom Printable Header */}
+            <div id="printable-dialog-header" className="hidden print:block pt-2 pb-2 mb-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="title">Ingestion Report</h2>
+                  {reportData?.reportSummary?.id && <p className="subtitle">Report ID: {reportData.reportSummary.id}</p>}
+                </div>
+                {reportData?.reportSummary?.timestamp && <p className="timestamp">{format(parseISO(reportData.reportSummary.timestamp), "M/d/yy, p")}</p>}
+              </div>
+            </div>
+
             {isLoading && (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -246,17 +259,14 @@ export function IngestionReportDialog({
             )}
             {reportData && !isLoading && (
               <div className="space-y-3 p-1 print:space-y-2 print:p-0">
-                {/* --- Photographer Info (Moved to its own section) --- */}
-                {reportData.reportSummary.photographer && (
-                    <SectionCard title="Photographer Details" icon={UserCircle} isEmpty={!reportData.reportSummary.photographer} className="print:border-none print:shadow-none print:p-0">
-                        <InfoPair label="Photographer" value={reportData.reportSummary.photographer?.name} />
-                        <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer?.id} />
-                        <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer?.initials} />
-                    </SectionCard>
-                )}
+                
+                <SectionCard title="Photographer Details" icon={UserCircle} isEmpty={!reportData.reportSummary.photographer}>
+                    <InfoPair label="Photographer" value={reportData.reportSummary.photographer?.name} />
+                    <InfoPair label="Photographer ID (HIVE)" value={reportData.reportSummary.photographer?.id} />
+                    <InfoPair label="Photographer Initials" value={reportData.reportSummary.photographer?.initials} />
+                </SectionCard>
 
-                {/* --- Report Summary Section --- */}
-                <SectionCard title="Report Summary" icon={Info} isEmpty={!reportData.reportSummary} className="print:border-none print:shadow-none print:p-0">
+                <SectionCard title="Report Summary" icon={Info} isEmpty={!reportData.reportSummary}>
                   <InfoPair label="Report ID" value={reportData.reportSummary.id} />
                   <InfoPair label="Timestamp" value={reportData.reportSummary.timestamp ? format(parseISO(reportData.reportSummary.timestamp), "M/d/yyyy, h:mm:ss a") : "N/A"} />
                   <InfoPair label="Performed By" value={reportData.reportSummary.performedBy ? `${reportData.reportSummary.performedBy.name} (ID: ${reportData.reportSummary.performedBy.userId})` : "N/A"} />
@@ -266,29 +276,26 @@ export function IngestionReportDialog({
                   <InfoPair label="Event Folder Hint" value={reportData.reportSummary.event?.folderHint} />
                 </SectionCard>
 
-                {/* --- Sources Section --- */}
                 {reportData.sources && reportData.sources.length > 0 && (
-                    <SectionCard title="Sources" icon={HardDrive} isEmpty={!reportData.sources || reportData.sources.length === 0} className="print:border-none print:shadow-none print:p-0">
+                    <SectionCard title="Sources" icon={HardDrive} isEmpty={!reportData.sources || reportData.sources.length === 0}>
                         {reportData.sources.map((source, index) => (
-                        <div key={source.id || index} className="border-b border-border/50 pb-2 mb-2 last:border-b-0 last:mb-0 print:border-0 print:pb-0 print:mb-0">
+                        <div key={source.id || index} className="print-phase-details-wrapper">
                             <InfoPair label={`Source ${index + 1}`} value={`${source.path} (Selected at: ${source.selectedAt ? format(parseISO(source.selectedAt), "h:mm:ss a") : "N/A"})`} />
                         </div>
                         ))}
                     </SectionCard>
                 )}
                 
-                {/* --- Destinations Section --- */}
-                <SectionCard title="Destinations" icon={FolderOpen} isEmpty={!reportData.destinations} className="print:border-none print:shadow-none print:p-0">
+                <SectionCard title="Destinations" icon={FolderOpen} isEmpty={!reportData.destinations}>
                   <InfoPair label="Working Base" value={reportData.destinations?.workingBase} />
                   <InfoPair label="Effective Working" value={reportData.destinations?.effectiveWorking} />
                   <InfoPair label="Backup Base" value={reportData.destinations?.backupBase} />
                   <InfoPair label="Effective Backup" value={reportData.destinations?.effectiveBackup} />
                 </SectionCard>
 
-                {/* --- Phases Section --- */}
-                <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0} className="print:border-none print:shadow-none print:p-0">
+                <SectionCard title="Ingestion Phases" icon={Settings2} isEmpty={!reportData.phases || Object.keys(reportData.phases).length === 0}>
                     {reportData.phases?.merge && (
-                        <div className="border-b border-border/50 pb-2 mb-2 print:border-0 print:pb-1 print:mb-1">
+                        <div className="print-phase-details-wrapper">
                             <h4 className="font-semibold text-sm print:text-sm">Merge Phase</h4>
                             <InfoPair label="Status"><StatusBadge status={reportData.phases.merge.status} /></InfoPair>
                             <InfoPair label="Duration" value={reportData.phases.merge.duration || `${reportData.phases.merge.started ? format(parseISO(reportData.phases.merge.started), "h:mm:ss a") : "N/A"} - ${reportData.phases.merge.ended ? format(parseISO(reportData.phases.merge.ended), "h:mm:ss a") : "N/A"}`} />
@@ -298,7 +305,7 @@ export function IngestionReportDialog({
                         </div>
                     )}
                     {reportData.phases?.copy && (
-                        <div className="border-b border-border/50 pb-2 mb-2 print:border-0 print:pb-1 print:mb-1">
+                        <div className="print-phase-details-wrapper">
                             <h4 className="font-semibold text-sm print:text-sm">Copy Phase</h4>
                             <InfoPair label="Status"><StatusBadge status={reportData.phases.copy.status} /></InfoPair>
                             <InfoPair label="Duration" value={reportData.phases.copy.duration || `${reportData.phases.copy.started ? format(parseISO(reportData.phases.copy.started), "h:mm:ss a") : "N/A"} - ${reportData.phases.copy.ended ? format(parseISO(reportData.phases.copy.ended), "h:mm:ss a") : "N/A"}`} />
@@ -309,7 +316,7 @@ export function IngestionReportDialog({
                         </div>
                     )}
                     {reportData.phases?.checksum && (
-                        <div className="print:border-0 print:pb-1 print:mb-1">
+                        <div className="print-phase-details-wrapper">
                             <h4 className="font-semibold text-sm print:text-sm">Checksum Phase</h4>
                             <InfoPair label="Status"><StatusBadge status={reportData.phases.checksum.status} /></InfoPair>
                             <InfoPair label="Duration" value={reportData.phases.checksum.duration || `${reportData.phases.checksum.started ? format(parseISO(reportData.phases.checksum.started), "h:mm:ss a") : "N/A"} - ${reportData.phases.checksum.ended ? format(parseISO(reportData.phases.checksum.ended), "h:mm:ss a") : "N/A"}`} />
@@ -323,8 +330,7 @@ export function IngestionReportDialog({
                     )}
                 </SectionCard>
 
-                {/* --- File Details Section --- */}
-                <SectionCard title="File Details" icon={FileText} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0} className="print:border-none print:shadow-none print:p-0">
+                <SectionCard title="File Details" icon={FileText} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0}>
                     <Table>
                     <TableHeader>
                         <TableRow>
@@ -349,8 +355,7 @@ export function IngestionReportDialog({
                     </Table>
                 </SectionCard>
 
-                {/* --- Overall Summary Section --- */}
-                <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={!reportData.overallSummary} className="print:border-none print:shadow-none print:p-0">
+                <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={!reportData.overallSummary}>
                   <InfoPair label="Total Files Attempted" value={reportData.overallSummary?.totalFilesAttempted} />
                   <InfoPair label="Total Files Ingested" value={reportData.overallSummary?.totalFilesIngested} />
                   <InfoPair label="Total Bytes Ingested" value={formatBytes(reportData.overallSummary?.totalBytesIngested)} />
@@ -381,8 +386,7 @@ export function IngestionReportDialog({
                   </InfoPair>
                 </SectionCard>
 
-                {/* --- Environment & Security (Optional Sections) --- */}
-                 <SectionCard title="Environment" icon={Laptop} isEmpty={!reportData.environment || Object.keys(reportData.environment).length === 0} className="print:border-none print:shadow-none print:p-0">
+                 <SectionCard title="Environment" icon={Laptop} isEmpty={!reportData.environment || Object.keys(reportData.environment).length === 0}>
                   <InfoPair label="Ingest Utility Version" value={reportData.environment?.ingestUtilityVersion} />
                   <InfoPair label="Node Version" value={reportData.environment?.nodeVersion} />
                   <InfoPair label="Electron Version" value={reportData.environment?.electronVersion} />
@@ -391,7 +395,7 @@ export function IngestionReportDialog({
                   <InfoPair label="Network" value={reportData.environment?.network} />
                 </SectionCard>
 
-                <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security} className="print:border-none print:shadow-none print:p-0">
+                <SectionCard title="Security" icon={ShieldCheck} isEmpty={!reportData.security}>
                   <InfoPair label="Encrypted"><StatusBadge status={reportData.security?.encrypted} /></InfoPair>
                   <InfoPair label="Algorithm" value={reportData.security?.algorithm} />
                   <InfoPair label="Overall Checksum" value={reportData.security?.checksum} />
@@ -424,4 +428,3 @@ export function IngestionReportDialog({
     </Dialog>
   );
 }
-

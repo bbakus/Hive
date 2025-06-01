@@ -153,10 +153,10 @@ body {
     -webkit-print-color-adjust: exact !important;
     color-adjust: exact !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 10pt !important; /* Base print font size */
+    font-size: 0.75rem !important; /* Slightly smaller base for print */
+    line-height: 1.4 !important; /* Increased line height for airiness */
   }
 
-  /* Hide general UI elements not part of the report content */
   header, footer, nav, aside, [data-sidebar="sidebar"], [data-sidebar="trigger"], .user-nav-container, .project-selector-container, .organization-selector-container {
     display: none !important;
   }
@@ -179,7 +179,7 @@ body {
   #ingestion-report-content {
     background-color: white !important; 
     margin: 0 !important;
-    padding: 0.5rem !important; /* Basic padding for the content area */
+    padding: 0.5rem !important;
   }
 
   #ingestion-report-content [data-radix-scroll-area-viewport] {
@@ -188,66 +188,95 @@ body {
   }
   
   /* Hide the standard dialog header and its close button for print */
-  [data-radix-dialog-content] > header { /* Targets DialogHeader */
+  [data-radix-dialog-content] > header.print\:hidden { /* Targets DialogHeader specifically if it has print:hidden */
       display: none !important;
   }
-  [data-radix-dialog-content] > button[aria-label="Close"] { /* Targets X button */
+  [data-radix-dialog-content] > button[aria-label="Close"].print\:hidden { /* Targets X button specifically if it has print:hidden */
       display: none !important;
   }
 
+  /* Custom Printable Header */
+  #printable-dialog-header {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    text-align: left !important;
+    padding-bottom: 0.5rem !important; /* Reduced padding */
+    margin-bottom: 1rem !important; /* Space after header */
+    border-bottom: none !important; /* REMOVED line */
+  }
+  #printable-dialog-header .title {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    color: black !important;
+    margin-bottom: 0.1rem !important;
+  }
+  #printable-dialog-header .subtitle {
+    font-size: 0.8rem !important;
+    color: #555 !important;
+    margin-bottom: 0.1rem !important;
+  }
+   #printable-dialog-header .timestamp {
+    font-size: 0.7rem !important;
+    color: #777 !important;
+  }
+
+
   /* SectionCard print styling - simplified */
   #ingestion-report-content .section-card-print {
-    padding: 0.5rem 0 !important; 
-    margin-bottom: 0.5rem !important; 
+    padding: 0 !important; 
+    margin-bottom: 1.25rem !important; /* Increased space between sections */
     background-color: transparent !important;
-    border: none !important; /* Remove borders from cards */
-    box-shadow: none !important; /* Remove shadows from cards */
+    border: none !important; 
+    box-shadow: none !important;
     page-break-inside: avoid !important; 
   }
   #ingestion-report-content .section-card-print:has(table) { 
     page-break-inside: auto !important;
   }
 
-  #ingestion-report-content .section-card-print h3 { /* Section titles - simplified */
-    font-size: 1.1em !important; /* Slightly larger than base */
+  #ingestion-report-content .section-card-print h3 { 
+    font-size: 1rem !important; 
     font-weight: 600 !important; 
     color: black !important;
-    margin-bottom: 0.25rem !important; 
+    margin-bottom: 0.6rem !important; /* Increased space after title */
     display: flex !important;
     align-items: center !important;
   }
-  #ingestion-report-content .section-card-print h3 svg { /* Icon next to title */
-    width: 1em !important; 
-    height: 1em !important; 
-    margin-right: 0.25rem !important; 
-    color: black !important; /* Simpler icon color */
+  #ingestion-report-content .section-card-print h3 svg { 
+    width: 0.9em !important; 
+    height: 0.9em !important; 
+    margin-right: 0.35rem !important; 
+    color: black !important; 
   }
 
-  /* InfoPair print styling - simplified to block display */
+  /* InfoPair print styling */
   #ingestion-report-content .info-pair-print {
-    display: block !important; /* Stack label and value */
-    margin-bottom: 0.2rem !important; 
-    font-size: 0.9em !important;
+    display: flex !important;
+    align-items: baseline !important; /* Align text along baseline */
+    margin-bottom: 0.5rem !important; /* Increased space between info pairs */
+    font-size: 0.8rem !important;
     page-break-inside: avoid !important;
-    line-height: 1.3 !important;
+    line-height: 1.4 !important; /* Ensure consistent line height */
   }
   #ingestion-report-content .info-pair-print > p:first-child { /* Label */
-    color: #333 !important; 
+    color: #4a5568 !important; /* Darker gray for labels */
     font-weight: 500 !important; 
-    margin-right: 0.25em; /* Small space if on same line, but block will stack */
-    display: inline !important; /* Allow label and value on same line if space permits, but primarily stacks */
+    padding-right: 0.5em !important; /* Space after label */
+    flex-shrink: 0; /* Prevent label from shrinking */
+    min-width: 120px; /* Ensure labels have some minimum width */
   }
   #ingestion-report-content .info-pair-print > p:last-child,
   #ingestion-report-content .info-pair-print > div:last-child { /* Value */
     color: black !important;
     word-break: break-word !important;
-    display: inline !important; /* Allow label and value on same line if space permits */
+    flex-grow: 1; /* Allow value to take remaining space */
   }
    #ingestion-report-content .info-pair-print ul {
     padding-left: 1.2em !important;
     margin-top: 0.1em !important;
     list-style-type: disc !important;
-    display: block !important; /* Ensure lists are block */
+    display: block !important;
   }
   #ingestion-report-content .info-pair-print li {
     margin-bottom: 0.05em !important;
@@ -258,51 +287,51 @@ body {
 
   /* StatusBadge print styling - simplified */
   #ingestion-report-content .print-status-badge {
-    background-color: transparent !important;
-    color: black !important;
-    border: 1px solid #ccc !important; 
-    padding: 1px 3px !important; 
-    font-size: 0.85em !important;
-    border-radius: 2px !important; 
+    background-color: #f3f4f6 !important; /* Light gray background */
+    color: #1f2937 !important; /* Dark gray text */
+    border: 1px solid #d1d5db !important; /* Light border */
+    padding: 2px 5px !important; 
+    font-size: 0.7rem !important; /* Slightly smaller */
+    border-radius: 3px !important; 
     display: inline-block !important;
     line-height: 1.2 !important;
     text-transform: capitalize !important;
     font-weight: normal !important;
   }
 
-  #ingestion-report-content .border-b.border-border\/50.pb-2.mb-2,
-  #ingestion-report-content .border-b.print\:border-gray-300 { 
-    border-bottom: 1px solid #eee !important; 
+  #ingestion-report-content .print-phase-details-wrapper {
+    border-bottom: none !important; /* Ensure no line between phase details */
     padding-bottom: 0.25rem !important;
     margin-bottom: 0.25rem !important;
   }
-  #ingestion-report-content h4 { /* Sub-phase titles */
+
+  #ingestion-report-content h4 { 
     font-weight: 600 !important;
-    font-size: 1em !important;
+    font-size: 0.9rem !important;
     color: black !important;
-    margin-bottom: 0.2rem !important;
+    margin-bottom: 0.4rem !important; /* Space below phase title */
   }
 
-  /* File Details Table Styling for Print - simplified */
+  /* File Details Table Styling for Print */
   #ingestion-report-content table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin-top: 0.25rem !important;
+    margin-top: 0.5rem !important;
     page-break-inside: auto !important; 
   }
   #ingestion-report-content table thead th {
-    background-color: #f0f0f0 !important; 
-    color: black !important; 
-    border: 1px solid #ddd !important;
-    padding: 0.2rem 0.3rem !important;
+    background-color: #f9fafb !important; 
+    color: #374151 !important; 
+    border: 1px solid #e5e7eb !important;
+    padding: 0.3rem 0.4rem !important;
     text-align: left !important;
     font-weight: 600 !important;
-    font-size: 0.9em !important;
+    font-size: 0.8rem !important;
   }
   #ingestion-report-content table tbody td {
-    border: 1px solid #ddd !important;
-    padding: 0.2rem 0.3rem !important;
-    font-size: 0.85em !important;
+    border: 1px solid #e5e7eb !important;
+    padding: 0.3rem 0.4rem !important;
+    font-size: 0.75rem !important;
     color: black !important;
     vertical-align: top !important;
     page-break-inside: avoid !important; 
@@ -333,4 +362,3 @@ body {
     margin: 0.5in; 
   }
 }
-
