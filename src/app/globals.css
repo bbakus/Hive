@@ -126,6 +126,121 @@ body {
   filter: none;
 }
 
+/* On-screen styles for IngestionReportDialog */
+#ingestion-report-content {
+  font-size: 0.875rem; /* approx 14px */
+  line-height: 1.6;
+}
+
+#ingestion-report-content .section-card-print { /* Assuming this class is on the SectionCard component */
+  margin-bottom: 1.75rem; /* More space between sections */
+  padding: 1rem;
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--card));
+  border-radius: var(--radius); /* Use theme radius */
+}
+
+#ingestion-report-content .section-card-print h3 {
+  font-size: 1.125rem; /* approx 18px for section titles */
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+}
+#ingestion-report-content .section-card-print h3 svg {
+  margin-right: 0.5rem;
+  height: 1.125em; /* Match font size of h3 */
+  width: 1.125em;
+  color: hsl(var(--accent));
+}
+
+#ingestion-report-content .info-pair-print { /* Class used by InfoPair component */
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  margin-bottom: 0.6rem; /* Spacing between label-value pairs */
+  font-size: 0.875rem; /* Consistent font size */
+}
+
+#ingestion-report-content .info-pair-print > p:first-child { /* Label */
+  min-width: 200px; /* Standardized width for labels */
+  padding-right: 1em; /* Space after label */
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+}
+
+#ingestion-report-content .info-pair-print > p:last-child,
+#ingestion-report-content .info-pair-print > div:last-child { /* Value */
+  flex-grow: 1;
+  word-break: break-word;
+  color: hsl(var(--foreground));
+}
+
+#ingestion-report-content .info-pair-print ul {
+  padding-left: 1.2em;
+  margin-top: 0.25em;
+  list-style-type: disc;
+}
+#ingestion-report-content .info-pair-print li {
+  margin-bottom: 0.25em;
+}
+#ingestion-report-content .info-pair-print .italic {
+  color: hsl(var(--muted-foreground) / 0.8);
+}
+
+/* File Details Table - On-screen styling */
+#ingestion-report-content table {
+  width: 100%;
+  margin-top: 0.75rem;
+  font-size: 0.875rem; /* Consistent with dialog text */
+  border-collapse: collapse;
+}
+#ingestion-report-content table thead th {
+  background-color: hsl(var(--muted) / 0.5);
+  text-align: left;
+  padding: 0.6rem 0.85rem; /* Slightly more padding for on-screen */
+  font-weight: 600;
+  border-bottom: 2px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+#ingestion-report-content table tbody td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid hsl(var(--border));
+  vertical-align: top;
+  color: hsl(var(--foreground));
+}
+#ingestion-report-content table tbody tr:last-child td {
+  border-bottom: none;
+}
+#ingestion-report-content table .font-mono {
+  font-family: var(--font-geist-mono), monospace;
+}
+#ingestion-report-content table .truncate,
+#ingestion-report-content table .max-w-xs,
+#ingestion-report-content table .max-w-\[150px\],
+#ingestion-report-content table .max-w-\[100px\],
+#ingestion-report-content table .max-w-\[80px\] {
+  max-width: 250px; /* Adjust for on-screen readability */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#ingestion-report-content table svg {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.4em;
+}
+/* On-screen specific icon colors */
+#ingestion-report-content table .icon-green { color: hsl(145 63% 42%); }
+#ingestion-report-content table .icon-red { color: hsl(0 72% 51%); }
+#ingestion-report-content .info-pair-print .icon-green { color: hsl(145 63% 42%); }
+#ingestion-report-content .info-pair-print .icon-red { color: hsl(0 72% 51%); }
+
+
+/* Print Styles */
 @media print {
   body { 
     --background: 0 0% 100% !important;
@@ -154,7 +269,7 @@ body {
     color-adjust: exact !important;
     font-family: Arial, Helvetica, sans-serif !important;
     font-size: 0.75rem !important; /* Base font size for print */
-    line-height: 1.4 !important; /* Adjusted line height for airiness */
+    line-height: 1.5 !important; /* Increased line height for airiness */
   }
 
   header, footer, nav, aside, [data-sidebar="sidebar"], [data-sidebar="trigger"], .user-nav-container, .project-selector-container, .organization-selector-container {
@@ -201,8 +316,8 @@ body {
     display: flex !important;
     justify-content: space-between !important;
     align-items: flex-start !important; /* Align items to the start for multiline titles */
-    padding-bottom: 0.5rem !important; /* Slightly increased padding */
-    margin-bottom: 1rem !important; /* Slightly increased margin */
+    padding-bottom: 0.75rem !important; /* Slightly increased padding */
+    margin-bottom: 1.25rem !important; /* Slightly increased margin */
     border-bottom: none !important; /* Removed line under header */
   }
   #printable-dialog-header .title-block { /* New wrapper for title and subtitle */
@@ -343,8 +458,8 @@ body {
     page-break-inside: avoid !important; 
   }
    #ingestion-report-content table tbody td svg {
-     width: 0.875rem !important; /* Slightly larger for 0.75rem font base */
-     height: 0.875rem !important;
+     width: 0.8em !important; /* Adjusted size for 0.75rem font base */
+     height: 0.8em !important;
      display: inline-block !important; 
      vertical-align: middle !important;
      margin-right: 0.2em !important; /* Add space if icon is before text */
@@ -373,8 +488,8 @@ body {
   /* Ensure icons within InfoPair also respect print color if needed */
   .info-pair-print svg {
     color: black !important;
-    width: 0.875rem !important; 
-    height: 0.875rem !important;
+    width: 0.8em !important; /* Adjusted size */
+    height: 0.8em !important;
     display: inline-block !important;
     vertical-align: middle !important;
     margin-right: 0.2em; 
@@ -385,5 +500,4 @@ body {
     margin: 0.5in; 
   }
 }
-
-    
+  
