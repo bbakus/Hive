@@ -127,7 +127,6 @@ body {
 }
 
 @media print {
-  /* Force light theme variables for printing */
   body { 
     --background: 0 0% 100% !important;
     --foreground: 0 0% 9% !important;
@@ -154,7 +153,7 @@ body {
     -webkit-print-color-adjust: exact !important;
     color-adjust: exact !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 0.75rem !important; /* Changed from 10pt to 0.75rem for better consistency with rem units below */
+    font-size: 10pt !important; /* Base print font size */
   }
 
   /* Hide general UI elements not part of the report content */
@@ -180,7 +179,7 @@ body {
   #ingestion-report-content {
     background-color: white !important; 
     margin: 0 !important;
-    padding: 0 !important; 
+    padding: 0.5rem !important; /* Basic padding for the content area */
   }
 
   #ingestion-report-content [data-radix-scroll-area-viewport] {
@@ -188,155 +187,131 @@ body {
     height: auto !important;
   }
   
-  /* Print Styling for Dialog Header (title and description) */
-  .print\:header-for-print {
-    text-align: left !important;
-    padding-bottom: 0.5rem !important;
-    border-bottom: 1px solid hsl(var(--border)) !important;
-    margin-bottom: 1rem !important;
+  /* Hide the standard dialog header and its close button for print */
+  [data-radix-dialog-content] > header { /* Targets DialogHeader */
+      display: none !important;
   }
-  .print\:header-for-print .print\:title-for-print {
-    font-size: 1.125rem !important; /* text-lg */
-    font-weight: 600 !important;
-    line-height: 1.2 !important;
-    color: black !important;
-  }
-  .print\:header-for-print .print\:description-for-print {
-    font-size: 0.75rem !important; /* text-xs */
-    color: #4b5563 !important; /* text-muted-foreground like */
-    margin-top: 0.125rem !important;
-    line-height: 1.2 !important;
-  }
-
-  /* Ensure the Dialog's default X button is hidden for print */
-  [data-radix-dialog-content] > button[aria-label="Close"] {
+  [data-radix-dialog-content] > button[aria-label="Close"] { /* Targets X button */
       display: none !important;
   }
 
-
-  /* SectionCard print styling */
+  /* SectionCard print styling - simplified */
   #ingestion-report-content .section-card-print {
-    padding: 0 0 0.25rem 0 !important; /* Reduced bottom padding */
-    margin-bottom: 0.75rem !important; /* Consistent space between sections */
+    padding: 0.5rem 0 !important; 
+    margin-bottom: 0.5rem !important; 
     background-color: transparent !important;
-    border: none !important;
+    border: none !important; /* Remove borders from cards */
+    box-shadow: none !important; /* Remove shadows from cards */
     page-break-inside: avoid !important; 
   }
   #ingestion-report-content .section-card-print:has(table) { 
     page-break-inside: auto !important;
   }
 
-
-  #ingestion-report-content .section-card-print h3 { /* Section titles */
-    font-size: 0.875rem !important; /* text-sm */
+  #ingestion-report-content .section-card-print h3 { /* Section titles - simplified */
+    font-size: 1.1em !important; /* Slightly larger than base */
     font-weight: 600 !important; 
     color: black !important;
-    margin-bottom: 0.375rem !important; /* Reduced from 0.5rem */
+    margin-bottom: 0.25rem !important; 
     display: flex !important;
     align-items: center !important;
   }
   #ingestion-report-content .section-card-print h3 svg { /* Icon next to title */
-    width: 0.875rem !important; 
-    height: 0.875rem !important; 
-    margin-right: 0.375rem !important; /* Reduced from 0.5rem */
-    color: hsl(var(--accent)) !important; 
+    width: 1em !important; 
+    height: 1em !important; 
+    margin-right: 0.25rem !important; 
+    color: black !important; /* Simpler icon color */
   }
 
-  /* InfoPair print styling for side-by-side layout */
+  /* InfoPair print styling - simplified to block display */
   #ingestion-report-content .info-pair-print {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: baseline !important; /* Align text baselines for cleaner look */
-    margin-bottom: 0.05rem !important; /* Minimal space between pairs */
-    font-size: 0.75rem !important; /* text-xs for content */
+    display: block !important; /* Stack label and value */
+    margin-bottom: 0.2rem !important; 
+    font-size: 0.9em !important;
     page-break-inside: avoid !important;
     line-height: 1.3 !important;
   }
   #ingestion-report-content .info-pair-print > p:first-child { /* Label */
-    /* Removed fixed width and min-width to allow natural flow */
-    padding-right: 0.375rem !important; /* Space after label */
-    color: #4b5563 !important; 
-    font-weight: 400 !important; 
-    text-align: left !important;
-    flex-shrink: 0 !important; /* Prevent label from shrinking */
+    color: #333 !important; 
+    font-weight: 500 !important; 
+    margin-right: 0.25em; /* Small space if on same line, but block will stack */
+    display: inline !important; /* Allow label and value on same line if space permits, but primarily stacks */
   }
   #ingestion-report-content .info-pair-print > p:last-child,
-  #ingestion-report-content .info-pair-print > div:last-child { /* Value or Children wrapper */
-    flex-grow: 1 !important; /* Allow value to take remaining space */
+  #ingestion-report-content .info-pair-print > div:last-child { /* Value */
     color: black !important;
     word-break: break-word !important;
-    text-align: left !important;
+    display: inline !important; /* Allow label and value on same line if space permits */
   }
    #ingestion-report-content .info-pair-print ul {
-    padding-left: 1rem !important;
-    margin-top: 0.125rem !important;
+    padding-left: 1.2em !important;
+    margin-top: 0.1em !important;
     list-style-type: disc !important;
+    display: block !important; /* Ensure lists are block */
   }
   #ingestion-report-content .info-pair-print li {
-    margin-bottom: 0.05rem !important;
+    margin-bottom: 0.05em !important;
   }
   #ingestion-report-content .info-pair-print .italic { 
-    color: #6b7280 !important; 
+    color: #555 !important; 
   }
 
-  /* StatusBadge print styling - simple text badge */
+  /* StatusBadge print styling - simplified */
   #ingestion-report-content .print-status-badge {
-    background-color: #f3f4f6 !important; /* Light grey bg */
-    color: #1f2937 !important; /* Dark grey text */
-    border: 1px solid #e5e7eb !important; /* Light border */
-    padding: 0px 4px !important;  /* Adjusted padding */
-    font-size: 0.65rem !important; /* Slightly smaller */
-    font-weight: 500 !important; 
-    border-radius: 0.2rem !important; 
-    text-transform: capitalize !important;
+    background-color: transparent !important;
+    color: black !important;
+    border: 1px solid #ccc !important; 
+    padding: 1px 3px !important; 
+    font-size: 0.85em !important;
+    border-radius: 2px !important; 
     display: inline-block !important;
     line-height: 1.2 !important;
-    margin-left: 0.25rem !important; /* Add margin if it's next to text */
+    text-transform: capitalize !important;
+    font-weight: normal !important;
   }
 
   #ingestion-report-content .border-b.border-border\/50.pb-2.mb-2,
   #ingestion-report-content .border-b.print\:border-gray-300 { 
-    border-bottom-color: #d1d5db !important; 
-    padding-bottom: 0.25rem !important; /* Reduced */
-    margin-bottom: 0.5rem !important; /* Reduced */
+    border-bottom: 1px solid #eee !important; 
+    padding-bottom: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
   }
-  #ingestion-report-content h4 { /* Sub-phase titles e.g. "Merge Phase" */
+  #ingestion-report-content h4 { /* Sub-phase titles */
     font-weight: 600 !important;
-    font-size: 0.75rem !important; /* text-xs */
+    font-size: 1em !important;
     color: black !important;
-    margin-bottom: 0.25rem !important; /* Reduced */
+    margin-bottom: 0.2rem !important;
   }
 
-  /* File Details Table Styling for Print */
+  /* File Details Table Styling for Print - simplified */
   #ingestion-report-content table {
     width: 100% !important;
     border-collapse: collapse !important;
-    margin-top: 0.25rem !important; /* Reduced */
+    margin-top: 0.25rem !important;
     page-break-inside: auto !important; 
   }
   #ingestion-report-content table thead th {
-    background-color: #f9fafb !important; 
-    color: #374151 !important; 
-    border: 1px solid #e5e7eb !important;
-    padding: 0.2rem 0.3rem !important; /* Reduced padding */
+    background-color: #f0f0f0 !important; 
+    color: black !important; 
+    border: 1px solid #ddd !important;
+    padding: 0.2rem 0.3rem !important;
     text-align: left !important;
     font-weight: 600 !important;
-    font-size: 0.7rem !important; /* Slightly smaller */
+    font-size: 0.9em !important;
   }
   #ingestion-report-content table tbody td {
-    border: 1px solid #e5e7eb !important;
-    padding: 0.2rem 0.3rem !important; /* Reduced padding */
-    font-size: 0.7rem !important; /* Slightly smaller */
+    border: 1px solid #ddd !important;
+    padding: 0.2rem 0.3rem !important;
+    font-size: 0.85em !important;
     color: black !important;
     vertical-align: top !important;
     page-break-inside: avoid !important; 
   }
    #ingestion-report-content table tbody tr:nth-child(even) {
-    background-color: transparent !important;
+    background-color: transparent !important; 
   }
   #ingestion-report-content table .font-mono {
       font-family: 'Courier New', Courier, monospace !important; 
-      color: black !important;
   }
   #ingestion-report-content table .truncate,
   #ingestion-report-content table .max-w-xs, 
@@ -349,13 +324,13 @@ body {
       max-width: none !important;
   }
 
-
-  #ingestion-report-content svg:not(.section-card-print h3 svg) { 
+  #ingestion-report-content svg { 
     color: black !important; 
   }
 
   @page {
     size: auto;
-    margin: 0.75in 0.5in 0.5in 0.5in;
+    margin: 0.5in; 
   }
 }
+
