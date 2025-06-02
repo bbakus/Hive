@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ReactNode, LucideIcon } from 'react';
@@ -15,10 +14,10 @@ import {
   RadioTower,
   UploadCloud,
   ListChecks,
-  LayoutGrid, 
-  Folders,    
-  Star, // Added for Highlights
-  Zap,  // Added for Quick Turnaround
+  LayoutGrid,
+  Folders,
+  Star, // Added
+  Zap,  // Added
 } from "lucide-react";
 
 export type NavItem = {
@@ -34,7 +33,7 @@ export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver", "View"];
 export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES];
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [],
+  "Dashboard": [], // Dashboard has no specific sub-nav items in sidebar typically
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -44,6 +43,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Shoot": [
     { href: "/shoot", label: "Live Schedule & Tracking", icon: RadioTower, matchStartsWith: true },
+    // Sub-items could be specific views like "My Schedule", "All Active Shoots" if needed later
   ],
   "Edit": [
     { href: "/post-production", label: "Post-Production", icon: ImageIcon, matchStartsWith: true },
@@ -53,7 +53,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true },
     { href: "/deliver/organize", label: "Organize Galleries", icon: Folders, matchStartsWith: true },
   ],
-  "View": [
+  "View": [ // Renamed and added sub-items
     { href: "/galleries", label: "Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
     // Placeholder sub-items - these will link to placeholder or specific gallery views eventually
     { href: "/gallery/mockId?album=day1", label: "Day 1 (Event)", icon: CalendarDays, matchStartsWith: false }, // Example with query param
@@ -73,16 +73,16 @@ type PhaseContextType = {
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
   constantFooterNavItems: NavItem[];
-  PHASES: Phase[];
+  PHASES: Phase[]; // Exporting PHASES for use in TopPhaseNavigation
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
+  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); // Default to Dashboard
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    if (phase === "Dashboard") return [];
+    if (phase === "Dashboard") return []; // Dashboard might not have its own items in sidebar if it's just a top-level link
     return phaseNavConfigs[phase] || [];
   };
 
@@ -91,7 +91,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
     setActivePhase,
     getNavItemsForPhase,
     constantFooterNavItems,
-    PHASES,
+    PHASES, // Make sure PHASES is part of the context value
   }), [activePhase]);
 
   return (
