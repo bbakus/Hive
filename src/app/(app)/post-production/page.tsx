@@ -284,21 +284,21 @@ export default function PostProductionPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center space-x-1 justify-end">
+            <div className="flex items-center justify-end">
                 <Checkbox
                     id="filter-only-my-tasks"
                     checked={filterOnlyMyTasks}
                     onCheckedChange={(checked) => setFilterOnlyMyTasks(!!checked)}
                 />
-                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
+                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap ml-0.5">Only My Tasks</Label>
             </div>
-             <div className="flex items-center space-x-1 justify-end">
+             <div className="flex items-center justify-end">
                 <Checkbox
                     id="filter-hide-completed"
                     checked={filterHideCompleted}
                     onCheckedChange={(checked) => setFilterHideCompleted(!!checked)}
                 />
-                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap">Hide Completed</Label>
+                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap ml-0.5">Hide Completed</Label>
             </div>
         </div>
       </Card>
