@@ -33,6 +33,9 @@ export function TopPhaseNavigation() {
       case 'Deliver':
         router.push('/deliverables');
         break;
+      case 'View':
+        router.push('/galleries');
+        break;
       default:
         router.push('/dashboard');
     }

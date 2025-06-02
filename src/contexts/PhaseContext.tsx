@@ -10,11 +10,13 @@ import {
   Cpu,
   Settings,
   LifeBuoy,
-  ImageIcon, 
+  ImageIcon,
   PackageCheck,
   RadioTower,
   UploadCloud,
-  ListChecks, // Added for Shot Planner
+  ListChecks,
+  LayoutGrid, // For new VIEW phase (Galleries Overview)
+  Folders,    // For new Organize Galleries
 } from "lucide-react";
 
 export type NavItem = {
@@ -24,17 +26,17 @@ export type NavItem = {
   matchStartsWith?: boolean;
 };
 
-export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver" | "Dashboard"; 
+export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver" | "Dashboard" | "View";
 
-export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver"]; 
-export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES]; 
+export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver", "View"];
+export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES];
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [], 
+  "Dashboard": [],
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
-    { href: "/shot-planner", label: "Shot Planner", icon: ListChecks, matchStartsWith: true }, // New Item
+    { href: "/shot-planner", label: "Shot Planner", icon: ListChecks, matchStartsWith: true },
     { href: "/personnel", label: "Personnel Roster", icon: Users, matchStartsWith: true },
     { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true },
   ],
@@ -46,7 +48,12 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true },
   ],
   "Deliver": [
-    { href: "/deliverables", label: "Deliverables", icon: PackageCheck, matchStartsWith: true },
+    { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true },
+    { href: "/deliver/organize", label: "Organize Galleries", icon: Folders, matchStartsWith: true },
+  ],
+  "View": [
+    { href: "/galleries", label: "All Client Galleries", icon: LayoutGrid, matchStartsWith: true },
+    // Individual galleries /gallery/[galleryId] will also activate this phase but don't need a direct sidebar link here.
   ],
 };
 
@@ -60,17 +67,17 @@ type PhaseContextType = {
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
   constantFooterNavItems: NavItem[];
-  PHASES: Phase[]; 
+  PHASES: Phase[];
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); 
+  const [activePhase, setActivePhase] = useState<Phase>("Dashboard");
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    if (phase === "Dashboard") return []; // Dashboard has no specific sidebar items from phaseNavConfigs
-    return phaseNavConfigs[phase] || []; 
+    if (phase === "Dashboard") return [];
+    return phaseNavConfigs[phase] || [];
   };
 
   const value = useMemo(() => ({
@@ -78,7 +85,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
     setActivePhase,
     getNavItemsForPhase,
     constantFooterNavItems,
-    PHASES, 
+    PHASES,
   }), [activePhase]);
 
   return (
@@ -95,4 +102,3 @@ export function usePhaseContext() {
   }
   return context;
 }
-

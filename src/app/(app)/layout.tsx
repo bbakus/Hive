@@ -28,8 +28,8 @@ import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray } from "@/co
 import { EventProvider } from "@/contexts/EventContext";
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
-import { LocalAgentStatusIndicator } from "@/components/local-agent-status-indicator"; 
-import { LocalAgentProvider } from "@/contexts/LocalAgentContext"; 
+import { LocalAgentStatusIndicator } from "@/components/local-agent-status-indicator";
+import { LocalAgentProvider } from "@/contexts/LocalAgentContext";
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
 
 
@@ -42,7 +42,7 @@ function AppSidebar() {
 
 
   return (
-    <Sidebar 
+    <Sidebar
       collapsible="icon"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -117,13 +117,12 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/projects' || currentPath.startsWith('/projects/')) {
       determinedPhase = 'Plan';
     } else if (currentPath === '/events' || currentPath.startsWith('/events/')) {
-      // If already in Shoot and navigating within events (e.g. to shots page), keep Shoot
       if (activePhase === "Shoot" && currentPath.includes('/shots')) {
         determinedPhase = "Shoot";
       } else {
         determinedPhase = "Plan";
       }
-    } else if (currentPath === '/shot-planner' || currentPath.startsWith('/shot-planner/')) { // New case
+    } else if (currentPath === '/shot-planner' || currentPath.startsWith('/shot-planner/')) {
         determinedPhase = 'Plan';
     } else if (currentPath === '/personnel' || currentPath.startsWith('/personnel/')) {
       determinedPhase = 'Plan';
@@ -132,33 +131,30 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
     } else if (currentPath === '/shoot' || currentPath.startsWith('/shoot/')) {
       determinedPhase = 'Shoot';
     } else if (currentPath === '/ingestion' || currentPath.startsWith('/ingestion/')) {
-      determinedPhase = 'Edit'; 
+      determinedPhase = 'Edit';
     } else if (currentPath === '/post-production' || currentPath.startsWith('/post-production/')) {
       determinedPhase = 'Edit';
     } else if (currentPath === '/deliverables' || currentPath.startsWith('/deliverables/')) {
       determinedPhase = 'Deliver';
+    } else if (currentPath === '/deliver/organize' || currentPath.startsWith('/deliver/organize/')) {
+      determinedPhase = 'Deliver';
+    } else if (currentPath === '/galleries' || currentPath.startsWith('/galleries/') || currentPath.startsWith('/gallery/')) {
+      determinedPhase = 'View';
     } else if (currentPath === '/settings' || currentPath.startsWith('/settings/')) {
-       determinedPhase = activePhase || 'Dashboard'; // Keep current phase or default
+       determinedPhase = activePhase || 'Dashboard';
     } else if (currentPath === '/support' || currentPath.startsWith('/support/')) {
-       determinedPhase = activePhase || 'Dashboard'; // Keep current phase or default
+       determinedPhase = activePhase || 'Dashboard';
     } else {
-      // Fallback if no specific match: check if current activePhase is still valid for the current path
-      // This handles cases where activePhase might be set by top nav, and user navigates to a sub-page of that phase.
-      // For simplicity, if we don't have a direct match, we might not change the phase,
-      // relying on top nav clicks to be the primary driver for phase changes outside these main routes.
-      // Or, default to dashboard if phase seems incongruent.
-      // For now, let's keep current phase if no rule matches, unless path implies dashboard.
-      if (!currentPath.startsWith('/')) { // a catch for invalid paths
+      if (!currentPath.startsWith('/')) {
         determinedPhase = 'Dashboard';
       }
     }
-
 
     if (determinedPhase && allPossiblePhases.includes(determinedPhase) && determinedPhase !== activePhase) {
       setActivePhase(determinedPhase);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, activePhase, setActivePhase, allPossiblePhases]); // Removed availableTopPhases, using allPossiblePhases
+  }, [pathname, activePhase, setActivePhase, allPossiblePhases]);
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -170,7 +166,7 @@ function AppLayoutInternal({ children }: { children: React.ReactNode }) {
             <TopPhaseNavigation />
           </div>
           <div className="flex-1"></div>
-          <div className="flex items-center gap-2 sm:gap-4"> {/* Adjusted gap for responsiveness */}
+          <div className="flex items-center gap-2 sm:gap-4">
             <LocalAgentStatusIndicator />
             <OrganizationSelector />
             <ProjectSelector />
@@ -202,4 +198,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </SettingsProvider>
   );
 }
-
