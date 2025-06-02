@@ -284,7 +284,7 @@ export default function PostProductionPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center justify-between pt-5">
+            <div className="flex items-center justify-between">
                 <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
                 <Checkbox
                     id="filter-only-my-tasks"
@@ -292,7 +292,7 @@ export default function PostProductionPage() {
                     onCheckedChange={(checked) => setFilterOnlyMyTasks(!!checked)}
                 />
             </div>
-             <div className="flex items-center justify-between pt-5">
+             <div className="flex items-center justify-between">
                 <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap">Hide Completed</Label>
                 <Checkbox
                     id="filter-hide-completed"
@@ -447,3 +447,4 @@ export default function PostProductionPage() {
     </div>
   );
 }
+
