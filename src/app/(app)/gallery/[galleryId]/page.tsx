@@ -124,12 +124,21 @@ export default function ClientGalleryViewPage() {
           )}
         </Card>
         
-        {/* Placeholder for Multi-Level Navigation */}
-        <div className="mb-6 p-3 bg-secondary/30 rounded-none">
-            <p className="text-xs text-muted-foreground">
-                Multi-Level Navigation (Conceptual): Project / Day / Event / Album <br/>
-                (e.g., <Button variant="link" size="sm" className="p-0 h-auto text-xs" disabled>OCW-24</Button> {'>'} <Button variant="link" size="sm" className="p-0 h-auto text-xs" disabled>2024-10-12</Button> {'>'} <Button variant="link" size="sm" className="p-0 h-auto text-xs" disabled>Keynote</Button>)
-            </p>
+        {/* Breadcrumb Navigation Placeholder */}
+        <div className="mb-6 p-3 bg-secondary/30 rounded-none text-sm text-muted-foreground">
+            <Button variant="link" size="sm" className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground" disabled>
+              {gallery.deliverableContextName || "Project"}
+            </Button>
+            <span className="mx-1">/</span>
+            <Button variant="link" size="sm" className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground" disabled>
+              Day 1
+            </Button>
+            <span className="mx-1">/</span>
+            <Button variant="link" size="sm" className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground" disabled>
+              Keynote
+            </Button>
+            <span className="mx-1">/</span>
+            <span className="font-semibold text-foreground">{gallery.galleryName.split(" - ")[0] || "Current Album"}</span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">

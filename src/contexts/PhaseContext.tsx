@@ -15,8 +15,10 @@ import {
   RadioTower,
   UploadCloud,
   ListChecks,
-  LayoutGrid, // For new VIEW phase (Galleries Overview)
-  Folders,    // For new Organize Galleries
+  LayoutGrid, 
+  Folders,    
+  Star, // Added for Highlights
+  Zap,  // Added for Quick Turnaround
 } from "lucide-react";
 
 export type NavItem = {
@@ -52,8 +54,12 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/deliver/organize", label: "Organize Galleries", icon: Folders, matchStartsWith: true },
   ],
   "View": [
-    { href: "/galleries", label: "Client Galleries", icon: LayoutGrid, matchStartsWith: true },
-    // Individual galleries /gallery/[galleryId] will also activate this phase but don't need a direct sidebar link here.
+    { href: "/galleries", label: "Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
+    // Placeholder sub-items - these will link to placeholder or specific gallery views eventually
+    { href: "/gallery/mockId?album=day1", label: "Day 1 (Event)", icon: CalendarDays, matchStartsWith: false }, // Example with query param
+    { href: "/gallery/mockId?album=day2", label: "Day 2 (Event)", icon: CalendarDays, matchStartsWith: false },
+    { href: "/gallery/mockId?album=highlights", label: "Highlights", icon: Star, matchStartsWith: false },
+    { href: "/gallery/mockId?album=quickturn", label: "Quick Turnaround", icon: Zap, matchStartsWith: false },
   ],
 };
 
