@@ -104,7 +104,11 @@ export default function PostProductionPage() {
       currentTasks = currentTasks.filter(task => task.status === filterTaskStatus);
     }
     if (filterAssignedEditorId !== "all") {
-      currentTasks = currentTasks.filter(task => task.assignedEditorId === filterAssignedEditorId);
+      if (filterAssignedEditorId === "unassigned") {
+        currentTasks = currentTasks.filter(task => !task.assignedEditorId);
+      } else {
+        currentTasks = currentTasks.filter(task => task.assignedEditorId === filterAssignedEditorId);
+      }
     }
     if (filterOnlyMyTasks) {
       currentTasks = currentTasks.filter(task => task.assignedEditorId === MOCK_CURRENT_USER_ID);
@@ -280,21 +284,21 @@ export default function PostProductionPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center space-x-2 pt-5"> {/* pt-5 to align checkboxes better */}
+            <div className="flex items-center justify-between pt-5">
+                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
                 <Checkbox
                     id="filter-only-my-tasks"
                     checked={filterOnlyMyTasks}
                     onCheckedChange={(checked) => setFilterOnlyMyTasks(!!checked)}
                 />
-                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
             </div>
-             <div className="flex items-center space-x-2 pt-5">
+             <div className="flex items-center justify-between pt-5">
+                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap">Hide Completed</Label>
                 <Checkbox
                     id="filter-hide-completed"
                     checked={filterHideCompleted}
                     onCheckedChange={(checked) => setFilterHideCompleted(!!checked)}
                 />
-                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap">Hide Completed</Label>
             </div>
         </div>
       </Card>
@@ -443,4 +447,3 @@ export default function PostProductionPage() {
     </div>
   );
 }
-
