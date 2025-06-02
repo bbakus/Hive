@@ -16,7 +16,7 @@ interface MockGallery {
   name: string;
   client: string;
   date: string;
-  lastUpdated: string;
+  lastUpdated: string; // ISO date string
   projectId: string;
   organizationId: string;
 }
@@ -72,7 +72,7 @@ export default function GalleriesOverviewPage() {
         <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <LayoutGrid className="h-8 w-8 text-accent" /> Client Galleries Overview
         </p>
-        <p className="text-muted-foreground">{pageDescription}</p>
+        <p className="text-muted-foreground mt-1">{pageDescription}</p>
       </div>
 
       <Card className="border-0">
@@ -94,7 +94,7 @@ export default function GalleriesOverviewPage() {
                   <CardContent>
                     <img src="https://placehold.co/600x400.png?text=Gallery+Preview" alt={`Preview of ${gallery.name}`} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
                   </CardContent>
-                  <CardContent className="pt-4"> 
+                  <CardContent className="pt-4"> {/* Removed border-t */}
                     <Link href={`/gallery/${gallery.id}`} passHref legacyBehavior>
                       <a className={cn(buttonVariants({ variant: 'ghost', className: 'w-full text-accent hover:text-accent/90' }))}>
                         View Gallery
