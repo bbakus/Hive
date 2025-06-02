@@ -34,7 +34,7 @@ export default function GalleriesOverviewPage() {
           {mockClientGalleries.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {mockClientGalleries.map(gallery => (
-                <Card key={gallery.id} className="hover:shadow-md transition-shadow">
+                <Card key={gallery.id} className="hover:shadow-md transition-shadow border-0">
                   <CardHeader>
                     <CardTitle className="text-base">{gallery.name}</CardTitle>
                     <CardDescription>Client: {gallery.client} | Date: {gallery.date}</CardDescription>
