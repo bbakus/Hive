@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle } from "lucide-react";
+import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, Share } from "lucide-react";
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
@@ -26,6 +26,7 @@ import {
 import type { SubmitHandler } from "react-hook-form";
 import { format, parseISO } from "date-fns";
 import { DeliverableFormDialog, type DeliverableFormDialogData } from "@/components/modals/DeliverableFormDialog";
+import { ClientGalleryFormDialog, type ClientGalleryFormDialogData } from "@/components/modals/ClientGalleryFormDialog";
 
 
 export type Deliverable = DeliverableFormDialogData & {
@@ -53,6 +54,8 @@ export default function DeliverablesPage() {
   const [editingDeliverable, setEditingDeliverable] = useState<Deliverable | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deliverableToDeleteId, setDeliverableToDeleteId] = useState<string | null>(null);
+
+  const [isClientGalleryModalOpen, setIsClientGalleryModalOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -172,6 +175,16 @@ export default function DeliverablesPage() {
       setIsLoadingSummary(false);
     }
   };
+  
+  const handleCreateClientGallerySubmit = (data: ClientGalleryFormDialogData) => {
+    console.log("Client Gallery Data:", data);
+    toast({
+      title: "Client Gallery Prepared (Simulated)",
+      description: `Gallery "${data.galleryName}" for ${data.clientEmail} would be created.`,
+    });
+    setIsClientGalleryModalOpen(false);
+  };
+
 
   if (isLoadingSettings || isLoadingProjects) {
     return <div>Loading deliverables data settings...</div>;
@@ -186,10 +199,16 @@ export default function DeliverablesPage() {
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
           </p>
         </div>
-        <Button onClick={openAddDeliverableModal} variant="accent">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Add New Deliverable
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsClientGalleryModalOpen(true)} variant="outline">
+            <Share className="mr-2 h-4 w-4" />
+            Create Client Gallery
+          </Button>
+          <Button onClick={openAddDeliverableModal} variant="accent">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Add New Deliverable
+          </Button>
+        </div>
       </div>
 
       <DeliverableFormDialog
@@ -199,6 +218,13 @@ export default function DeliverablesPage() {
         onSubmit={handleDeliverableSubmit}
         allProjects={allProjectsFromContext}
         selectedProject={selectedProject}
+      />
+
+      <ClientGalleryFormDialog
+        isOpen={isClientGalleryModalOpen}
+        onOpenChange={setIsClientGalleryModalOpen}
+        onSubmit={handleCreateClientGallerySubmit}
+        contextName={selectedProject?.name || "Selected Deliverables"}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -320,3 +346,5 @@ export default function DeliverablesPage() {
     </div>
   );
 }
+
+    
