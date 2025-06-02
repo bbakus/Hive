@@ -52,7 +52,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/deliver/organize", label: "Organize Galleries", icon: Folders, matchStartsWith: true },
   ],
   "View": [
-    { href: "/galleries", label: "All Client Galleries", icon: LayoutGrid, matchStartsWith: true },
+    { href: "/galleries", label: "Client Galleries", icon: LayoutGrid, matchStartsWith: true },
     // Individual galleries /gallery/[galleryId] will also activate this phase but don't need a direct sidebar link here.
   ],
 };
