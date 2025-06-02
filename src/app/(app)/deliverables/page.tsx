@@ -46,6 +46,18 @@ const initialDeliverablesMock: Deliverable[] = [
 const initialClientGalleriesMock: ClientGallery[] = [
     { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights!", deliverableContextName: "Summer Music Festival 2024" },
     { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings for Tech Conference X.", deliverableContextName: "Tech Conference X" },
+    {
+      id: "gal003",
+      galleryName: "G9e Summit Live Previews",
+      clientEmail: "internal_stakeholder@g9e.com",
+      accessType: "private",
+      password: "",
+      allowHighResDownload: true,
+      enableWatermarking: true,
+      expiresOn: parseISO("2024-12-31"),
+      welcomeMessage: "Live previews from the G9e Annual Summit 2024.",
+      deliverableContextName: "G9e Annual Summit 2024"
+    },
 ];
 
 
@@ -490,3 +502,4 @@ export default function DeliverablesPage() {
 }
 
     
+
