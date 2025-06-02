@@ -5,9 +5,10 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LayoutGrid } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button"; // Import buttonVariants
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from '@/contexts/OrganizationContext';
+import { cn } from "@/lib/utils"; // Import cn
 
 // Placeholder for client galleries data, eventually from a context or API
 interface MockGallery {
@@ -22,10 +23,10 @@ interface MockGallery {
 
 const mockClientGalleries: MockGallery[] = [
   { id: "gal001", name: "Summer Fest Highlights", client: "Client A", date: "2024-07-20", lastUpdated: "2024-07-22T10:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal002", name: "Tech Conference Keynotes", client: "Client B", date: "2024-09-15", lastUpdated: "2024-09-16T11:00:00Z", projectId: "proj_other_tech_conf", organizationId: "org_g9e" }, // Different project for filtering
+  { id: "gal002", name: "Tech Conference Keynotes", client: "Client B", date: "2024-09-15", lastUpdated: "2024-09-16T11:00:00Z", projectId: "proj_other_tech_conf", organizationId: "org_g9e" },
   { id: "gal003", name: "G9e Summit Live Previews", client: "Internal Stakeholder", date: "2024-10-01", lastUpdated: "2024-10-02T12:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
   { id: "gal004", name: "Product Shoot Q4", client: "Client C", date: "2024-10-15", lastUpdated: "2024-11-12T09:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal005", name: "Annual Charity Ball", client: "Client D", date: "2024-11-01", lastUpdated: "2024-11-05T14:00:00Z", projectId: "proj_charity_event_2024", organizationId: "org_another_org" }, // Different org
+  { id: "gal005", name: "Annual Charity Ball", client: "Client D", date: "2024-11-01", lastUpdated: "2024-11-05T14:00:00Z", projectId: "proj_charity_event_2024", organizationId: "org_another_org" },
   { id: "gal006", name: "Holiday Special Shoot", client: "Client E", date: "2024-11-10", lastUpdated: "2024-11-11T16:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
   { id: "gal007", name: "Autumn Collection Launch", client: "Fashion House X", date: "2024-10-05", lastUpdated: "2024-10-05T18:00:00Z", projectId: "proj_fashion_autumn", organizationId: "org_g9e" },
   { id: "gal008", name: "G9e Summit - Day 1 Selects", client: "Marketing Team", date: "2024-10-01", lastUpdated: "2024-10-03T09:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
@@ -50,7 +51,7 @@ export default function GalleriesOverviewPage() {
     return [...filtered]
       .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
       .slice(0, 4);
-  }, [mockClientGalleries, selectedProjectId, selectedOrganizationId]);
+  }, [selectedProjectId, selectedOrganizationId]); // Removed mockClientGalleries from deps as it's constant here
 
   const pageDescription = useMemo(() => {
     let desc = "Browse and access shared client galleries.";
@@ -94,9 +95,11 @@ export default function GalleriesOverviewPage() {
                     <img src="https://placehold.co/600x400.png?text=Gallery+Preview" alt={`Preview of ${gallery.name}`} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
                   </CardContent>
                   <CardContent className="pt-4"> {/* Removed border-t */}
-                    <Button asChild variant="accent" className="w-full"> {/* Changed variant to accent */}
-                      <Link href={`/gallery/${gallery.id}`}>View Gallery</Link>
-                    </Button>
+                    <Link href={`/gallery/${gallery.id}`} passHref legacyBehavior>
+                      <a className={cn(buttonVariants({ variant: 'accent', className: 'w-full' }))}>
+                        View Gallery
+                      </a>
+                    </Link>
                   </CardContent>
                 </Card>
               ))}
@@ -111,3 +114,5 @@ export default function GalleriesOverviewPage() {
     </div>
   );
 }
+
+    
