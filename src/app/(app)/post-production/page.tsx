@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle, Settings, Download } from "lucide-react";
+import { ImageIcon, User, CheckCircle, Edit3, RotateCcw, Inbox, Palette, GalleryThumbnails, UserCheck, UploadCloud, PlusCircle, Settings, Download, Filter as FilterIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,9 @@ import { RevisionRequestDialog } from "@/components/modals/RevisionRequestDialog
 import { IngestionReportDialog } from "@/components/modals/IngestionReportDialog";
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
@@ -70,6 +73,11 @@ const REVISION_TARGET_STAGES: { value: TaskStatus; label: string }[] = [
   { value: 'color', label: 'Color Treatment' },
 ];
 
+const taskStatusFilterOptions: { value: TaskStatus | "all"; label: string }[] = [
+  { value: "all", label: "All Task Statuses" },
+  ...KANBAN_COLUMNS.map(col => ({ value: col.id, label: col.title }))
+];
+
 export default function PostProductionPage() {
   const [tasks, setTasks] = useState<KanbanTask[]>(initialTasksData);
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
@@ -78,10 +86,35 @@ export default function PostProductionPage() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [currentReportUrl, setCurrentReportUrl] = useState<string | undefined>(undefined);
 
+  // Filter states
+  const [filterTaskStatus, setFilterTaskStatus] = useState<TaskStatus | "all">("all");
+  const [filterAssignedEditorId, setFilterAssignedEditorId] = useState<string>("all");
+  const [filterOnlyMyTasks, setFilterOnlyMyTasks] = useState(false);
+  const [filterHideCompleted, setFilterHideCompleted] = useState(false);
+
+
   const getEditorName = (editorId?: string | null) => {
     if (!editorId) return null;
     return MOCK_EDITORS.find(e => e.id === editorId)?.name || 'Unknown Editor';
   };
+
+  const filteredTasks = useMemo(() => {
+    let currentTasks = [...tasks];
+    if (filterTaskStatus !== "all") {
+      currentTasks = currentTasks.filter(task => task.status === filterTaskStatus);
+    }
+    if (filterAssignedEditorId !== "all") {
+      currentTasks = currentTasks.filter(task => task.assignedEditorId === filterAssignedEditorId);
+    }
+    if (filterOnlyMyTasks) {
+      currentTasks = currentTasks.filter(task => task.assignedEditorId === MOCK_CURRENT_USER_ID);
+    }
+    if (filterHideCompleted) {
+      currentTasks = currentTasks.filter(task => task.status !== "completed");
+    }
+    return currentTasks;
+  }, [tasks, filterTaskStatus, filterAssignedEditorId, filterOnlyMyTasks, filterHideCompleted]);
+
 
   const handleTaskAction = (
     taskId: string,
@@ -180,10 +213,10 @@ export default function PostProductionPage() {
 
   const tasksByColumn = useMemo(() => {
     return KANBAN_COLUMNS.reduce((acc, column) => {
-      acc[column.id] = tasks.filter(task => task.status === column.id);
+      acc[column.id] = filteredTasks.filter(task => task.status === column.id);
       return acc;
     }, {} as Record<TaskStatus, KanbanTask[]>);
-  }, [tasks]);
+  }, [filteredTasks]);
 
   return (
     <div className="flex flex-col gap-6 h-full">
@@ -192,13 +225,12 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
-            <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated based on completion reports from local ingestion utilities (via POST to `/api/ingestion/notify-completion`).</p>
+            <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated.</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
             <PlusCircle className="mr-2 h-4 w-4" /> Simulate New Ingested Task
         </Button>
       </div>
-
 
       {revisionTaskDetails && (
         <RevisionRequestDialog
@@ -218,10 +250,59 @@ export default function PostProductionPage() {
         />
       )}
 
+      <Card className="p-4 shadow-sm border bg-card/50">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div>
+                <Label htmlFor="filter-task-status" className="text-xs text-muted-foreground">Task Status</Label>
+                <Select value={filterTaskStatus} onValueChange={(value) => setFilterTaskStatus(value as any)}>
+                    <SelectTrigger id="filter-task-status" className="h-9">
+                        <SelectValue placeholder="Filter by task status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {taskStatusFilterOptions.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div>
+                <Label htmlFor="filter-assigned-editor" className="text-xs text-muted-foreground">Assigned Editor</Label>
+                <Select value={filterAssignedEditorId} onValueChange={setFilterAssignedEditorId}>
+                    <SelectTrigger id="filter-assigned-editor" className="h-9">
+                        <SelectValue placeholder="Filter by editor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Editors</SelectItem>
+                        {MOCK_EDITORS.map(editor => (
+                            <SelectItem key={editor.id} value={editor.id}>{editor.name}</SelectItem>
+                        ))}
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="flex items-center space-x-2 pt-5"> {/* pt-5 to align checkboxes better */}
+                <Checkbox
+                    id="filter-only-my-tasks"
+                    checked={filterOnlyMyTasks}
+                    onCheckedChange={(checked) => setFilterOnlyMyTasks(!!checked)}
+                />
+                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
+            </div>
+             <div className="flex items-center space-x-2 pt-5">
+                <Checkbox
+                    id="filter-hide-completed"
+                    checked={filterHideCompleted}
+                    onCheckedChange={(checked) => setFilterHideCompleted(!!checked)}
+                />
+                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap">Hide Completed</Label>
+            </div>
+        </div>
+      </Card>
+
 
       <ScrollArea className="flex-grow pb-4">
         <div className="flex w-full justify-start gap-4 items-start">
-          {KANBAN_COLUMNS.map((column) => (
+          {(filterHideCompleted ? KANBAN_COLUMNS.filter(col => col.id !== 'completed') : KANBAN_COLUMNS).map((column) => (
             <div key={column.id} className="min-w-[18rem] flex-1">
               <Card className="border-0 bg-transparent h-full">
                 <CardHeader className="pb-3 pt-4 px-4 border-b">
@@ -235,7 +316,12 @@ export default function PostProductionPage() {
                 </CardHeader>
                 <CardContent className="p-3 space-y-3 min-h-[200px]">
                   {tasksByColumn[column.id]?.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">No tasks in this stage.</p>
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      {filteredTasks.length > 0 && tasks.length > filteredTasks.length 
+                        ? "No tasks match current filters for this stage."
+                        : "No tasks in this stage."
+                      }
+                    </p>
                   )}
                   {tasksByColumn[column.id]?.map((task) => {
                     const assignedEditorName = getEditorName(task.assignedEditorId);
@@ -284,6 +370,9 @@ export default function PostProductionPage() {
                             <p className="text-muted-foreground mb-1">
                               Assigned to: <span className="font-medium text-foreground">{assignedEditorName}</span>
                             </p>
+                          )}
+                           {!assignedEditorName && task.status !== 'ingestion' && task.status !== 'completed' && (
+                              <p className="text-muted-foreground italic mb-1">Unassigned</p>
                           )}
                           <p className="text-muted-foreground/80 italic">Last Activity: {task.lastActivity}</p>
                           <div className="mt-2.5 flex flex-wrap gap-1.5">
