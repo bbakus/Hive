@@ -5,10 +5,10 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LayoutGrid } from "lucide-react";
 import Link from "next/link";
-import { Button, buttonVariants } from "@/components/ui/button"; // Import buttonVariants
+import { buttonVariants } from "@/components/ui/button"; 
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from '@/contexts/OrganizationContext';
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils"; 
 
 // Placeholder for client galleries data, eventually from a context or API
 interface MockGallery {
@@ -51,7 +51,7 @@ export default function GalleriesOverviewPage() {
     return [...filtered]
       .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
       .slice(0, 4);
-  }, [selectedProjectId, selectedOrganizationId]); // Removed mockClientGalleries from deps as it's constant here
+  }, [selectedProjectId, selectedOrganizationId]); 
 
   const pageDescription = useMemo(() => {
     let desc = "Browse and access shared client galleries.";
@@ -94,9 +94,9 @@ export default function GalleriesOverviewPage() {
                   <CardContent>
                     <img src="https://placehold.co/600x400.png?text=Gallery+Preview" alt={`Preview of ${gallery.name}`} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
                   </CardContent>
-                  <CardContent className="pt-4"> {/* Removed border-t */}
+                  <CardContent className="pt-4"> 
                     <Link href={`/gallery/${gallery.id}`} passHref legacyBehavior>
-                      <a className={cn(buttonVariants({ variant: 'accent', className: 'w-full' }))}>
+                      <a className={cn(buttonVariants({ variant: 'ghost', className: 'w-full text-accent hover:text-accent/90' }))}>
                         View Gallery
                       </a>
                     </Link>
@@ -114,5 +114,3 @@ export default function GalleriesOverviewPage() {
     </div>
   );
 }
-
-    
