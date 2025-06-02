@@ -8,11 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, Share } from "lucide-react";
+import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, Share, Eye, PackageSearch } from "lucide-react";
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
+import Link from "next/link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +27,7 @@ import {
 import type { SubmitHandler } from "react-hook-form";
 import { format, parseISO } from "date-fns";
 import { DeliverableFormDialog, type DeliverableFormDialogData } from "@/components/modals/DeliverableFormDialog";
-import { ClientGalleryFormDialog, type ClientGalleryFormDialogData } from "@/components/modals/ClientGalleryFormDialog";
+import { ClientGalleryFormDialog, type ClientGalleryFormDialogData, type ClientGallery } from "@/components/modals/ClientGalleryFormDialog";
 
 
 export type Deliverable = DeliverableFormDialogData & {
@@ -42,6 +43,12 @@ const initialDeliverablesMock: Deliverable[] = [
   { id: "del005", name: "Sizzle Reel - Tech", event: "Tech Conference X", dueDate: parseISO("2024-09-20"), status: "In Progress", type: "Video", projectName: "Tech Conference X", projectId: "proj002" },
 ];
 
+const initialClientGalleriesMock: ClientGallery[] = [
+    { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights!", deliverableContextName: "Summer Music Festival 2024" },
+    { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings for Tech Conference X.", deliverableContextName: "Tech Conference X" },
+];
+
+
 export default function DeliverablesPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
@@ -55,13 +62,19 @@ export default function DeliverablesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deliverableToDeleteId, setDeliverableToDeleteId] = useState<string | null>(null);
 
+  const [clientGalleries, setClientGalleries] = useState<ClientGallery[]>([]);
   const [isClientGalleryModalOpen, setIsClientGalleryModalOpen] = useState(false);
+  const [editingClientGallery, setEditingClientGallery] = useState<ClientGallery | null>(null);
+  const [isDeleteGalleryDialogOpen, setIsDeleteGalleryDialogOpen] = useState(false);
+  const [galleryToDeleteId, setGalleryToDeleteId] = useState<string | null>(null);
+
 
   const { toast } = useToast();
 
   useEffect(() => {
     if (!isLoadingSettings) {
       setDeliverablesList(useDemoData ? initialDeliverablesMock : []);
+      setClientGalleries(useDemoData ? initialClientGalleriesMock : []);
     }
   }, [useDemoData, isLoadingSettings]);
   
@@ -81,6 +94,13 @@ export default function DeliverablesPage() {
     }
     return deliverablesList.filter(d => d.projectName === selectedProject.name);
   }, [selectedProject, deliverablesList]);
+
+  const filteredClientGalleries = useMemo(() => {
+    if (!selectedProject) {
+      return clientGalleries;
+    }
+    return clientGalleries.filter(g => g.deliverableContextName === selectedProject.name);
+  }, [selectedProject, clientGalleries]);
   
 
   const handleDeliverableSubmit: SubmitHandler<DeliverableFormDialogData> = (data) => {
@@ -177,12 +197,55 @@ export default function DeliverablesPage() {
   };
   
   const handleCreateClientGallerySubmit = (data: ClientGalleryFormDialogData) => {
-    console.log("Client Gallery Data:", data);
-    toast({
-      title: "Client Gallery Prepared (Simulated)",
-      description: `Gallery "${data.galleryName}" for ${data.clientEmail} would be created.`,
-    });
+    if (editingClientGallery) {
+      setClientGalleries(prev => prev.map(g => g.id === editingClientGallery.id ? { ...editingClientGallery, ...data } : g));
+      toast({
+        title: "Client Gallery Updated",
+        description: `Gallery "${data.galleryName}" has been updated.`,
+      });
+    } else {
+      const newGallery: ClientGallery = {
+        ...data,
+        id: `gal${String(clientGalleries.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        deliverableContextName: selectedProject?.name || "Selected Deliverables",
+      };
+      setClientGalleries(prev => [...prev, newGallery]);
+      toast({
+        title: "Client Gallery Created (Simulated)",
+        description: `Gallery "${data.galleryName}" for ${data.clientEmail} is ready.`,
+      });
+    }
     setIsClientGalleryModalOpen(false);
+    setEditingClientGallery(null);
+  };
+
+  const openAddClientGalleryModal = () => {
+    setEditingClientGallery(null);
+    setIsClientGalleryModalOpen(true);
+  };
+
+  const openEditClientGalleryModal = (gallery: ClientGallery) => {
+    setEditingClientGallery(gallery);
+    setIsClientGalleryModalOpen(true);
+  };
+
+  const handleDeleteGalleryClick = (galleryId: string) => {
+    setGalleryToDeleteId(galleryId);
+    setIsDeleteGalleryDialogOpen(true);
+  };
+
+  const confirmDeleteGallery = () => {
+    if (galleryToDeleteId) {
+      const gallery = clientGalleries.find(g => g.id === galleryToDeleteId);
+      setClientGalleries(prevList => prevList.filter(g => g.id !== galleryToDeleteId));
+      toast({
+        title: "Client Gallery Deleted",
+        description: `Gallery "${gallery?.galleryName}" has been deleted.`,
+        variant: "destructive"
+      });
+      setGalleryToDeleteId(null);
+    }
+    setIsDeleteGalleryDialogOpen(false);
   };
 
 
@@ -200,7 +263,7 @@ export default function DeliverablesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setIsClientGalleryModalOpen(true)} variant="outline">
+          <Button onClick={openAddClientGalleryModal} variant="outline">
             <Share className="mr-2 h-4 w-4" />
             Create Client Gallery
           </Button>
@@ -225,6 +288,7 @@ export default function DeliverablesPage() {
         onOpenChange={setIsClientGalleryModalOpen}
         onSubmit={handleCreateClientGallerySubmit}
         contextName={selectedProject?.name || "Selected Deliverables"}
+        editingGallery={editingClientGallery}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -238,6 +302,21 @@ export default function DeliverablesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeliverableToDeleteId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteDeliverable} className={buttonVariants({ variant: "destructive" })}>Delete Deliverable</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDeleteGalleryDialogOpen} onOpenChange={setIsDeleteGalleryDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Client Gallery?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this client gallery? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setGalleryToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteGallery} className={buttonVariants({ variant: "destructive" })}>Delete Gallery</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -305,6 +384,69 @@ export default function DeliverablesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="border-0">
+        <CardHeader>
+            <p className="text-lg font-semibold flex items-center gap-2"><PackageSearch className="h-6 w-6 text-accent" /> Client Galleries</p>
+            <div className="text-sm text-muted-foreground">
+                {selectedProject ? `Client galleries associated with ${selectedProject.name}.` : "All client galleries."}
+                 ({filteredClientGalleries.length} galleries)
+            </div>
+        </CardHeader>
+        <CardContent>
+            {filteredClientGalleries.length > 0 ? (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Gallery Name</TableHead>
+                            <TableHead>Client Email</TableHead>
+                            <TableHead>Access</TableHead>
+                            <TableHead>Expires On</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredClientGalleries.map((gallery) => (
+                            <TableRow key={gallery.id}>
+                                <TableCell className="font-medium">{gallery.galleryName}</TableCell>
+                                <TableCell>{gallery.clientEmail}</TableCell>
+                                <TableCell>
+                                    <Badge variant={gallery.accessType === 'password' ? 'secondary' : 'outline'}>
+                                        {gallery.accessType.charAt(0).toUpperCase() + gallery.accessType.slice(1)}
+                                        {gallery.accessType === 'password' && ' Protected'}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {gallery.expiresOn ? format(gallery.expiresOn, "PPP") : <span className="text-muted-foreground italic">No Expiry</span>}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" className="hover:text-foreground/80" asChild>
+                                      <Link href={`/gallery/${gallery.id}`} target="_blank">
+                                        <Eye className="h-4 w-4" />
+                                        <span className="sr-only">View Gallery</span>
+                                      </Link>
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditClientGalleryModal(gallery)}>
+                                        <Edit className="h-4 w-4" />
+                                        <span className="sr-only">Edit Gallery</span>
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteGalleryClick(gallery.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Delete Gallery</span>
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            ) : (
+                <p className="text-muted-foreground text-center py-8">
+                    No client galleries created yet {selectedProject ? `for ${selectedProject.name}` : ""}. Click "Create Client Gallery" to get started.
+                </p>
+            )}
+        </CardContent>
+      </Card>
+
 
       <Card className="border-0">
         <CardHeader>
