@@ -392,7 +392,7 @@ body {
   .info-pair-print {
     display: flex !important;
     align-items: baseline !important; 
-    margin-bottom: 0.5rem !important; /* Increased item spacing */
+    margin-bottom: 0.6rem !important; /* INCREASED from 0.5rem for more space between pairs */
     font-size: 0.75rem !important; /* Ensure consistent font size */
     page-break-inside: avoid !important;
     line-height: 1.5 !important; 
@@ -441,14 +441,19 @@ body {
   .print-phase-details-wrapper {
     border-bottom: none !important; 
     padding-bottom: 0 !important; 
-    margin-bottom: 0 !important; 
+    margin-bottom: 0 !important;
+    margin-top: 1rem !important; /* ADDED: Space between phase blocks */
+  }
+  
+  .print-phase-details-wrapper:first-child {
+    margin-top: 0 !important; /* Ensure first phase block doesn't have extra top margin */
   }
 
   .print-phase-details-wrapper h4 { 
     font-weight: 600 !important;
     font-size: 0.85rem !important; 
     color: black !important;
-    margin-bottom: 0.35rem !important; 
+    margin-bottom: 0.75rem !important; /* INCREASED from 0.35rem for space below sub-header */
   }
 
   /* File Details Table Styling for Print */
