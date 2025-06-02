@@ -68,32 +68,10 @@ export default function ClientGalleryViewPage() {
   return (
     <div className="min-h-screen bg-muted/40">
       {/* Header is now part of the main AppLayout */}
-      {/* <header className="bg-background shadow-sm sticky top-0 z-40">
-        <div className="container mx-auto p-4 flex flex-col sm:flex-row justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{gallery.galleryName}</h1>
-            <p className="text-sm text-muted-foreground">Client: {gallery.clientEmail}</p>
-            {gallery.expiresOn && (
-                <Badge variant="outline" className="mt-1 text-xs">
-                    Expires: {format(gallery.expiresOn, "PPP")}
-                </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mt-3 sm:mt-0">
-            {gallery.allowHighResDownload && (
-                <Button variant="accent" size="sm">
-                    <Download className="mr-2 h-4 w-4" /> Download All
-                </Button>
-            )}
-            <Button variant="outline" size="sm" disabled>
-                <Star className="mr-2 h-4 w-4" /> My Favorites (0)
-            </Button>
-          </div>
-        </div>
-      </header> */}
+      
 
       <main className="container mx-auto p-0 pt-2 md:p-4 md:pt-4"> {/* Adjusted padding for better integration */}
-         <Card className="mb-6 bg-card shadow-none border-0">
+         <Card className="mb-8 bg-card shadow-none border-0">
           <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 pt-4 px-4 md:px-6">
             <div>
               <CardTitle className="text-xl sm:text-2xl">{gallery.galleryName}</CardTitle>
