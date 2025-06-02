@@ -290,7 +290,7 @@ export default function PostProductionPage() {
                     checked={filterOnlyMyTasks}
                     onCheckedChange={(checked) => setFilterOnlyMyTasks(!!checked)}
                 />
-                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap ml-0.5">Only My Tasks</Label>
+                <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
             </div>
              <div className="flex items-center justify-end">
                 <Checkbox
@@ -298,7 +298,7 @@ export default function PostProductionPage() {
                     checked={filterHideCompleted}
                     onCheckedChange={(checked) => setFilterHideCompleted(!!checked)}
                 />
-                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap ml-0.5">Hide Completed</Label>
+                <Label htmlFor="filter-hide-completed" className="font-normal text-sm whitespace-nowrap">Hide Completed</Label>
             </div>
         </div>
       </Card>
