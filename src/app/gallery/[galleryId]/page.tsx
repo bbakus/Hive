@@ -8,20 +8,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Star, AlertCircle, Heart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ClientGallery } from '@/components/modals/ClientGalleryFormDialog'; // Use the actual type
+import type { ClientGallery } from '@/components/modals/ClientGalleryFormDialog'; // Use the actual type
+import { format, parseISO } from 'date-fns';
+
 
 // Mock Gallery Data - In a real app, this would come from a context or API
+// Duplicating this here for now. Ideally, this would be shared or fetched.
 const mockGalleries: ClientGallery[] = [
-    { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: new Date("2024-12-31"), welcomeMessage: "Enjoy the highlights!", deliverableContextName: "Summer Music Festival 2024" },
-    { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings for Tech Conference X.", deliverableContextName: "Tech Conference X" },
-    { id: "mockId", galleryName: "Client Showcase Gallery", clientEmail: "test@example.com", accessType: "public", allowHighResDownload: true, enableWatermarking: false, expiresOn: null, welcomeMessage: "Welcome to your preview gallery!", deliverableContextName: "Mock Project" },
+    { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights from the Summer Music Festival 2024!", deliverableContextName: "Summer Music Festival 2024" },
+    { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings and selected presentation stills from Tech Conference X.", deliverableContextName: "Tech Conference X" },
+    { id: "mockId", galleryName: "Client Showcase Gallery (Generic)", clientEmail: "test@example.com", accessType: "public", allowHighResDownload: true, enableWatermarking: false, expiresOn: null, welcomeMessage: "Welcome to your preview gallery! This is a generic mock gallery.", deliverableContextName: "Mock Project" },
 ];
 
 const mockImageUrls = Array.from({ length: 12 }, (_, i) => ({
   src: `https://placehold.co/600x400.png?text=Image+${i + 1}`,
   alt: `Placeholder Image ${i + 1}`,
   id: `img_${i + 1}`,
-  hint: i % 3 === 0 ? "event photography" : (i % 3 === 1 ? "conference presentation" : "product launch display"),
+  hint: i % 4 === 0 ? "event photography" : (i % 4 === 1 ? "conference presentation" : (i % 4 === 2 ? "product launch display" : "networking event")),
 }));
 
 export default function ClientGalleryViewPage() {
@@ -38,7 +41,7 @@ export default function ClientGalleryViewPage() {
     const foundGallery = mockGalleries.find(g => g.id === galleryId);
     if (foundGallery) {
       setGallery(foundGallery);
-    } else if (galleryId === "mockId" && !foundGallery) { // Fallback for generic mockId viewing
+    } else if (galleryId === "mockId" && !foundGallery) { // Fallback for generic mockId viewing if not explicitly found
         setGallery(mockGalleries.find(g => g.id === "mockId") || null);
     }
     else {
@@ -96,9 +99,17 @@ export default function ClientGalleryViewPage() {
             </Card>
         )}
         
+        {/* Placeholder for Multi-Level Navigation */}
+        <div className="mb-6 p-3 bg-secondary/30 rounded-none">
+            <p className="text-xs text-muted-foreground">
+                Multi-Level Navigation (Conceptual): Project / Day / Event / Album <br/>
+                (e.g., <Button variant="link" size="sm" className="p-0 h-auto text-xs" disabled>OCW-24</Button> {'>'} <Button variant="link" size="sm" className="p-0 h-auto text-xs" disabled>2024-10-12</Button> {'>'} <Button variant="link" size="sm" className="p-0 h-auto text-xs" disabled>Keynote</Button>)
+            </p>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {mockImageUrls.map((image, index) => (
-            <Card key={image.id} className="overflow-hidden group relative border-0 shadow-none">
+            <Card key={image.id} className="overflow-hidden group relative border-0 shadow-none rounded-none">
               <Image
                 src={image.src}
                 alt={image.alt}
@@ -115,8 +126,8 @@ export default function ClientGalleryViewPage() {
               </div>
               {gallery.enableWatermarking && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="text-2xl sm:text-4xl font-bold text-white/20 transform -rotate-12 select-none">
-                        HIVE Preview
+                    <span className="text-3xl sm:text-5xl font-bold text-white/25 transform -rotate-12 select-none opacity-70">
+                        HIVE PREVIEW
                     </span>
                 </div>
               )}
@@ -131,6 +142,7 @@ export default function ClientGalleryViewPage() {
       </main>
       <footer className="py-6 text-center text-xs text-muted-foreground">
         <p>Powered by HIVE. Gallery for {gallery.galleryName}.</p>
+        <p>&copy; {new Date().getFullYear()} HIVE Media Solutions</p>
       </footer>
     </div>
   );
