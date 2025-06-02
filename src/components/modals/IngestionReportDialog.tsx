@@ -333,37 +333,6 @@ export function IngestionReportDialog({
                     )}
                 </SectionCard>
 
-                <SectionCard title="File Details" icon={FileText} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0}>
-                    <Table>
-                    <TableHeader>
-                        <TableRow>
-                        <TableHead className={cn("w-[25%] text-center", "report-table-cell-small-font")}>Name</TableHead>
-                        <TableHead className={cn("w-[15%] text-center", "report-table-cell-small-font")}>Size</TableHead>
-                        <TableHead className="w-[20%] text-center">Status</TableHead>
-                        <TableHead className={cn("w-[15%] text-center", "report-table-cell-small-font")}>Checksum Calc.</TableHead>
-                        <TableHead className="w-[25%] text-center">Reason (if Excluded)</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {(reportData.fileDetails || []).map((file, index) => (
-                        <TableRow key={index}>
-                            <TableCell className={cn("font-mono max-w-sm truncate print:max-w-none print:truncate-none", "report-table-cell-small-font")} title={file.name}>{file.name}</TableCell>
-                            <TableCell className={cn("text-right font-mono", "report-table-cell-small-font")}>{formatBytes(file.size)}</TableCell>
-                            <TableCell className="text-center">
-                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-4 w-4 icon-green print:text-black mx-auto" /> :
-                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-4 w-4 icon-red print:text-black mx-auto" /> :
-                               <StatusBadge status={file.status} />}
-                            </TableCell>
-                            <TableCell className={cn("font-mono text-center", "report-table-cell-small-font")}>
-                                {renderChecksumIcon(file.checksum)}
-                            </TableCell>
-                            <TableCell className="max-w-xs truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
-                        </TableRow>
-                        ))}
-                    </TableBody>
-                    </Table>
-                </SectionCard>
-
                 <SectionCard title="Overall Summary" icon={CheckCircle} isEmpty={!reportData.overallSummary}>
                   <InfoPair label="Total Files Attempted" value={reportData.overallSummary?.totalFilesAttempted} />
                   <InfoPair label="Total Files Ingested" value={reportData.overallSummary?.totalFilesIngested} />
@@ -409,6 +378,37 @@ export function IngestionReportDialog({
                   <InfoPair label="Algorithm" value={reportData.security?.algorithm} />
                   <InfoPair label="Overall Checksum" value={reportData.security?.checksum} />
                   <InfoPair label="Signed By" value={reportData.security?.signedBy} />
+                </SectionCard>
+
+                <SectionCard title="File Details" icon={FileText} isEmpty={!reportData.fileDetails || reportData.fileDetails.length === 0}>
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead className={cn("w-[25%] text-center", "report-table-cell-small-font")}>Name</TableHead>
+                        <TableHead className={cn("w-[15%] text-center", "report-table-cell-small-font")}>Size</TableHead>
+                        <TableHead className="w-[20%] text-center">Status</TableHead>
+                        <TableHead className={cn("w-[15%] text-center", "report-table-cell-small-font")}>Checksum Calc.</TableHead>
+                        <TableHead className="w-[25%] text-center">Reason (if Excluded)</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {(reportData.fileDetails || []).map((file, index) => (
+                        <TableRow key={index}>
+                            <TableCell className={cn("font-mono max-w-sm truncate print:max-w-none print:truncate-none", "report-table-cell-small-font")} title={file.name}>{file.name}</TableCell>
+                            <TableCell className={cn("text-right font-mono", "report-table-cell-small-font")}>{formatBytes(file.size)}</TableCell>
+                            <TableCell className="text-center">
+                              {file.status.toLowerCase() === 'ingested' ? <CheckCircle className="h-4 w-4 icon-green print:text-black mx-auto" /> :
+                               file.status.toLowerCase() === 'excluded' ? <XCircle className="h-4 w-4 icon-red print:text-black mx-auto" /> :
+                               <StatusBadge status={file.status} />}
+                            </TableCell>
+                            <TableCell className={cn("font-mono text-center", "report-table-cell-small-font")}>
+                                {renderChecksumIcon(file.checksum)}
+                            </TableCell>
+                            <TableCell className="max-w-xs truncate print:max-w-none print:truncate-none" title={file.reason}>{file.reason || "N/A"}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
                 </SectionCard>
 
               </div>
