@@ -284,7 +284,7 @@ export default function PostProductionPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 justify-end">
                 <Checkbox
                     id="filter-only-my-tasks"
                     checked={filterOnlyMyTasks}
@@ -292,7 +292,7 @@ export default function PostProductionPage() {
                 />
                 <Label htmlFor="filter-only-my-tasks" className="font-normal text-sm whitespace-nowrap">Only My Tasks</Label>
             </div>
-             <div className="flex items-center space-x-2">
+             <div className="flex items-center space-x-2 justify-end">
                 <Checkbox
                     id="filter-hide-completed"
                     checked={filterHideCompleted}
