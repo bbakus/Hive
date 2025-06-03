@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,9 +10,9 @@ import { ClientGalleryFormDialog, type ClientGalleryFormDialogData, type ClientG
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 // Mock data - ideally, this would come from a context or API in a real app
-// For now, we use a copy of the mock data similar to the Deliverables page
 const initialClientGalleriesMockData: ClientGallery[] = [
     { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights!", deliverableContextName: "Summer Music Festival 2024" },
     { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings for Tech Conference X.", deliverableContextName: "Tech Conference X" },
@@ -38,6 +38,7 @@ const initialFoldersMock: Folder[] = [
 ];
 
 const NO_FOLDER_ID = "unassigned";
+const ALL_GALLERIES_ID = "all";
 
 export default function OrganizeGalleriesPage() {
   const [galleries, setGalleries] = useState<OrganizableClientGallery[]>([]);
@@ -46,10 +47,10 @@ export default function OrganizeGalleriesPage() {
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [editingGalleryForSettings, setEditingGalleryForSettings] = useState<OrganizableClientGallery | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(ALL_GALLERIES_ID);
 
 
   useEffect(() => {
-    // Initialize galleries with a folderId (e.g., assign some to mock folders or leave as null/unassigned)
     setGalleries(
       initialClientGalleriesMockData.map((gallery, index) => ({
         ...gallery,
@@ -89,7 +90,7 @@ export default function OrganizeGalleriesPage() {
       setGalleries(prevGalleries =>
         prevGalleries.map(gallery =>
           gallery.id === editingGalleryForSettings.id
-            ? { ...gallery, ...data, expiresOn: data.expiresOn ? data.expiresOn : null } // Ensure expiresOn is Date or null
+            ? { ...gallery, ...data, expiresOn: data.expiresOn ? data.expiresOn : null }
             : gallery
         )
       );
@@ -99,6 +100,15 @@ export default function OrganizeGalleriesPage() {
     setEditingGalleryForSettings(null);
   };
 
+  const displayedGalleries = useMemo(() => {
+    if (selectedFolderId === ALL_GALLERIES_ID) {
+      return galleries;
+    }
+    if (selectedFolderId === NO_FOLDER_ID) {
+      return galleries.filter(g => !g.folderId);
+    }
+    return galleries.filter(g => g.folderId === selectedFolderId);
+  }, [galleries, selectedFolderId]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -130,13 +140,27 @@ export default function OrganizeGalleriesPage() {
               <PlusCircle className="mr-2 h-4 w-4" /> New Folder
             </Button>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-1">
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedFolderId(ALL_GALLERIES_ID)}
+              className={cn(
+                "w-full justify-start px-3 py-2 text-sm",
+                selectedFolderId === ALL_GALLERIES_ID && "bg-accent text-accent-foreground hover:bg-accent/90 hover:text-accent-foreground"
+              )}
+            >
+              <FolderIcon className="mr-2 h-4 w-4 text-muted-foreground" /> All Galleries
+            </Button>
             {folders.length > 0 ? (
               folders.map(folder => (
                 <Button
                   key={folder.id}
                   variant="ghost"
-                  className="w-full justify-start px-3 py-2 text-sm"
+                  onClick={() => setSelectedFolderId(folder.id)}
+                  className={cn(
+                    "w-full justify-start px-3 py-2 text-sm",
+                    selectedFolderId === folder.id && "bg-accent text-accent-foreground hover:bg-accent/90 hover:text-accent-foreground"
+                  )}
                 >
                   <FolderIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                   {folder.name}
@@ -147,7 +171,11 @@ export default function OrganizeGalleriesPage() {
             )}
              <Button
                 variant="ghost"
-                className="w-full justify-start px-3 py-2 text-sm italic"
+                onClick={() => setSelectedFolderId(NO_FOLDER_ID)}
+                className={cn(
+                  "w-full justify-start px-3 py-2 text-sm italic",
+                  selectedFolderId === NO_FOLDER_ID && "bg-accent text-accent-foreground hover:bg-accent/90 hover:text-accent-foreground"
+                )}
             >
                 <ImageIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                 Uncategorized Galleries
@@ -158,13 +186,17 @@ export default function OrganizeGalleriesPage() {
         {/* Galleries Area */}
         <Card className="border-0">
           <CardHeader>
-            <CardTitle className="text-lg">All Client Galleries</CardTitle>
-            <CardDescription>Assign galleries to folders or edit their settings.</CardDescription>
+            <CardTitle className="text-lg">
+              {selectedFolderId === ALL_GALLERIES_ID ? "All Client Galleries" 
+               : selectedFolderId === NO_FOLDER_ID ? "Uncategorized Galleries" 
+               : `Galleries in "${folders.find(f => f.id === selectedFolderId)?.name || 'Folder'}"`}
+            </CardTitle>
+            <CardDescription>Assign galleries to folders or edit their settings. ({displayedGalleries.length} galleries shown)</CardDescription>
           </CardHeader>
           <CardContent>
-            {galleries.length > 0 ? (
+            {displayedGalleries.length > 0 ? (
               <div className="space-y-4">
-                {galleries.map(gallery => (
+                {displayedGalleries.map(gallery => (
                   <Card key={gallery.id} className="bg-muted/30 shadow-none">
                     <CardContent className="p-4 flex flex-col gap-3">
                         <div className="flex items-start justify-between gap-4">
@@ -211,7 +243,9 @@ export default function OrganizeGalleriesPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-8">No galleries available to organize.</p>
+              <p className="text-muted-foreground text-center py-8">
+                {galleries.length === 0 ? "No galleries available to organize." : `No galleries in "${folders.find(f => f.id === selectedFolderId)?.name || (selectedFolderId === NO_FOLDER_ID ? 'Uncategorized' : 'this selection')}".`}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -219,5 +253,3 @@ export default function OrganizeGalleriesPage() {
     </div>
   );
 }
-
-
