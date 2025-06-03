@@ -6,19 +6,17 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Star, AlertCircle, Heart } from 'lucide-react';
+import { Download, Star, AlertCircle, Heart, MessageSquare, DownloadCloud } from 'lucide-react'; // Added MessageSquare, DownloadCloud
 import { Badge } from '@/components/ui/badge';
-import type { ClientGallery } from '@/components/modals/ClientGalleryFormDialog'; // Use the actual type
+import type { ClientGallery } from '@/components/modals/ClientGalleryFormDialog'; 
 import { format, parseISO } from 'date-fns';
 
-
-// Mock Gallery Data - In a real app, this would come from a context or API
-// Duplicating this here for now. Ideally, this would be shared or fetched.
+// Mock Gallery Data - Adjusted to better reflect new spec context
 const mockGalleries: ClientGallery[] = [
-    { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights from the Summer Music Festival 2024!", deliverableContextName: "Summer Music Festival 2024" },
-    { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings and selected presentation stills from Tech Conference X.", deliverableContextName: "Tech Conference X" },
-    { id: "gal003", galleryName: "G9e Summit Live Previews", clientEmail: "internal_stakeholder@g9e.com", accessType: "private", password: "", allowHighResDownload: true, enableWatermarking: true, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Live previews from the G9e Annual Summit 2024.", deliverableContextName: "G9e Annual Summit 2024"},
-    { id: "mockId", galleryName: "Client Showcase Gallery (Generic)", clientEmail: "test@example.com", accessType: "public", allowHighResDownload: true, enableWatermarking: false, expiresOn: null, welcomeMessage: "Welcome to your preview gallery! This is a generic mock gallery.", deliverableContextName: "Mock Project" },
+    { id: "gal001", galleryName: "Quick Turn Selects", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy these quick turnaround selects from the event!", deliverableContextName: "Day 1 (2024-07-15) - Summer Music Festival Main Stage" },
+    { id: "gal002", galleryName: "Final Keynote Shots", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Final approved keynote photography from Tech Conference X.", deliverableContextName: "Day 1 (2024-09-15) - Tech Conference Keynote Speech" },
+    { id: "gal003", galleryName: "Live Previews", clientEmail: "internal_stakeholder@g9e.com", accessType: "private", password: "", allowHighResDownload: true, enableWatermarking: true, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Live previews from the G9e Annual Summit 2024.", deliverableContextName: "Day 2 (2024-10-02) - G9e Summit General Session"},
+    { id: "mockId", galleryName: "Behind the Scenes", clientEmail: "test@example.com", accessType: "public", allowHighResDownload: true, enableWatermarking: false, expiresOn: null, welcomeMessage: "A look behind the scenes of the Mock Project.", deliverableContextName: "Day 1 (2024-01-01) - Mock Project Kickoff" },
 ];
 
 const mockImageUrls = Array.from({ length: 12 }, (_, i) => ({
@@ -38,11 +36,10 @@ export default function ClientGalleryViewPage() {
   useEffect(() => {
     setIsLoading(true);
     setError(null);
-    // Simulate fetching gallery data
     const foundGallery = mockGalleries.find(g => g.id === galleryId);
     if (foundGallery) {
       setGallery(foundGallery);
-    } else if (galleryId === "mockId" && !foundGallery) { // Fallback for generic mockId viewing if not explicitly found
+    } else if (galleryId === "mockId" && !foundGallery) {
         setGallery(mockGalleries.find(g => g.id === "mockId") || null);
     }
     else {
@@ -50,6 +47,12 @@ export default function ClientGalleryViewPage() {
     }
     setIsLoading(false);
   }, [galleryId]);
+
+  const handleImageClick = (imageId: string) => {
+    // Placeholder for opening image viewer modal
+    console.log(`Image ${imageId} clicked. Future: Open image viewer modal.`);
+    alert(`Image ${imageId} clicked. Future: Open image viewer modal.`);
+  };
 
   if (isLoading) {
     return <div className="container mx-auto p-4 text-center">Loading gallery...</div>;
@@ -63,14 +66,13 @@ export default function ClientGalleryViewPage() {
     return <div className="container mx-auto p-4 text-center">Gallery data could not be loaded.</div>;
   }
 
-  // TODO: Implement password protection if gallery.accessType === 'password'
+  const contextParts = gallery.deliverableContextName.split(" - ");
+  const dayInfo = contextParts[0] || "Project Day";
+  const eventInfo = contextParts.slice(1).join(" - ") || "Event";
 
   return (
     <div className="min-h-screen bg-muted/40">
-      {/* Header is now part of the main AppLayout */}
-      
-
-      <main className="container mx-auto p-0 pt-2 md:p-4 md:pt-4"> {/* Adjusted padding for better integration */}
+      <main className="container mx-auto p-0 pt-2 md:p-4 md:pt-4">
          <Card className="mb-8 bg-card shadow-none border-0">
           <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 pt-4 px-4 md:px-6">
             <div>
@@ -102,26 +104,25 @@ export default function ClientGalleryViewPage() {
           )}
         </Card>
         
-        {/* Breadcrumb Navigation Placeholder */}
         <div className="mb-6 p-3 bg-secondary/30 rounded-none text-sm text-muted-foreground">
             <Button variant="link" size="sm" className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground" disabled>
-              {gallery.deliverableContextName || "Project"}
+              {dayInfo}
             </Button>
             <span className="mx-1">/</span>
             <Button variant="link" size="sm" className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground" disabled>
-              Day 1
+              {eventInfo}
             </Button>
             <span className="mx-1">/</span>
-            <Button variant="link" size="sm" className="p-0 h-auto text-sm text-muted-foreground hover:text-foreground" disabled>
-              Keynote
-            </Button>
-            <span className="mx-1">/</span>
-            <span className="font-semibold text-foreground">{gallery.galleryName.split(" - ")[0] || "Current Album"}</span>
+            <span className="font-semibold text-foreground">{gallery.galleryName}</span>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-          {mockImageUrls.map((image, index) => (
-            <Card key={image.id} className="overflow-hidden group relative border-0 shadow-none rounded-none">
+          {mockImageUrls.map((image) => (
+            <Card 
+                key={image.id} 
+                className="overflow-hidden group relative border-0 shadow-none rounded-none cursor-pointer"
+                onClick={() => handleImageClick(image.id)}
+            >
               <Image
                 src={image.src}
                 alt={image.alt}
@@ -130,10 +131,21 @@ export default function ClientGalleryViewPage() {
                 className="aspect-video w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
                 data-ai-hint={image.hint}
               />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <p className="text-xs text-white truncate">{image.alt}</p>
-                <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 text-white hover:bg-white/20 hover:text-white p-1" title="Favorite">
+              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                {/* Overlay content appears on hover */}
+              </div>
+              <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-white bg-black/40 hover:bg-black/60 hover:text-white p-1" title="Download" onClick={(e) => {e.stopPropagation(); console.log('Download clicked for', image.id); alert('Download per image: TBD');}}>
+                    <DownloadCloud className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-white bg-black/40 hover:bg-black/60 hover:text-white p-1" title="Favorite" onClick={(e) => {e.stopPropagation(); console.log('Favorite clicked for', image.id); alert('Favorite: TBD');}}>
                     <Heart className="h-4 w-4" />
+                </Button>
+                 <Button variant="ghost" size="icon" className="h-7 w-7 text-white bg-black/40 hover:bg-black/60 hover:text-white p-1" title="Comment" onClick={(e) => {e.stopPropagation(); console.log('Comment clicked for', image.id); alert('Comment: TBD');}}>
+                    <MessageSquare className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-white bg-black/40 hover:bg-black/60 hover:text-white p-1" title="Report Issue" onClick={(e) => {e.stopPropagation(); console.log('Report clicked for', image.id); alert('Report Image: TBD');}}>
+                    <AlertCircle className="h-4 w-4" />
                 </Button>
               </div>
               {gallery.enableWatermarking && (
@@ -146,11 +158,7 @@ export default function ClientGalleryViewPage() {
             </Card>
           ))}
         </div>
-        <div className="mt-8 text-center">
-            <Button variant="outline" disabled>
-                <AlertCircle className="mr-2 h-4 w-4" /> Report an Issue
-            </Button>
-        </div>
+        {/* Global "Report an Issue" button removed as per new spec direction (per-image reporting) */}
       </main>
       <footer className="py-6 text-center text-xs text-muted-foreground">
         <p>Powered by HIVE. Gallery for {gallery.galleryName}.</p>
@@ -159,3 +167,4 @@ export default function ClientGalleryViewPage() {
     </div>
   );
 }
+
