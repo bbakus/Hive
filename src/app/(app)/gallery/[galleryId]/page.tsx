@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils';
 
 // Mock Gallery Data - Adjusted to better reflect new spec context
 const mockGalleries: ClientGallery[] = [
-    { id: "gal001", galleryName: "Quick Turn Selects", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy these quick turnaround selects from the event!", deliverableContextName: "Day 1 (2024-07-15) - Summer Music Festival Main Stage" },
-    { id: "gal002", galleryName: "Final Keynote Shots", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Final approved keynote photography from Tech Conference X.", deliverableContextName: "Day 1 (2024-09-15) - Tech Conference Keynote Speech" },
+    { id: "gal001", galleryName: "Quick Turn Selects", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: true, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy these quick turnaround selects from the event!", deliverableContextName: "Day 1 (2024-07-15) - Summer Music Festival Main Stage" },
+    { id: "gal002", galleryName: "Final Keynote Shots", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: false, expiresOn: null, welcomeMessage: "Final approved keynote photography from Tech Conference X.", deliverableContextName: "Day 1 (2024-09-15) - Tech Conference Keynote Speech" },
     { id: "gal003", galleryName: "Live Previews", clientEmail: "internal_stakeholder@g9e.com", accessType: "private", password: "", allowHighResDownload: true, enableWatermarking: true, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Live previews from the G9e Annual Summit 2024.", deliverableContextName: "Day 2 (2024-10-02) - G9e Summit General Session"},
     { id: "mockId", galleryName: "Behind the Scenes", clientEmail: "test@example.com", accessType: "public", allowHighResDownload: true, enableWatermarking: false, expiresOn: null, welcomeMessage: "A look behind the scenes of the Mock Project.", deliverableContextName: "Day 1 (2024-01-01) - Mock Project Kickoff" },
 ];
@@ -53,7 +53,7 @@ export default function ClientGalleryViewPage() {
 
   const handleImageClick = (imageId: string) => {
     // Placeholder for opening image viewer modal
-    console.log(`Image ${imageId} clicked. Future: Open image viewer modal with metadata overlay.`);
+    console.log(`Image ${imageId} clicked. Future: Open image viewer modal with metadata overlay (timestamp, photographer, event code).`);
     alert(`Image ${imageId} clicked. Future: Open image viewer modal with metadata overlay (timestamp, photographer, event code).`);
   };
 
