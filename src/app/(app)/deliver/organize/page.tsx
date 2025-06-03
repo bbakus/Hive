@@ -51,10 +51,12 @@ export default function OrganizeGalleriesPage() {
 
 
   useEffect(() => {
+    // Assign initial folderIds to mock galleries for demonstration
     setGalleries(
       initialClientGalleriesMockData.map((gallery, index) => ({
         ...gallery,
-        folderId: index % 4 === 0 ? initialFoldersMock[0]?.id : (index % 4 === 1 ? initialFoldersMock[1]?.id : null),
+        // Example assignment: 1st to "Completed Projects 2024", 2nd to "Client Drafts Q4", others unassigned
+        folderId: index === 0 ? initialFoldersMock[0]?.id : (index === 1 ? initialFoldersMock[1]?.id : null),
       }))
     );
   }, []);
