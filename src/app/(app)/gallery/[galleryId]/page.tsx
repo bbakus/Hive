@@ -201,6 +201,6 @@ export default function ClientGalleryViewPage() {
     </div>
   );
 }
-
+    
 
     
