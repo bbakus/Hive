@@ -5,20 +5,24 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Folder as FolderIcon, ImageIcon, PlusCircle, Settings } from "lucide-react";
+import { Folder as FolderIcon, ImageIcon, PlusCircle, Settings, Info } from "lucide-react";
 import { ClientGalleryFormDialog, type ClientGalleryFormDialogData, type ClientGallery } from "@/components/modals/ClientGalleryFormDialog";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useProjectContext } from "@/contexts/ProjectContext"; // Import ProjectContext
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// Mock data - ideally, this would come from a context or API in a real app
-const initialClientGalleriesMockData: ClientGallery[] = [
+// Expanded Mock data - deliverableContextName acts as the project name for filtering
+const allClientGalleriesMockData: ClientGallery[] = [
     { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights!", deliverableContextName: "Summer Music Festival 2024" },
     { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings for Tech Conference X.", deliverableContextName: "Tech Conference X" },
     { id: "gal003", galleryName: "G9e Summit Live Previews", clientEmail: "internal_stakeholder@g9e.com", accessType: "private", password: "", allowHighResDownload: true, enableWatermarking: true, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Live previews from the G9e Annual Summit 2024.", deliverableContextName: "G9e Annual Summit 2024"},
     { id: "gal004", galleryName: "Corporate Retreat 2023 Photos", clientEmail: "hr@example.com", accessType: "password", password: "securepassword", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2025-01-15"), welcomeMessage: "Photos from the 2023 Corporate Retreat.", deliverableContextName: "Corporate Retreat 2023"},
     { id: "gal005", galleryName: "Product Launch Q1 Assets", clientEmail: "marketing@example.com", accessType: "private", allowHighResDownload: true, enableWatermarking: true, expiresOn: null, welcomeMessage: "Approved assets for Q1 Product Launch.", deliverableContextName: "Product Launch Q1"},
+    { id: "gal006", galleryName: "Summer Fest - Day 2 Candids", clientEmail: "clientA@example.com", accessType: "private", allowHighResDownload: true, enableWatermarking: true, expiresOn: parseISO("2024-12-01"), welcomeMessage: "Day 2 candids.", deliverableContextName: "Summer Music Festival 2024" },
+    { id: "gal007", galleryName: "Tech Conference - Workshop Shots", clientEmail: "clientB@example.com", accessType: "password", password:"techy", allowHighResDownload: true, enableWatermarking: false, expiresOn: null, welcomeMessage: "Workshop photos from Tech Conference X.", deliverableContextName: "Tech Conference X" },
 ];
 
 interface OrganizableClientGallery extends ClientGallery {
@@ -41,6 +45,7 @@ const NO_FOLDER_ID = "unassigned";
 const ALL_GALLERIES_ID = "all";
 
 export default function OrganizeGalleriesPage() {
+  const { selectedProject } = useProjectContext(); // Get selected project
   const [galleries, setGalleries] = useState<OrganizableClientGallery[]>([]);
   const [folders, setFolders] = useState<Folder[]>(initialFoldersMock);
   const { toast } = useToast();
@@ -49,17 +54,22 @@ export default function OrganizeGalleriesPage() {
   const [editingGalleryForSettings, setEditingGalleryForSettings] = useState<OrganizableClientGallery | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(ALL_GALLERIES_ID);
 
-
   useEffect(() => {
+    // Filter galleries based on selected project
+    const projectGalleries = selectedProject
+      ? allClientGalleriesMockData.filter(gallery => gallery.deliverableContextName === selectedProject.name)
+      : [];
+
     // Assign initial folderIds to mock galleries for demonstration
     setGalleries(
-      initialClientGalleriesMockData.map((gallery, index) => ({
+      projectGalleries.map((gallery, index) => ({
         ...gallery,
-        // Example assignment: 1st to "Completed Projects 2024", 2nd to "Client Drafts Q4", others unassigned
-        folderId: index === 0 ? initialFoldersMock[0]?.id : (index === 1 ? initialFoldersMock[1]?.id : null),
+        folderId: index % 3 === 0 ? initialFoldersMock[0]?.id : (index % 3 === 1 ? initialFoldersMock[1]?.id : null),
       }))
     );
-  }, []);
+    // Reset folder selection when project changes
+    setSelectedFolderId(ALL_GALLERIES_ID);
+  }, [selectedProject]);
 
   const handleMoveGallery = (galleryId: string, targetFolderId: string | null) => {
     setGalleries(prevGalleries =>
@@ -103,23 +113,49 @@ export default function OrganizeGalleriesPage() {
   };
 
   const displayedGalleries = useMemo(() => {
+    if (!selectedProject) return []; // No galleries if no project selected
+
+    let projectGalleries = galleries; // galleries state is already project-filtered
+
     if (selectedFolderId === ALL_GALLERIES_ID) {
-      return galleries;
+      return projectGalleries;
     }
     if (selectedFolderId === NO_FOLDER_ID) {
-      return galleries.filter(g => !g.folderId);
+      return projectGalleries.filter(g => !g.folderId);
     }
-    return galleries.filter(g => g.folderId === selectedFolderId);
-  }, [galleries, selectedFolderId]);
+    return projectGalleries.filter(g => g.folderId === selectedFolderId);
+  }, [galleries, selectedFolderId, selectedProject]);
+
+  if (!selectedProject) {
+    return (
+      <div className="flex flex-col gap-8">
+        <div>
+          <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <FolderIcon className="h-8 w-8 text-accent" /> Organize Galleries
+          </p>
+          <p className="text-muted-foreground">
+            Manage the structure, organization, and settings of your galleries for the selected project.
+          </p>
+        </div>
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>No Project Selected</AlertTitle>
+          <AlertDescription>
+            Please select a project from the main header to organize its galleries.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <FolderIcon className="h-8 w-8 text-accent" /> Organize Client Galleries
+          <FolderIcon className="h-8 w-8 text-accent" /> Organize Galleries
         </p>
         <p className="text-muted-foreground">
-          Manage the structure, organization, and settings of your client-facing galleries.
+          Organize galleries for project: <span className="font-semibold text-foreground">{selectedProject.name}</span>.
         </p>
       </div>
 
@@ -128,7 +164,7 @@ export default function OrganizeGalleriesPage() {
             isOpen={isSettingsModalOpen}
             onOpenChange={setIsSettingsModalOpen}
             onSubmit={handleSettingsSubmit}
-            contextName={editingGalleryForSettings.deliverableContextName}
+            contextName={editingGalleryForSettings.deliverableContextName} // This context name is effectively the project name
             editingGallery={editingGalleryForSettings}
         />
       )}
@@ -189,9 +225,9 @@ export default function OrganizeGalleriesPage() {
         <Card className="border-0">
           <CardHeader>
             <CardTitle className="text-lg">
-              {selectedFolderId === ALL_GALLERIES_ID ? "All Client Galleries" 
-               : selectedFolderId === NO_FOLDER_ID ? "Uncategorized Galleries" 
-               : `Galleries in "${folders.find(f => f.id === selectedFolderId)?.name || 'Folder'}"`}
+              {selectedFolderId === ALL_GALLERIES_ID ? `All Galleries for ${selectedProject.name}`
+               : selectedFolderId === NO_FOLDER_ID ? `Uncategorized Galleries for ${selectedProject.name}`
+               : `Galleries in "${folders.find(f => f.id === selectedFolderId)?.name || 'Folder'}" (for ${selectedProject.name})`}
             </CardTitle>
             <CardDescription>Assign galleries to folders or edit their settings. ({displayedGalleries.length} galleries shown)</CardDescription>
           </CardHeader>
@@ -207,7 +243,7 @@ export default function OrganizeGalleriesPage() {
                                 <div className="min-w-0">
                                 <p className="font-medium truncate" title={gallery.galleryName}>{gallery.galleryName}</p>
                                 <p className="text-xs text-muted-foreground truncate" title={gallery.clientEmail}>
-                                    Client: {gallery.clientEmail} | For: {gallery.deliverableContextName}
+                                    Client: {gallery.clientEmail}
                                 </p>
                                 </div>
                             </div>
@@ -246,7 +282,7 @@ export default function OrganizeGalleriesPage() {
               </div>
             ) : (
               <p className="text-muted-foreground text-center py-8">
-                {galleries.length === 0 ? "No galleries available to organize." : `No galleries in "${folders.find(f => f.id === selectedFolderId)?.name || (selectedFolderId === NO_FOLDER_ID ? 'Uncategorized' : 'this selection')}".`}
+                {galleries.length === 0 ? `No galleries found for project "${selectedProject.name}".` : `No galleries in "${folders.find(f => f.id === selectedFolderId)?.name || (selectedFolderId === NO_FOLDER_ID ? 'Uncategorized' : 'this selection')}" for this project.`}
               </p>
             )}
           </CardContent>
@@ -255,3 +291,4 @@ export default function OrganizeGalleriesPage() {
     </div>
   );
 }
+
