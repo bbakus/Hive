@@ -37,6 +37,7 @@ interface EventShootAccordionItemProps {
     captured: number;
     total: number;
   };
+  isActive?: boolean; // Added isActive prop
 }
 
 export const EventShootAccordionItem = React.memo(function EventShootAccordionItemComponent({
@@ -48,7 +49,8 @@ export const EventShootAccordionItem = React.memo(function EventShootAccordionIt
   onCheckOut,
   onShotAction,
   getEventStatusBadgeInfo,
-  getShotProgress
+  getShotProgress,
+  isActive, // Destructure isActive prop
 }: EventShootAccordionItemProps) {
   const eventStatusBadge = getEventStatusBadgeInfo(event);
   const shotProgress = getShotProgress(event.id);
@@ -57,7 +59,10 @@ export const EventShootAccordionItem = React.memo(function EventShootAccordionIt
     <AccordionItem
       value={event.id}
       key={event.id}
-      className="bg-card rounded-none shadow-none hover:shadow-none transition-shadow border"
+      className={cn(
+        "bg-card rounded-none shadow-none hover:shadow-none transition-shadow border",
+        isActive ? "border-accent" : "border-border" // Conditional border color
+      )}
     >
       <AccordionTrigger className="p-4 hover:no-underline">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center w-full gap-2 sm:gap-4">

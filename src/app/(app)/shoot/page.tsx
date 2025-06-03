@@ -363,6 +363,7 @@ export default function ShootPage() {
               onShotAction={handleShotAction}
               getEventStatusBadgeInfo={getEventStatusBadgeInfo}
               getShotProgress={getShotProgress}
+              isActive={activeAccordionItem === event.id} // Pass isActive prop
             />
           ))}
         </Accordion>
