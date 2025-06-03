@@ -45,20 +45,27 @@ type ProjectContextType = {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
+const CULINARY_PROJECT_ID = "proj_pb_culinary_classic_2025";
+const CULINARY_ORG_ID = "org_g9e"; // Assuming G9e hosts this
+
 const getInitialMockProjects = (): Project[] => [
   {
-    id: "proj_g9e_summit_2024",
-    name: "G9e Annual Summit 2024",
-    startDate: format(subDays(new Date(), 1), "yyyy-MM-dd"), 
-    endDate: format(addDays(new Date(), 2), "yyyy-MM-dd"),   
-    status: "In Progress",
-    description: "Comprehensive photographic coverage of the G9e Annual Summit 2024 over 4 days, involving 4 key photographers.",
-    location: "Grand Conference Center, Metropolis",
+    id: CULINARY_PROJECT_ID,
+    name: "Pebble Beach Culinary Classic 2025",
+    startDate: "2025-05-16", // Friday
+    endDate: "2025-05-18",   // Sunday
+    status: "Planning",
+    description: "A 3-day premier culinary festival featuring world-renowned chefs, wine tastings, and exclusive dining experiences. HIVE will provide comprehensive photographic coverage across all main events and selected private functions.",
+    location: "Pebble Beach Resorts, CA",
     keyPersonnel: [
-      { personnelId: "user003", name: "Charlie Chaplin", projectRole: "Project Manager" },
-      { personnelId: "user005", name: "Edward Scissorhands", projectRole: "Lead Editor" },
+      { personnelId: "user_liam_w", name: "Liam Wilson", projectRole: "Project Manager" },
+      { personnelId: "user_ava_m", name: "Ava Miller", projectRole: "Lead Editor" },
+      { personnelId: "user_maria_s", name: "Maria Sanchez", projectRole: "Lead Photographer Day 1" },
+      { personnelId: "user_david_l", name: "David Lee", projectRole: "Lead Photographer Day 2" },
+      { personnelId: "user_sophia_c", name: "Sophia Chen", projectRole: "Lead Photographer Day 3" },
+      { personnelId: "user_event_lead_ops", name: "Ops Event Lead", projectRole: "Event Lead"},
     ],
-    organizationId: "org_g9e",
+    organizationId: CULINARY_ORG_ID,
     createdByUserId: "user_admin_demo",
   }
 ];
@@ -77,7 +84,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const loadedProjects = useDemoData ? getInitialMockProjects() : [];
       setAllProjects(loadedProjects);
       if (loadedProjects.length > 0) {
-        // Default selection to the new single project if demo data is on
         setSelectedProjectIdState(loadedProjects[0].id);
       } else {
         setSelectedProjectIdState(null);
@@ -88,7 +94,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
-      return allProjects; // Should ideally be empty or one if only G9e exists
+      return allProjects;
     }
     return allProjects.filter(p => p.organizationId === selectedOrganizationId);
   }, [allProjects, selectedOrganizationId]);
@@ -112,13 +118,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setAllProjects((prevProjects) => {
       const newProject: Project = {
         ...projectData,
-        id: `proj${String(prevProjects.length + getInitialMockProjects().length + 1 + Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+        id: `proj_new_${Date.now()}`,
         keyPersonnel: projectData.keyPersonnel || [],
         organizationId: organizationId,
         createdByUserId: userId,
       };
       const updatedProjects = [...prevProjects, newProject];
-       // If this is the first project for the currently selected org (or for "All Orgs" if applicable), select it.
       const currentOrgProjects = selectedOrganizationId === ALL_ORGANIZATIONS_ID 
                                 ? updatedProjects 
                                 : updatedProjects.filter(p => p.organizationId === selectedOrganizationId);
@@ -177,3 +182,5 @@ export function useProjectContext() {
   }
   return context;
 }
+
+    

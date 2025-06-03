@@ -33,7 +33,7 @@ import { PersonnelFormDialog, type PersonnelFormDialogData } from "@/components/
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 
 
-export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client"] as const;
+export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client", "Event Lead"] as const;
 
 export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
   id: string;
@@ -41,13 +41,14 @@ export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
 };
 
 export let initialPersonnelMock: Personnel[] = [
-  { id: "user001", name: "Alice Wonderland", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN12345A", "SN123XYZ"] },
-  { id: "user002", name: "Bob The Builder", role: "Photographer", status: "Assigned", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN98765E"]},
-  { id: "user003", name: "Charlie Chaplin", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png" },
-  { id: "user004", name: "Diana Prince", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN11223F"] },
-  { id: "user005", name: "Edward Scissorhands", role: "Editor", status: "Assigned", avatar: "https://placehold.co/40x40.png" },
-  { id: "user006", name: "Fiona Gallagher", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png", cameraSerials: ["SN13579D", "SN24680G"] },
-  { id: "user008", name: "Client Representative", role: "Client", status: "Available", avatar: "https://placehold.co/40x40.png" },
+  { id: "user_maria_s", name: "Maria Sanchez", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=MS", cameraSerials: ["SN_CANON_R5_001", "SN_SONY_A7IV_002"] },
+  { id: "user_david_l", name: "David Lee", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=DL", cameraSerials: ["SN_NIKON_Z7II_003", "SN_FUJI_XT4_004"] },
+  { id: "user_sophia_c", name: "Sophia Chen", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=SC", cameraSerials: ["SN_SONY_A1_005"] },
+  { id: "user_james_b", name: "James Brown", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=JB", cameraSerials: ["SN_CANON_R6_006", "SN_LEICA_M11_007"] },
+  { id: "user_liam_w", name: "Liam Wilson", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png?text=LW" },
+  { id: "user_ava_m", name: "Ava Miller", role: "Editor", status: "Available", avatar: "https://placehold.co/40x40.png?text=AM" },
+  { id: "user_client_liaison", name: "Client Liaison (PBCC)", role: "Client", status: "Available", avatar: "https://placehold.co/40x40.png?text=CL" },
+  { id: "user_event_lead_ops", name: "Ops Event Lead", role: "Event Lead", status: "Available", avatar: "https://placehold.co/40x40.png?text=EL" },
 ];
 
 export default function PersonnelPage() {
@@ -98,7 +99,7 @@ export default function PersonnelPage() {
     } else {
       const newPersonnelMember: Personnel = {
         ...data,
-        id: `user${String(personnelList.length + initialPersonnelMock.length + 1 + Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        id: `user_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         cameraSerials: data.cameraSerials || [],
       };
       setPersonnelList((prevList) => [...prevList, newPersonnelMember]);
@@ -469,3 +470,5 @@ export default function PersonnelPage() {
     </div>
   );
 }
+
+    
