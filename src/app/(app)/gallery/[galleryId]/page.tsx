@@ -109,7 +109,7 @@ export default function ClientGalleryViewPage() {
             <div className="flex items-center gap-2 mt-3 sm:mt-0 self-start sm:self-center">
               {gallery.allowHighResDownload && (
                   <Button variant="accent" size="sm">
-                      <Download className="mr-2 h-4 w-4" /> Download All
+                      <Download className="mr-2 h-4 w-4" /> Download All (High-Res)
                   </Button>
               )}
               <Button variant="outline" size="sm">
@@ -158,9 +158,11 @@ export default function ClientGalleryViewPage() {
                   {/* Overlay content appears on hover */}
                 </div>
                 <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-white bg-black/40 hover:bg-black/60 hover:text-white p-1" title="Download" onClick={(e) => {e.stopPropagation(); console.log('Download clicked for', image.id); alert('Download per image: TBD');}}>
-                      <DownloadCloud className="h-4 w-4" />
-                  </Button>
+                  {gallery.allowHighResDownload && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-white bg-black/40 hover:bg-black/60 hover:text-white p-1" title="Download" onClick={(e) => {e.stopPropagation(); console.log('Download clicked for', image.id); alert('Download per image: TBD');}}>
+                        <DownloadCloud className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -200,3 +202,5 @@ export default function ClientGalleryViewPage() {
   );
 }
 
+
+    
