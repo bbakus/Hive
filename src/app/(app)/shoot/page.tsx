@@ -50,6 +50,8 @@ export default function ShootPage() {
 
   const [isBlockedReasonDialogOpen, setIsBlockedReasonDialogOpen] = useState(false);
   const [shotForBlockedReasonDialog, setShotForBlockedReasonDialog] = useState<{ eventId: string; shotId: string; description: string; currentReason: string } | null>(null);
+  const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
+
 
   useEffect(() => {
     setCurrentTime(new Date());
@@ -124,6 +126,20 @@ export default function ShootPage() {
     }
     return filtered;
   }, [todaysCoveredEvents, filterTimeStatus, filterQuickTurnaround, filterHidePastEvents, currentTime, getEventStatus]);
+  
+  useEffect(() => {
+    if (filteredTodaysEvents.length > 0 && !activeAccordionItem) {
+      // Open the first event by default if no item is active and there are events
+      setActiveAccordionItem(filteredTodaysEvents[0].id);
+    } else if (filteredTodaysEvents.length === 0 && activeAccordionItem) {
+      // Clear active item if no events are shown (e.g., due to filtering)
+      setActiveAccordionItem(undefined);
+    } else if (filteredTodaysEvents.length > 0 && activeAccordionItem && !filteredTodaysEvents.find(e => e.id === activeAccordionItem)) {
+      // If the currently active item is filtered out, open the new first one
+      setActiveAccordionItem(filteredTodaysEvents[0].id);
+    }
+  }, [filteredTodaysEvents, activeAccordionItem]);
+
 
   const getEventStatusBadgeInfo = useCallback((event: Event): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } => {
     if (!currentTime) return { label: "Pending", variant: "outline" };
@@ -328,7 +344,13 @@ export default function ShootPage() {
       )}
 
       {filteredTodaysEvents.length > 0 && (
-        <Accordion type="multiple" className="w-full space-y-3">
+        <Accordion 
+            type="single" 
+            collapsible 
+            className="w-full space-y-3"
+            value={activeAccordionItem}
+            onValueChange={setActiveAccordionItem}
+        >
           {filteredTodaysEvents.map(event => (
             <EventShootAccordionItem
               key={event.id}
@@ -351,4 +373,5 @@ export default function ShootPage() {
     
 
     
+
 
