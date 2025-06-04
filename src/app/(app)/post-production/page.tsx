@@ -15,21 +15,26 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useEventContext } from "@/contexts/EventContext";
+import { useProjectContext } from "@/contexts/ProjectContext";
+import { useSettingsContext } from "@/contexts/SettingsContext";
+import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
 
 interface KanbanTask {
   id: string;
-  title: string; 
-  content: string; 
+  title: string;
+  content: string;
   status: TaskStatus;
   assignedEditorId?: string | null;
   lastActivity?: string;
-  eventName?: string; 
-  photographerName?: string; 
-  ingestionJobId?: string; 
-  reportUrl?: string; 
+  eventName?: string;
+  photographerName?: string;
+  ingestionJobId?: string;
+  reportUrl?: string;
+  sourceEventId?: string; // To link back to the original event
 }
 
 interface KanbanColumnDef {
@@ -41,24 +46,10 @@ interface KanbanColumnDef {
 const MOCK_EDITORS: Editor[] = [
   { id: 'editor1', name: 'Alice Editor' },
   { id: 'editor2', name: 'Bob Retoucher' },
-  { id: 'editor_current_user', name: 'Charlie CurrentUser' }, 
+  { id: 'editor_current_user', name: 'Charlie CurrentUser' },
 ];
 
 const MOCK_CURRENT_USER_ID = 'editor_current_user';
-
-const initialTasksData: KanbanTask[] = [
-  { id: 'task1', title: 'Keynote Speaker Candids', content: '150 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Keynote', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_ABC)', ingestionJobId: 'Job_ABC', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task2', title: 'Networking Reception - Batch 1', content: '200 Images', status: 'ingestion', eventName: 'G9e Summit - Day 1 Reception', photographerName: 'Bob B.', lastActivity: 'Awaiting culling (Ingested from Job_DEF)', ingestionJobId: 'Job_DEF', reportUrl: '/reports/mock/sample_ingest_report.json'},
-  { id: 'task3', title: 'Workshop Alpha - Selects', content: '80 Images (Culled from 250)', status: 'culling', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Tech Conference X - Workshop A', photographerName: 'Diana P.', lastActivity: `Culling claimed by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_GHI', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task4', title: 'Product Launch - Hero Shots', content: '30 Images (Color Processed)', status: 'color', assignedEditorId: 'editor2', eventName: 'Product Launch Q3', photographerName: 'Fiona G.', lastActivity: `Color Treatment claimed by ${MOCK_EDITORS.find(e=>e.id === 'editor2')?.name}`, ingestionJobId: 'Job_JKL', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task5', title: 'VIP Portraits - Final Review', content: '90 Images', status: 'review', assignedEditorId: 'editor1', eventName: 'Corporate Gala Dinner', photographerName: 'Alice W.', lastActivity: `Awaiting approval by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}`, reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task6', title: 'Awards Ceremony - Stage & Winners', content: '200 Images', status: 'completed', assignedEditorId: 'editor1', eventName: 'Annual Shareholder Meeting', photographerName: 'Bob B.', lastActivity: `Completed by ${MOCK_EDITORS.find(e=>e.id === 'editor1')?.name}`, reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task7', title: 'Team Headshots - Batch A', content: '50 Images', status: 'ingestion', eventName: 'Company Wide Headshots', photographerName: 'Alice W.', lastActivity: 'Awaiting culling (Ingested from Job_MNO)', ingestionJobId: 'Job_MNO', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task8', title: 'Behind the Scenes - Setup', content: '75 Images', status: 'culling', assignedEditorId: null, eventName: 'Music Festival Pre-Event', photographerName: 'Bob B.', lastActivity: 'Ready for culling', ingestionJobId: 'Job_PQR', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task9', title: 'Aerial Venue Shots', content: '20 Images', status: 'color', assignedEditorId: null, eventName: 'Outdoor Expo Opening', photographerName: 'Diana P.', lastActivity: 'Ready for color treatment', ingestionJobId: 'Job_STU', reportUrl: '/reports/mock/sample_ingest_report.json' },
-  { id: 'task10', title: 'Client Testimonials - Video Stills', content: '100 Images', status: 'review', assignedEditorId: MOCK_CURRENT_USER_ID, eventName: 'Marketing Campaign Shoot', photographerName: 'Fiona G.', lastActivity: `Awaiting final review by ${MOCK_EDITORS.find(e=>e.id === MOCK_CURRENT_USER_ID)?.name}`, ingestionJobId: 'Job_VWX', reportUrl: '/reports/mock/sample_ingest_report.json' },
-];
-
 
 const KANBAN_COLUMNS: KanbanColumnDef[] = [
   { id: 'ingestion', title: 'Ingestion Queue', icon: Inbox },
@@ -79,18 +70,74 @@ const taskStatusFilterOptions: { value: TaskStatus | "all"; label: string }[] = 
 ];
 
 export default function PostProductionPage() {
-  const [tasks, setTasks] = useState<KanbanTask[]>(initialTasksData);
+  const { eventsForSelectedProjectAndOrg, isLoadingEvents } = useEventContext();
+  const { selectedProject, isLoadingProjects } = useProjectContext();
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+
+  const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
   const [revisionTaskDetails, setRevisionTaskDetails] = useState<{ taskId: string; taskTitle: string; currentAssigneeId?: string | null } | null>(null);
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [currentReportUrl, setCurrentReportUrl] = useState<string | undefined>(undefined);
 
-  // Filter states
   const [filterTaskStatus, setFilterTaskStatus] = useState<TaskStatus | "all">("all");
   const [filterAssignedEditorId, setFilterAssignedEditorId] = useState<string>("all");
   const [filterOnlyMyTasks, setFilterOnlyMyTasks] = useState(false);
   const [filterHideCompleted, setFilterHideCompleted] = useState(false);
+
+  const getPersonnelName = (personnelId?: string): string => {
+    if (!personnelId) return "N/A";
+    return initialPersonnelMock.find(p => p.id === personnelId)?.name || "Unknown";
+  };
+
+  useEffect(() => {
+    if (isLoadingEvents || isLoadingProjects || isLoadingSettings) {
+      setTasks([]); // Clear tasks while loading dependencies
+      return;
+    }
+
+    const derivedTasks: KanbanTask[] = eventsForSelectedProjectAndOrg
+      .filter(event => event.isCovered) // Only include events marked for coverage
+      .map(event => {
+        let photographerDisplay = "N/A";
+        const photoPersonnelIds = event.assignedPersonnelIds?.filter(pid => {
+            const p = initialPersonnelMock.find(person => person.id === pid);
+            return p && PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client";
+        }) || [];
+
+        if (photoPersonnelIds.length === 1) {
+          photographerDisplay = getPersonnelName(photoPersonnelIds[0]);
+        } else if (photoPersonnelIds.length > 1) {
+          photographerDisplay = `${getPersonnelName(photoPersonnelIds[0])} & Team`;
+        }
+
+        return {
+          id: `event-task-${event.id}`,
+          title: event.name,
+          content: `${event.shotRequests || 0} shots`,
+          status: 'ingestion' as TaskStatus, // Default to ingestion queue
+          assignedEditorId: null,
+          lastActivity: `Awaiting culling (from event: ${event.name})`,
+          eventName: `${event.project} - ${event.name}`,
+          photographerName: photographerDisplay,
+          ingestionJobId: `event-ingest-${event.id}`, // Reference to the event
+          reportUrl: `/shot-planner?eventId=${event.id}`, // Link to event's shot list
+          sourceEventId: event.id,
+        };
+      });
+    
+    setTasks(prevTasks => {
+      // Merge derived tasks with any simulated tasks, avoiding duplicates if a simulated task ID matches a derived one
+      const simulatedTasksNotMatchingDerived = prevTasks.filter(pt => pt.id.startsWith('task_sim_') && !derivedTasks.some(dt => dt.id === pt.id));
+      const taskIds = new Set(derivedTasks.map(dt => dt.id));
+      const uniquePrevTasks = prevTasks.filter(pt => !taskIds.has(pt.id) && !pt.id.startsWith('event-task-'));
+
+      return [...derivedTasks, ...uniquePrevTasks, ...simulatedTasksNotMatchingDerived];
+    });
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventsForSelectedProjectAndOrg, isLoadingEvents, isLoadingProjects, isLoadingSettings, selectedProject]);
 
 
   const getEditorName = (editorId?: string | null) => {
@@ -123,19 +170,19 @@ export default function PostProductionPage() {
   const handleTaskAction = (
     taskId: string,
     newStatus: TaskStatus,
-    newAssignedEditorId: string | null | undefined, 
+    newAssignedEditorId: string | null | undefined,
     specificAction?: string,
     revisionReason?: string
   ) => {
     setTasks(prevTasks =>
       prevTasks.map(task => {
         if (task.id === taskId) {
-          const editorForLog = newAssignedEditorId === undefined 
-                               ? task.assignedEditorId 
+          const editorForLog = newAssignedEditorId === undefined
+                               ? task.assignedEditorId
                                : (newAssignedEditorId === null ? task.assignedEditorId : newAssignedEditorId);
-          
-          const finalAssignedEditorId = newAssignedEditorId === undefined 
-                                        ? task.assignedEditorId 
+
+          const finalAssignedEditorId = newAssignedEditorId === undefined
+                                        ? task.assignedEditorId
                                         : newAssignedEditorId;
 
           const editorName = getEditorName(finalAssignedEditorId) || getEditorName(MOCK_CURRENT_USER_ID) || 'System Action';
@@ -158,7 +205,7 @@ export default function PostProductionPage() {
             default:
               newActivity = `${KANBAN_COLUMNS.find(c => c.id === newStatus)?.title || 'Task'} updated by ${editorName}.`;
           }
-          
+
           return { ...task, status: newStatus, assignedEditorId: finalAssignedEditorId, lastActivity: newActivity };
         }
         return task;
@@ -179,7 +226,7 @@ export default function PostProductionPage() {
       const actionType = taskToRevise.status === 'completed'
         ? 'reopen_completed_task'
         : 'request_revision_from_review';
-      
+
       handleTaskAction(revisionTaskDetails.taskId, targetStage, null, actionType, reason);
     }
     setIsRevisionDialogOpen(false);
@@ -203,11 +250,11 @@ export default function PostProductionPage() {
       photographerName: randomPhotographerNames[Math.floor(Math.random() * randomPhotographerNames.length)],
       lastActivity: `Awaiting culling (Simulated Ingestion - ${new Date().toLocaleTimeString()})`,
       ingestionJobId: jobSimId,
-      reportUrl: '/reports/mock/sample_ingest_report.json' 
+      reportUrl: '/reports/mock/sample_ingest_report.json'
     };
     setTasks(prevTasks => [newSimulatedTask, ...prevTasks]);
   };
-  
+
   const handleOpenReportModal = (reportUrl?: string) => {
     if (reportUrl) {
       setCurrentReportUrl(reportUrl);
@@ -222,6 +269,19 @@ export default function PostProductionPage() {
     }, {} as Record<TaskStatus, KanbanTask[]>);
   }, [filteredTasks]);
 
+  const isLoadingAllContexts = isLoadingEvents || isLoadingProjects || isLoadingSettings;
+
+  if (isLoadingAllContexts) {
+    return (
+      <div className="flex flex-col gap-6 h-full">
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
+        </h1>
+        <p>Loading workflow data...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 h-full">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -229,7 +289,7 @@ export default function PostProductionPage() {
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ImageIcon className="h-8 w-8 text-accent" /> Photo Editing Workflow
             </h1>
-            <p className="text-muted-foreground">Manage photo editing tasks. Tasks in 'Ingestion Queue' are typically auto-populated.</p>
+            <p className="text-muted-foreground">Manage photo editing tasks. { selectedProject ? `For project: ${selectedProject.name}` : "Select a project." }</p>
         </div>
         <Button variant="outline" onClick={handleSimulateNewIngestion} className="shrink-0">
             <PlusCircle className="mr-2 h-4 w-4" /> Simulate New Ingested Task
@@ -245,8 +305,8 @@ export default function PostProductionPage() {
           availableStages={REVISION_TARGET_STAGES}
         />
       )}
-      
-      {currentReportUrl && (
+
+      {currentReportUrl && currentReportUrl.startsWith('/reports/mock/') && ( // Only show for mock reports for now
         <IngestionReportDialog
           isOpen={isReportModalOpen}
           onOpenChange={setIsReportModalOpen}
@@ -323,7 +383,7 @@ export default function PostProductionPage() {
                 <CardContent className="p-3 space-y-3 min-h-[200px]">
                   {tasksByColumn[column.id]?.length === 0 && (
                     <p className="text-xs text-muted-foreground text-center py-4">
-                      {filteredTasks.length > 0 && tasks.length > filteredTasks.length 
+                      {filteredTasks.length > 0 && tasks.length > filteredTasks.length
                         ? "No tasks match current filters for this stage."
                         : "No tasks in this stage."
                       }
@@ -334,10 +394,10 @@ export default function PostProductionPage() {
                     const isCurrentUserAssigned = task.assignedEditorId === MOCK_CURRENT_USER_ID;
 
                     return (
-                      <Card 
-                        key={task.id} 
+                      <Card
+                        key={task.id}
                         className={cn(
-                          "shadow-none bg-background", 
+                          "shadow-none bg-background",
                           isCurrentUserAssigned ? "border border-accent" : "border-0"
                         )}
                       >
@@ -354,18 +414,18 @@ export default function PostProductionPage() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
                                     className="h-6 w-6 flex-shrink-0 ml-2"
-                                    onClick={() => handleOpenReportModal(task.reportUrl)}
+                                    onClick={() => task.reportUrl?.startsWith('/reports/mock/') ? handleOpenReportModal(task.reportUrl) : router.push(task.reportUrl!)}
                                    >
                                     <Settings className="h-4 w-4" />
-                                    <span className="sr-only">View Ingestion Report</span>
+                                    <span className="sr-only">View Report / Event Shots</span>
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>View Ingestion Report</p>
+                                  <p>{task.reportUrl?.startsWith('/reports/mock/') ? "View Ingestion Report" : "View Event Shot List"}</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -419,7 +479,7 @@ export default function PostProductionPage() {
                             )}
                             {task.status === 'review' && (
                                 <>
-                                  <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'completed', MOCK_CURRENT_USER_ID, 'approve_review')} className="text-xs text-green-600 dark:text-green-400"> 
+                                  <Button size="xs" variant="ghost" onClick={() => handleTaskAction(task.id, 'completed', MOCK_CURRENT_USER_ID, 'approve_review')} className="text-xs text-green-600 dark:text-green-400">
                                       Approve & Complete
                                   </Button>
                                   <Button size="xs" variant="ghost" className="text-xs text-accent" onClick={() => openRevisionDialog(task.id, task.title, task.assignedEditorId)}>
@@ -449,7 +509,3 @@ export default function PostProductionPage() {
     </div>
   );
 }
-
-    
-
-    
