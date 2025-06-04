@@ -269,7 +269,9 @@ export default function DeliverablesPage() {
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-3xl font-bold tracking-tight">Deliverables Tracker</p>
+          <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <FileText className="h-8 w-8 text-accent" /> Deliverables Tracker
+          </p>
           <p className="text-muted-foreground">
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
           </p>
@@ -502,4 +504,5 @@ export default function DeliverablesPage() {
 }
 
     
+
 
