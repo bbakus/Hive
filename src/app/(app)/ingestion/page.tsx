@@ -109,13 +109,13 @@ export default function IngestionUtilityPage() {
   }, [logHiveActivity, toast, processJobCompletions]);
   
   useEffect(() => {
-    if (useDemoData && !isLoadingSettings) {
+    if (!isLoadingSettings) {
+      // Always attempt to fetch jobs from the API, regardless of demo data setting.
+      // The API route /api/ingest-jobs itself will provide data (currently mock).
       handleFetchIngestionJobs();
-    } else if (!useDemoData && !isLoadingSettings) {
-      setIngestionJobs([]); // Clear jobs if demo data is off
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useDemoData, isLoadingSettings]); // Fetch on initial load if demo data is on
+  }, [isLoadingSettings]); // Re-run when settings are loaded.
   
   const isLoadingContexts = isLoadingSettings || isLoadingEvents || isLoadingProjects;
   
@@ -159,7 +159,7 @@ export default function IngestionUtilityPage() {
           {isLoadingJobs && <p className="text-muted-foreground text-center py-4">Loading ingestion jobs...</p>}
           {!isLoadingJobs && ingestionJobs.length === 0 && (
             <p className="text-muted-foreground text-center py-8">
-              No ingestion jobs reported yet. {useDemoData ? "Ensure your local utility is sending data to HIVE, or check mock API data." : "Enable demo data or have your local utility report jobs."}
+              No ingestion jobs reported yet. {useDemoData ? "Ensure your local utility is sending data to HIVE, or check mock API data." : "Have your local utility report jobs to HIVE, or enable demo data if you want to see sample jobs."}
             </p>
           )}
           {!isLoadingJobs && ingestionJobs.length > 0 && (
@@ -247,4 +247,3 @@ export default function IngestionUtilityPage() {
     </div>
   );
 }
-
