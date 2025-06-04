@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Folder as FolderIcon, ImageIcon, PlusCircle, Settings, Info } from "lucide-react";
+import { FolderIcon as DeprecatedFolderIcon, ImageIcon, PlusCircle, Settings, Info, FolderTree } from "lucide-react"; // Changed Folder to FolderTree
 import { ClientGalleryFormDialog, type ClientGalleryFormDialogData, type ClientGallery } from "@/components/modals/ClientGalleryFormDialog";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -131,7 +131,7 @@ export default function OrganizeGalleriesPage() {
       <div className="flex flex-col gap-8">
         <div>
           <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <FolderIcon className="h-8 w-8 text-accent" /> Organize Galleries
+            <FolderTree className="h-8 w-8 text-accent" /> Organize Galleries
           </p>
           <p className="text-muted-foreground">
             Manage the structure, organization, and settings of your galleries for the selected project.
@@ -152,7 +152,7 @@ export default function OrganizeGalleriesPage() {
     <div className="flex flex-col gap-8">
       <div>
         <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <FolderIcon className="h-8 w-8 text-accent" /> Organize Galleries
+          <FolderTree className="h-8 w-8 text-accent" /> Organize Galleries
         </p>
         <p className="text-muted-foreground">
           Organize galleries for project: <span className="font-semibold text-foreground">{selectedProject.name}</span>.
@@ -187,7 +187,7 @@ export default function OrganizeGalleriesPage() {
                 selectedFolderId === ALL_GALLERIES_ID && "bg-accent text-accent-foreground hover:bg-accent/90 hover:text-accent-foreground"
               )}
             >
-              <FolderIcon className="mr-2 h-4 w-4 text-muted-foreground" /> All Galleries
+              <DeprecatedFolderIcon className="mr-2 h-4 w-4 text-muted-foreground" /> All Galleries
             </Button>
             {folders.length > 0 ? (
               folders.map(folder => (
@@ -200,7 +200,7 @@ export default function OrganizeGalleriesPage() {
                     selectedFolderId === folder.id && "bg-accent text-accent-foreground hover:bg-accent/90 hover:text-accent-foreground"
                   )}
                 >
-                  <FolderIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <DeprecatedFolderIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                   {folder.name}
                 </Button>
               ))
@@ -292,3 +292,5 @@ export default function OrganizeGalleriesPage() {
   );
 }
 
+
+      
