@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, Edit, Trash2, FileText, Sparkles, Loader2, PlusCircle, Share, Eye, PackageSearch } from "lucide-react";
+import { UploadCloud, Edit, Trash2, Sparkles, Loader2, PlusCircle, Share, Eye, PackageSearch, PackageCheck } from "lucide-react"; // Added PackageCheck
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
@@ -270,7 +270,7 @@ export default function DeliverablesPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <FileText className="h-8 w-8 text-accent" /> Deliverables Tracker
+            <PackageCheck className="h-8 w-8 text-accent" /> Deliverables Tracker
           </p>
           <p className="text-muted-foreground">
             {selectedProject ? `Deliverables for ${selectedProject.name}` : "Track all deliverables per event with status updates and uploads."}
@@ -337,7 +337,7 @@ export default function DeliverablesPage() {
 
       <Card className="border-0">
         <CardHeader>
-          <p className="text-lg font-semibold flex items-center gap-2"><FileText className="h-6 w-6 text-accent" /> Deliverables List</p> 
+          <p className="text-lg font-semibold flex items-center gap-2"><PackageCheck className="h-6 w-6 text-accent" /> Deliverables List</p> 
           <div className="text-sm text-muted-foreground"> 
             {selectedProject ? `Deliverables associated with ${selectedProject.name}.` : "Centralized list of all project deliverables."}
             ({filteredDeliverables.length} items)
@@ -504,5 +504,3 @@ export default function DeliverablesPage() {
 }
 
     
-
-
