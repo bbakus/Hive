@@ -19,6 +19,7 @@ import { useEventContext } from "@/contexts/EventContext";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
+import { useRouter } from "next/navigation"; // Added for reportUrl navigation
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
@@ -70,9 +71,10 @@ const taskStatusFilterOptions: { value: TaskStatus | "all"; label: string }[] = 
 ];
 
 export default function PostProductionPage() {
-  const { eventsForSelectedProjectAndOrg, isLoadingEvents } = useEventContext();
+  const { eventsForSelectedProjectAndOrg, isLoadingEvents, getShotRequestsForEvent } = useEventContext();
   const { selectedProject, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const router = useRouter();
 
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
@@ -93,13 +95,15 @@ export default function PostProductionPage() {
 
   useEffect(() => {
     if (isLoadingEvents || isLoadingProjects || isLoadingSettings) {
-      setTasks([]); // Clear tasks while loading dependencies
+      setTasks([]);
       return;
     }
+    
+    const eventDerivedStatuses: TaskStatus[] = ['ingestion', 'culling', 'color'];
 
     const derivedTasks: KanbanTask[] = eventsForSelectedProjectAndOrg
-      .filter(event => event.isCovered) // Only include events marked for coverage
-      .map(event => {
+      .filter(event => event.isCovered)
+      .map((event, index) => {
         let photographerDisplay = "N/A";
         const photoPersonnelIds = event.assignedPersonnelIds?.filter(pid => {
             const p = initialPersonnelMock.find(person => person.id === pid);
@@ -111,33 +115,42 @@ export default function PostProductionPage() {
         } else if (photoPersonnelIds.length > 1) {
           photographerDisplay = `${getPersonnelName(photoPersonnelIds[0])} & Team`;
         }
+        
+        const shotsForEvent = getShotRequestsForEvent(event.id);
+        const shotCount = shotsForEvent.length;
+
+        const initialStatus = eventDerivedStatuses[index % eventDerivedStatuses.length];
+        let initialActivity = "";
+        switch(initialStatus) {
+            case 'ingestion': initialActivity = `Awaiting culling (from event: ${event.name})`; break;
+            case 'culling': initialActivity = `Awaiting color treatment (from event: ${event.name})`; break;
+            case 'color': initialActivity = `Awaiting review (from event: ${event.name})`; break;
+            default: initialActivity = `Task created for event: ${event.name}`;
+        }
+
 
         return {
           id: `event-task-${event.id}`,
           title: event.name,
-          content: `${event.shotRequests || 0} shots`,
-          status: 'ingestion' as TaskStatus, // Default to ingestion queue
-          assignedEditorId: null,
-          lastActivity: `Awaiting culling (from event: ${event.name})`,
+          content: `${shotCount} shots`,
+          status: initialStatus,
+          assignedEditorId: null, // Keep null initially
+          lastActivity: initialActivity,
           eventName: `${event.project} - ${event.name}`,
           photographerName: photographerDisplay,
-          ingestionJobId: `event-ingest-${event.id}`, // Reference to the event
-          reportUrl: `/shot-planner?eventId=${event.id}`, // Link to event's shot list
+          ingestionJobId: `event-ingest-${event.id}`,
+          reportUrl: `/events/${event.id}/shots`, // Link to event's shot list page
           sourceEventId: event.id,
         };
       });
     
     setTasks(prevTasks => {
-      // Merge derived tasks with any simulated tasks, avoiding duplicates if a simulated task ID matches a derived one
-      const simulatedTasksNotMatchingDerived = prevTasks.filter(pt => pt.id.startsWith('task_sim_') && !derivedTasks.some(dt => dt.id === pt.id));
-      const taskIds = new Set(derivedTasks.map(dt => dt.id));
-      const uniquePrevTasks = prevTasks.filter(pt => !taskIds.has(pt.id) && !pt.id.startsWith('event-task-'));
-
-      return [...derivedTasks, ...uniquePrevTasks, ...simulatedTasksNotMatchingDerived];
+      const simulatedTasks = prevTasks.filter(pt => pt.id.startsWith('task_sim_'));
+      return [...derivedTasks, ...simulatedTasks];
     });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventsForSelectedProjectAndOrg, isLoadingEvents, isLoadingProjects, isLoadingSettings, selectedProject]);
+  }, [eventsForSelectedProjectAndOrg, isLoadingEvents, isLoadingProjects, isLoadingSettings, selectedProject, getShotRequestsForEvent]);
 
 
   const getEditorName = (editorId?: string | null) => {
@@ -250,7 +263,7 @@ export default function PostProductionPage() {
       photographerName: randomPhotographerNames[Math.floor(Math.random() * randomPhotographerNames.length)],
       lastActivity: `Awaiting culling (Simulated Ingestion - ${new Date().toLocaleTimeString()})`,
       ingestionJobId: jobSimId,
-      reportUrl: '/reports/mock/sample_ingest_report.json'
+      reportUrl: '/reports/mock/sample_ingest_report.json' // Keep mock for simulated tasks
     };
     setTasks(prevTasks => [newSimulatedTask, ...prevTasks]);
   };
@@ -306,7 +319,7 @@ export default function PostProductionPage() {
         />
       )}
 
-      {currentReportUrl && currentReportUrl.startsWith('/reports/mock/') && ( // Only show for mock reports for now
+      {currentReportUrl && currentReportUrl.startsWith('/reports/mock/') && (
         <IngestionReportDialog
           isOpen={isReportModalOpen}
           onOpenChange={setIsReportModalOpen}
