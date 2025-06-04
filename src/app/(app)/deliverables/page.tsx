@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadCloud, Edit, Trash2, Sparkles, Loader2, PlusCircle, Share, Eye, PackageSearch, PackageCheck } from "lucide-react"; // Added PackageCheck
+import { UploadCloud, Edit, Trash2, Sparkles, Loader2, PlusCircle, Share, Eye, PackageCheck, Images } from "lucide-react"; // Changed PackageSearch to Images
 import { generateDeliverableSummary, type DeliverableSummaryOutput } from "@/ai/flows/deliverable-summary-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project } from "@/contexts/ProjectContext";
@@ -401,7 +401,7 @@ export default function DeliverablesPage() {
 
       <Card className="border-0">
         <CardHeader>
-            <p className="text-lg font-semibold flex items-center gap-2"><PackageSearch className="h-6 w-6 text-accent" /> Client Galleries</p>
+            <p className="text-lg font-semibold flex items-center gap-2"><Images className="h-6 w-6 text-accent" /> Client Galleries</p>
             <div className="text-sm text-muted-foreground">
                 {selectedProject ? `Client galleries associated with ${selectedProject.name}.` : "All client galleries."}
                  ({filteredClientGalleries.length} galleries)
@@ -504,3 +504,5 @@ export default function DeliverablesPage() {
 }
 
     
+
+
