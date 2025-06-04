@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link"; 
+import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project, type KeyPersonnel, type ProjectFormData as ProjectContextFormData } from "@/contexts/ProjectContext";
-import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext"; 
+import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
 import { cn } from "@/lib/utils";
 import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/modals/ProjectFormDialog";
 
@@ -84,9 +84,9 @@ export default function ProjectsPage() {
     }
     setIsDeleteDialogOpen(false);
   };
-  
+
   const displayProjects = useMemo(() => {
-    let filtered = projects; 
+    let filtered = projects;
     if (filterText) {
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(filterText.toLowerCase())
@@ -102,18 +102,18 @@ export default function ProjectsPage() {
   if (isLoadingProjects || isLoadingOrganizations) {
     return <div className="p-4">Loading projects and organizations...</div>;
   }
-  
+
   const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
 
   return (
-   
+
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-3xl font-bold tracking-tight">Projects</p>
           <p className="text-muted-foreground">
-            {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId) 
-              ? `Projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. ` 
+            {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
+              ? `Projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
               : "All projects across your organizations. "}
             Manage your event timelines and project setups.
           </p>
@@ -156,10 +156,10 @@ export default function ProjectsPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-grow">
-              <p className="text-lg font-semibold">Project List</p> 
-              <div className="text-sm text-muted-foreground"> 
-                {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId) 
-                  ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. ` 
+              <p className="text-lg font-semibold">Project List</p>
+              <div className="text-sm text-muted-foreground">
+                {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
+                  ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
                   : "Showing projects for all your organizations. "}
                 ({displayProjects.length} projects shown)
               </div>
@@ -207,7 +207,7 @@ export default function ProjectsPage() {
                 {displayProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
-                    {selectedOrganizationId === ALL_ORGANIZATIONS_ID && 
+                    {selectedOrganizationId === ALL_ORGANIZATIONS_ID &&
                       <TableCell className="text-xs text-muted-foreground">
                         {organizations.find(o => o.id === project.organizationId)?.name || "N/A"}
                       </TableCell>
@@ -225,7 +225,7 @@ export default function ProjectsPage() {
                         project.status === "Completed" ? "default" :
                         project.status === "On Hold" ? "outline" :
                         project.status === "Cancelled" ? "destructive" :
-                        "destructive" 
+                        "destructive"
                       }>{project.status}</Badge>
                     </TableCell>
                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={
@@ -253,8 +253,8 @@ export default function ProjectsPage() {
             </Table>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              {filterText || statusFilter !== "all" 
-                ? `No projects found matching your filters ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}.` 
+              {filterText || statusFilter !== "all"
+                ? `No projects found matching your filters ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}.`
                 : `No projects found ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}. Click "Add New Project (Wizard)" to get started.`}
             </p>
           )}
@@ -263,5 +263,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
-    
