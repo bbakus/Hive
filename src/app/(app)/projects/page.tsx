@@ -28,10 +28,12 @@ import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/moda
 
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
-// --- Placeholder for User Role ---
+// --- Placeholder for User Role & ID ---
 // In a real app, this would come from an authentication context
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Project Manager"; // Change this to "HIVE" or "Admin" to see the button
+const MOCK_CURRENT_USER_ROLE: UserRole = "Project Manager";
+// Assuming Liam Wilson is our logged-in Project Manager for testing assigned projects
+const MOCK_CURRENT_USER_ID: string = "user_liam_w";
 // --- End Placeholder ---
 
 export default function ProjectsPage() {
@@ -87,6 +89,14 @@ export default function ProjectsPage() {
 
   const displayProjects = useMemo(() => {
     let filtered = projects;
+
+    // Filter by assigned projects if current user is a Project Manager
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
+      filtered = filtered.filter(project =>
+        project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
+      );
+    }
+    // Further filter by text and status
     if (filterText) {
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(filterText.toLowerCase())
@@ -114,7 +124,7 @@ export default function ProjectsPage() {
           <p className="text-muted-foreground">
             {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
               ? `Projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
-              : "All projects across your organizations. "}
+              : (MOCK_CURRENT_USER_ROLE === "Project Manager" ? "Your assigned projects. " : "All projects across your organizations. ")}
             Manage your event timelines and project setups.
           </p>
         </div>
@@ -160,7 +170,8 @@ export default function ProjectsPage() {
               <div className="text-sm text-muted-foreground">
                 {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
                   ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
-                  : "Showing projects for all your organizations. "}
+                  : (MOCK_CURRENT_USER_ROLE === "Project Manager" ? "Showing your assigned projects. " : "Showing projects for all your organizations. ")
+                }
                 ({displayProjects.length} projects shown)
               </div>
             </div>
@@ -195,7 +206,7 @@ export default function ProjectsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Project Name</TableHead>
-                  {selectedOrganizationId === ALL_ORGANIZATIONS_ID && <TableHead>Organization</TableHead>}
+                  {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager") && <TableHead>Organization</TableHead>}
                   <TableHead>Location</TableHead>
                   <TableHead>Dates</TableHead>
                   <TableHead>Status</TableHead>
@@ -207,7 +218,7 @@ export default function ProjectsPage() {
                 {displayProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
-                    {selectedOrganizationId === ALL_ORGANIZATIONS_ID &&
+                    {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager") &&
                       <TableCell className="text-xs text-muted-foreground">
                         {organizations.find(o => o.id === project.organizationId)?.name || "N/A"}
                       </TableCell>
@@ -254,8 +265,20 @@ export default function ProjectsPage() {
           ) : (
             <p className="text-muted-foreground text-center py-8">
               {filterText || statusFilter !== "all"
-                ? `No projects found matching your filters ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}.`
-                : `No projects found ${selectedOrganizationId !== ALL_ORGANIZATIONS_ID ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}` : ''}. Click "Add New Project (Wizard)" to get started.`}
+                ? `No projects found matching your filters ${
+                    MOCK_CURRENT_USER_ROLE === "Project Manager"
+                      ? "among your assigned projects"
+                      : selectedOrganizationId !== ALL_ORGANIZATIONS_ID
+                      ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}`
+                      : ""
+                  }.`
+                : MOCK_CURRENT_USER_ROLE === "Project Manager"
+                ? "You are not assigned to any projects."
+                : `No projects found ${
+                    selectedOrganizationId !== ALL_ORGANIZATIONS_ID
+                      ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}`
+                      : ""
+                  }.`}
             </p>
           )}
         </CardContent>
@@ -263,3 +286,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
