@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ReactNode, LucideIcon } from 'react';
@@ -15,9 +16,9 @@ import {
   UploadCloud,
   ListChecks,
   LayoutGrid,
-  Folders,
-  Star, // Added
-  Zap,  // Added
+  FolderTree, // Changed from Folders
+  Star,
+  Zap,
 } from "lucide-react";
 
 export type NavItem = {
@@ -51,7 +52,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Deliver": [
     { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true },
-    { href: "/deliver/organize", label: "Organize Galleries", icon: Folders, matchStartsWith: true },
+    { href: "/deliver/organize", label: "Organize Galleries", icon: FolderTree, matchStartsWith: true }, // Changed here
   ],
   "View": [ // Renamed and added sub-items
     { href: "/galleries", label: "Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
