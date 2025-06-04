@@ -38,6 +38,18 @@ export type Event = EventTypeDefinition & {
    discipline?: "Photography" | "";
 };
 
+// Type for raw event data from Python backend
+type BackendEvent = {
+  id: string; // Ensure this matches after str() conversion in backend
+  name: string;
+  date: string;
+  location: string | null;
+  status: string | null;
+  description: string | null;
+  shots: ShotRequestFormData[]; // Assuming backend 'shots' is an array of objects matching ShotRequestFormData
+};
+
+
 const CULINARY_PROJECT_ID = "proj_pb_culinary_classic_2025";
 const CULINARY_ORG_ID = "org_g9e";
 
@@ -50,7 +62,8 @@ const generateCulinaryClassicEventsAndShots = (): { events: Event[], shotsByEven
   let eventIdCounter = 1000;
   let shotIdCounter = 5000;
 
-  const eventDates = ["2025-05-16", "2025-05-17", "2025-05-18"]; // Fri, Sat, Sun
+  // Adjusted dates to be around June 4th, 2025 for demo purposes
+  const eventDates = ["2025-06-03", "2025-06-04", "2025-06-05"]; // Tue, Wed, Thu
 
   const eventTemplates = [
     { namePrefix: "Grand Opening Breakfast", time: "08:00 - 10:00", priority: "High", photographers: 2, shots: 5, quickTurn: true, deadlineOffset: 12, discipline: "Photography"},
@@ -100,14 +113,14 @@ const generateCulinaryClassicEventsAndShots = (): { events: Event[], shotsByEven
       if (shotStatus === "Captured" || shotStatus === "Completed") {
         initialCapturerId = mainPhotographer;
         lastStatusModifierId = mainPhotographer;
-        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.random() < 0.5 ? 0 : 1).toISOString(); // Captured on event day or day before
+        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.floor(Math.random() * 2)).toISOString();
       } else if (shotStatus === "Blocked") {
         lastStatusModifierId = supportStaffMember;
-         lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.random() < 0.5 ? 0 : 1).toISOString();
+        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.floor(Math.random() * 2)).toISOString();
       } else if (shotStatus === "Assigned" || shotStatus === "Request More") {
         currentAssignedPersonnelId = mainPhotographer;
         lastStatusModifierId = supportStaffMember;
-        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.random() < 0.5 ? 0 : 1).toISOString();
+        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.floor(Math.random() * 2)).toISOString();
       }
       
       shotsByEventId[eventId].push({
@@ -128,10 +141,8 @@ const generateCulinaryClassicEventsAndShots = (): { events: Event[], shotsByEven
   let photographerRotationIndex = 0;
   eventDates.forEach((dateStr, dayIdx) => {
     let eventCountForDay = 0;
-    const dailyEvents = []; // To help assign photographers somewhat evenly
-
-    // Create ~10-12 events for the day
-    while(eventCountForDay < (10 + dayIdx) && eventCountForDay < eventTemplates.length) { // up to 10, 11, 12 events
+    
+    while(eventCountForDay < (10 + dayIdx) && eventCountForDay < eventTemplates.length) {
         const templateIndex = (eventIdCounter + dayIdx * 10 + eventCountForDay) % eventTemplates.length;
         const template = eventTemplates[templateIndex];
         let eventName = template.namePrefix;
@@ -151,13 +162,18 @@ const generateCulinaryClassicEventsAndShots = (): { events: Event[], shotsByEven
         photographerRotationIndex = (photographerRotationIndex + template.photographers) % CULINARY_PHOTOGRAPHERS_IDS.length;
 
         const personnelActivity: Event['personnelActivity'] = {};
-        if (dayIdx <= 1) { // Only for yesterday and today
+        // Check if the event is "today" (June 4th, 2025) or "yesterday" (June 3rd, 2025) relative to our new demo date
+        const isTodayOrYesterday = dateStr === "2025-06-04" || dateStr === "2025-06-03";
+
+        if (isTodayOrYesterday) { 
             assignedPhotographers.forEach(pId => {
-                if (Math.random() < 0.7) { // 70% chance to have activity
+                if (Math.random() < 0.7) { 
                     const eventStartTime = parseISO(`${dateStr}T${template.time.split(" - ")[0]}:00`);
-                    const checkInTime = subHours(eventStartTime, Math.random() * 0.5); // Check-in up to 30 mins before
+                    const checkInTime = subHours(eventStartTime, Math.random() * 0.5); 
                     personnelActivity[pId] = { checkInTime: checkInTime.toISOString() };
-                    if (dayIdx === 0 || (dayIdx === 1 && isBefore(eventStartTime, subHours(new Date(), 2)) ) ) { // If yesterday, or today but event ended 2hrs ago
+                    
+                    const isPastEvent = dateStr === "2025-06-03" || (dateStr === "2025-06-04" && isBefore(eventStartTime, subHours(new Date("2025-06-04T12:00:00"), 2)));
+                    if (isPastEvent) { 
                         const eventEndTime = parseISO(`${dateStr}T${template.time.split(" - ")[1]}:00`);
                         personnelActivity[pId]!.checkOutTime = addHours(eventEndTime, Math.random() * 0.5).toISOString();
                     }
@@ -169,10 +185,10 @@ const generateCulinaryClassicEventsAndShots = (): { events: Event[], shotsByEven
             id: eventId, name: eventName,
             projectId: CULINARY_PROJECT_ID, project: "Pebble Beach Culinary Classic 2025",
             date: dateStr, time: template.time, priority: template.priority as Event['priority'],
-            assignedPersonnelIds: [...assignedPhotographers, CULINARY_SUPPORT_STAFF_IDS[dayIdx % CULINARY_SUPPORT_STAFF_IDS.length]], // Add one support staff
+            assignedPersonnelIds: [...assignedPhotographers, CULINARY_SUPPORT_STAFF_IDS[dayIdx % CULINARY_SUPPORT_STAFF_IDS.length]],
             isQuickTurnaround: template.quickTurn,
             deadline: template.quickTurn ? `${dateStr}T${String(template.deadlineOffset).padStart(2, '0')}:00:00Z` : undefined,
-            deliverables: 0, shotRequests: 0, // Will be updated after shots are created
+            deliverables: 0, shotRequests: 0,
             organizationId: CULINARY_ORG_ID,
             discipline: template.discipline as Event['discipline'],
             isCovered: true,
@@ -214,7 +230,7 @@ const EventContext = createContext<EventContextType | undefined>(undefined);
 
 export function EventProvider({ children }: { children: ReactNode }) {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { selectedProjectId, projects } = useProjectContext();
+  const { selectedProjectId, projects, selectedProject } = useProjectContext(); // Added selectedProject
   const { selectedOrganizationId } = useOrganizationContext();
 
   const [allEventsState, setAllEventsState] = useState<Event[]>([]);
@@ -222,23 +238,77 @@ export function EventProvider({ children }: { children: ReactNode }) {
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
 
   useEffect(() => {
-    if (!isLoadingSettings) {
+    const loadData = async () => {
+      if (isLoadingSettings) return;
+
       setIsLoadingEvents(true);
       if (useDemoData) {
         const { events: culinaryClassicEvents, shotsByEventId: culinaryClassicShots } = generateCulinaryClassicEventsAndShots();
         setAllEventsState(culinaryClassicEvents);
         setShotRequestsByEventId(culinaryClassicShots);
       } else {
-        setAllEventsState([]);
-        setShotRequestsByEventId({});
+        // Fetch live data
+        try {
+          // IMPORTANT: If your Python backend runs on a different port (e.g., 5000)
+          // than your Next.js app (e.g., 9002), you'll need a proxy for this fetch.
+          // Create a Next.js API route (e.g., /api/events) that forwards to your Python backend.
+          // For now, this assumes the fetch will work (e.g., proxy is set up, or same origin).
+          const response = await fetch('/api/events'); // Or your actual backend endpoint
+          if (!response.ok) {
+            throw new Error(`Failed to fetch events: ${response.status}`);
+          }
+          const data: { events: BackendEvent[] } = await response.json();
+          
+          const liveEvents: Event[] = [];
+          const liveShotsByEventId: Record<string, ShotRequest[]> = {};
+
+          data.events.forEach(be => {
+            const frontendEvent: Event = {
+              id: String(be.id), // Ensure ID is string
+              name: be.name,
+              project: selectedProject?.name || "Unknown Project", // Derive from context
+              projectId: selectedProject?.id || "unknown_project_id", // Derive from context
+              date: be.date,
+              time: "09:00 - 17:00", // Default, backend doesn't provide this
+              priority: "Medium", // Default
+              assignedPersonnelIds: [], // Default, or backend needs to provide
+              shotRequests: (be.shots || []).length,
+              deliverables: 0, // Default
+              isQuickTurnaround: false, // Default
+              organizationId: selectedProject?.organizationId || "", // Derive from context
+              discipline: "", // Default
+              isCovered: true, // Default
+              personnelActivity: {},
+              description: be.description || "", // Map from backend
+              location: be.location || "", // Map from backend
+              status: be.status || "Upcoming", // Map from backend
+              // hasOverlap can be calculated later if needed
+            };
+            liveEvents.push(frontendEvent);
+
+            const shotsForThisEvent: ShotRequest[] = (be.shots || []).map((shotData, index) => ({
+              ...shotData,
+              id: `live_sr_${be.id}_${index}`, // Generate a unique ID for live shots
+              eventId: String(be.id),
+            }));
+            liveShotsByEventId[String(be.id)] = shotsForThisEvent;
+          });
+
+          setAllEventsState(liveEvents);
+          setShotRequestsByEventId(liveShotsByEventId);
+
+        } catch (error) {
+          console.error("Error fetching live event data:", error);
+          setAllEventsState([]);
+          setShotRequestsByEventId({});
+          // Optionally, set an error state here to show in UI
+        }
       }
       setIsLoadingEvents(false);
-    } else {
-      setAllEventsState([]);
-      setShotRequestsByEventId({});
-      setIsLoadingEvents(true);
-    }
-  }, [useDemoData, isLoadingSettings]);
+    };
+    loadData();
+  }, [useDemoData, isLoadingSettings, selectedProject]);
+
 
   const addEvent = useCallback((eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }): string => {
     const projectForEvent = projects.find(p => p.id === eventData.projectId);
@@ -465,5 +535,3 @@ export function useEventContext() {
   }
   return context;
 }
-
-    

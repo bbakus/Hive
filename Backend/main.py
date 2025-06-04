@@ -1,9 +1,13 @@
+
+import os
 from flask import Flask, request
 from flask_restful import Resource, Api
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:password@host:port/database'  # Replace with your database URI
+# Use DATABASE_URL from environment variables, with a fallback for local development
+DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://user:password@host:port/database')
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
 db = SQLAlchemy(app)
 api = Api(app)
 
@@ -15,13 +19,13 @@ class EventListResource(Resource):
         event_list = []
         for event in events:
             event_list.append({
-                'id': event.id,
+                'id': str(event.id), # Ensure ID is a string for frontend compatibility
                 'name': event.name,
                 'date': str(event.date), # Convert date to string for JSON
                 'location': event.location,
                 'status': event.status,
                 'description': event.description,
-                'shots': event.shots
+                'shots': event.shots or [] # Ensure shots is an array, even if null in DB
             })
         return {'events': event_list}
 
@@ -29,7 +33,7 @@ class EventListResource(Resource):
         new_event_data = request.get_json()
         new_event = Event(
             name=new_event_data['name'],
-            date=new_event_data['date'],
+            date=new_event_data['date'], # Assuming date comes in 'YYYY-MM-DD'
             location=new_event_data['location'],
             status=new_event_data['status'],
             description=new_event_data.get('description'), # description can be optional
@@ -38,7 +42,7 @@ class EventListResource(Resource):
         db.session.add(new_event)
         db.session.commit()
         return {'message': 'Event created successfully', 'event': {
-            'id': new_event.id,
+            'id': str(new_event.id),
             'name': new_event.name,
             'date': str(new_event.date),
             'location': new_event.location,
