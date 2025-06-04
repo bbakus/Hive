@@ -28,6 +28,12 @@ import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/moda
 
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
+// --- Placeholder for User Role ---
+// In a real app, this would come from an authentication context
+type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
+const MOCK_CURRENT_USER_ROLE: UserRole = "Project Manager"; // Change this to "HIVE" or "Admin" to see the button
+// --- End Placeholder ---
+
 export default function ProjectsPage() {
   const { projects, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
   const { organizations, selectedOrganizationId, isLoadingOrganizations } = useOrganizationContext();
@@ -97,6 +103,8 @@ export default function ProjectsPage() {
     return <div className="p-4">Loading projects and organizations...</div>;
   }
   
+  const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
+
   return (
    
     <div className="flex flex-col gap-8">
@@ -110,12 +118,14 @@ export default function ProjectsPage() {
             Manage your event timelines and project setups.
           </p>
         </div>
-        <Button asChild variant="outline" className="px-3 py-2 h-9">
-          <Link href="/projects/new">
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Add New Project (Wizard)
-          </Link>
-        </Button>
+        {canCreateProject && (
+          <Button asChild variant="outline" className="px-3 py-2 h-9">
+            <Link href="/projects/new">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Add New Project (Wizard)
+            </Link>
+          </Button>
+        )}
       </div>
 
       <ProjectFormDialog
@@ -253,3 +263,5 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
+    
