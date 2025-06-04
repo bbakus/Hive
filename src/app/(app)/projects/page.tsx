@@ -31,9 +31,11 @@ const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Can
 // --- Placeholder for User Role & ID ---
 // In a real app, this would come from an authentication context
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Project Manager";
-// Assuming Liam Wilson is our logged-in Project Manager for testing assigned projects
-const MOCK_CURRENT_USER_ID: string = "user_liam_w";
+const MOCK_CURRENT_USER_ROLE: UserRole = "Admin"; // CORRECTED: Set to Admin
+// Assuming an Admin might not have a specific user ID tied to project assignment in this simplified mock,
+// or we can define one if Admin project assignment becomes a feature.
+// For now, Admins see projects by Organization. Project Managers see by assignment.
+const MOCK_CURRENT_USER_ID: string = "user_org_admin_g9e"; // Example Admin user ID
 // --- End Placeholder ---
 
 export default function ProjectsPage() {
@@ -90,13 +92,14 @@ export default function ProjectsPage() {
   const displayProjects = useMemo(() => {
     let filtered = projects;
 
-    // Filter by assigned projects if current user is a Project Manager
     if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
       filtered = filtered.filter(project =>
         project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
       );
     }
-    // Further filter by text and status
+    // Admins and HIVE roles see all projects for the selected organization (or all if no org filter)
+    // This is implicitly handled by the `projects` from `useProjectContext()` which is already org-filtered.
+
     if (filterText) {
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(filterText.toLowerCase())
@@ -115,18 +118,32 @@ export default function ProjectsPage() {
 
   const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
 
+  const pageDescription = useMemo(() => {
+    const selectedOrgName = organizations.find(o => o.id === selectedOrganizationId)?.name;
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
+      return "Your assigned projects. Manage your event timelines and project setups.";
+    }
+    if (MOCK_CURRENT_USER_ROLE === "Admin") {
+      if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
+        return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
+      }
+      return "All projects you administer across your organizations. Manage event timelines and project setups.";
+    }
+    // Default for HIVE or other roles if not covered above
+    if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
+      return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
+    }
+    return "All projects across all organizations. Manage event timelines and project setups.";
+  }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
+
+
   return (
 
     <div className="flex flex-col gap-8">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-3xl font-bold tracking-tight">Projects</p>
-          <p className="text-muted-foreground">
-            {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
-              ? `Projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
-              : (MOCK_CURRENT_USER_ROLE === "Project Manager" ? "Your assigned projects. " : "All projects across your organizations. ")}
-            Manage your event timelines and project setups.
-          </p>
+          <p className="text-muted-foreground">{pageDescription}</p>
         </div>
         {canCreateProject && (
           <Button asChild variant="outline" className="px-3 py-2 h-9">
