@@ -31,7 +31,7 @@ const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Can
 // Define UserRole type locally for this page's mock implementation
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
 const MOCK_CURRENT_USER_ROLE: UserRole = "Editor"; 
-const MOCK_CURRENT_USER_ID: string = "user_ava_m"; // Example Editor ID (Ava Miller)
+const MOCK_CURRENT_USER_ID: string = "user_ava_m"; 
 
 export default function ProjectsPage() {
   const { projects: projectsFromContext, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
@@ -46,8 +46,7 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   
   const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
-  
-  // Moved hook calls to the top level
+
   const pageDescription = useMemo(() => {
     const selectedOrgName = organizations.find(o => o.id === selectedOrganizationId)?.name;
     
@@ -72,7 +71,6 @@ export default function ProjectsPage() {
     if (MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor") {
       return "Projects you are involved in. View status and event timelines.";
     }
-    // Default for other roles or if no specific match
     return "Overview of projects. Manage event timelines and project setups.";
   }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
 
@@ -141,7 +139,7 @@ export default function ProjectsPage() {
     setIsDeleteDialogOpen(false);
   };
 
-  const canEditDeleteThisProject = (project: Project): boolean => {
+  const showActionsForProject = (project: Project): boolean => {
     if (MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin") return true;
     if (MOCK_CURRENT_USER_ROLE === "Project Manager" && project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)) return true;
     return false;
@@ -278,7 +276,7 @@ export default function ProjectsPage() {
                         ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ')
                         : "N/A"}
                     </TableCell>
-                    {canEditDeleteThisProject(project) ? (
+                    {showActionsForProject(project) ? (
                         <TableCell className="text-right">
                         <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
                             <Edit className="h-4 w-4" />
@@ -320,3 +318,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
