@@ -17,8 +17,8 @@ import {
   ListChecks,
   LayoutGrid,
   FolderTree, 
-  Star, // Keep Star or choose another for gallery items
-  Zap,
+  Star,
+  Zap, // Added Zap for Highlights
 } from "lucide-react";
 
 export type NavItem = {
@@ -57,10 +57,11 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "View": [
     { href: "/galleries", label: "All Galleries Overview", icon: LayoutGrid, matchStartsWith: true, type: 'link' },
+    { href: "/gallery/mockId?type=highlights", label: "Highlights Gallery", icon: Zap, type: 'link', matchStartsWith: false }, // Added Highlights Gallery
     {
-      href: "#day1_events_accordion", // href for accordion trigger can be a unique ID
+      href: "#day1_events_accordion", 
       label: "Day 1 Events",
-      icon: CalendarDays, // Icon for the "Day 1" group
+      icon: CalendarDays, 
       type: 'accordion',
       children: [
         { href: "/gallery/mockId?event=Day1Breakfast", label: "Grand Opening Breakfast", icon: Star, type: 'link', matchStartsWith: false },
@@ -70,7 +71,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     {
       href: "#day2_events_accordion",
       label: "Day 2 Events",
-      icon: CalendarDays, // Icon for the "Day 2" group
+      icon: CalendarDays, 
       type: 'accordion',
       children: [
         { href: "/gallery/mockId?event=Day2Workshop", label: "Workshop ABC", icon: Star, type: 'link', matchStartsWith: false },
