@@ -17,7 +17,7 @@ import {
   ListChecks,
   LayoutGrid,
   FolderTree, 
-  Star,
+  Star, // Keep Star or choose another for gallery items
   Zap,
 } from "lucide-react";
 
@@ -26,6 +26,8 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   matchStartsWith?: boolean;
+  type?: 'link' | 'accordion'; // New property to differentiate
+  children?: NavItem[];      // New property for sub-items
 };
 
 export type Phase = "Plan" | "Shoot" | "Edit" | "Deliver" | "Dashboard" | "View";
@@ -36,39 +38,51 @@ export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES];
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   "Dashboard": [], 
   "Plan": [
-    { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
-    { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
-    { href: "/shot-planner", label: "Shot Planner", icon: ListChecks, matchStartsWith: true },
-    { href: "/personnel", label: "Personnel Roster", icon: Users, matchStartsWith: true },
-    { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true },
+    { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true, type: 'link' },
+    { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true, type: 'link' },
+    { href: "/shot-planner", label: "Shot Planner", icon: ListChecks, matchStartsWith: true, type: 'link' },
+    { href: "/personnel", label: "Personnel Roster", icon: Users, matchStartsWith: true, type: 'link' },
+    { href: "/scheduler", label: "Smart Scheduler", icon: Cpu, matchStartsWith: true, type: 'link' },
   ],
   "Shoot": [
-    { href: "/shoot", label: "Live Schedule & Tracking", icon: RadioTower, matchStartsWith: true },
+    { href: "/shoot", label: "Live Schedule & Tracking", icon: RadioTower, matchStartsWith: true, type: 'link' },
   ],
   "Edit": [
-    { href: "/post-production", label: "Post-Production", icon: ImageIcon, matchStartsWith: true },
-    { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true },
+    { href: "/post-production", label: "Post-Production", icon: ImageIcon, matchStartsWith: true, type: 'link' },
+    { href: "/ingestion", label: "Ingestion Utility", icon: UploadCloud, matchStartsWith: true, type: 'link' },
   ],
   "Deliver": [
-    { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true },
-    { href: "/deliver/organize", label: "Organize Galleries", icon: FolderTree, matchStartsWith: true }, 
+    { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true, type: 'link' },
+    { href: "/deliver/organize", label: "Organize Galleries", icon: FolderTree, matchStartsWith: true, type: 'link' }, 
   ],
   "View": [
-    { href: "/galleries", label: "All Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
-    // Mocked structure for Day 1 (using existing icons for now)
-    { href: "#day1_label", label: "Day 1 (Sample Events)", icon: CalendarDays, matchStartsWith: false }, // Non-functional, acts as visual header
-    { href: "/gallery/event_day1_breakfast", label: "  - Grand Opening Breakfast", icon: Star, matchStartsWith: false },
-    { href: "/gallery/event_day1_keynote", label: "  - Keynote Speech", icon: Star, matchStartsWith: false },
-    // Mocked structure for Day 2
-    { href: "#day2_label", label: "Day 2 (Sample Events)", icon: CalendarDays, matchStartsWith: false }, // Non-functional
-    { href: "/gallery/event_day2_workshop", label: "  - Workshop ABC", icon: Star, matchStartsWith: false },
-    { href: "/gallery/event_day2_panel", label: "  - Expert Panel Discussion", icon: Star, matchStartsWith: false },
+    { href: "/galleries", label: "All Galleries Overview", icon: LayoutGrid, matchStartsWith: true, type: 'link' },
+    {
+      href: "#day1_events_accordion", // href for accordion trigger can be a unique ID
+      label: "Day 1 Events",
+      icon: CalendarDays, // Icon for the "Day 1" group
+      type: 'accordion',
+      children: [
+        { href: "/gallery/mockId?event=Day1Breakfast", label: "Grand Opening Breakfast", icon: Star, type: 'link', matchStartsWith: false },
+        { href: "/gallery/mockId?event=Day1Keynote", label: "Keynote Speech", icon: Star, type: 'link', matchStartsWith: false },
+      ]
+    },
+    {
+      href: "#day2_events_accordion",
+      label: "Day 2 Events",
+      icon: CalendarDays, // Icon for the "Day 2" group
+      type: 'accordion',
+      children: [
+        { href: "/gallery/mockId?event=Day2Workshop", label: "Workshop ABC", icon: Star, type: 'link', matchStartsWith: false },
+        { href: "/gallery/mockId?event=Day2Panel", label: "Expert Panel Discussion", icon: Star, type: 'link', matchStartsWith: false },
+      ]
+    },
   ],
 };
 
 export const constantFooterNavItems: NavItem[] = [
-  { href: "/settings", label: "Settings", icon: Settings, matchStartsWith: true },
-  { href: "/support", label: "Support", icon: LifeBuoy, matchStartsWith: true },
+  { href: "/settings", label: "Settings", icon: Settings, matchStartsWith: true, type: 'link' },
+  { href: "/support", label: "Support", icon: LifeBuoy, matchStartsWith: true, type: 'link' },
 ];
 
 type PhaseContextType = {

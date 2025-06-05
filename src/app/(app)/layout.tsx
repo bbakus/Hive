@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
-import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray } from "@/contexts/PhaseContext";
+import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray, type NavItem } from "@/contexts/PhaseContext";
 import { EventProvider } from "@/contexts/EventContext";
 import { UserProvider } from "@/contexts/UserContext"; // Import UserProvider
 import { ProjectSelector } from "@/components/project-selector";
@@ -32,14 +32,81 @@ import { OrganizationSelector } from "@/components/organization-selector";
 import { LocalAgentStatusIndicator } from "@/components/local-agent-status-indicator";
 import { LocalAgentProvider } from "@/contexts/LocalAgentContext";
 import { TopPhaseNavigation } from "@/components/top-phase-navigation";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 function AppSidebar() {
   const pathname = usePathname();
-  const { open, setOpen } = useSidebar();
+  const { open, setOpen, state: sidebarState } = useSidebar(); // Added sidebarState
   const { activePhase, getNavItemsForPhase, constantFooterNavItems } = usePhaseContext();
 
   const currentPhaseNavItems = getNavItemsForPhase(activePhase) || [];
+
+  const renderNavItems = (items: NavItem[], currentPathname: string, currentActivePhase: Phase) => {
+    return items.map((item) => {
+      if (item.type === 'accordion' && item.children) {
+        // Ensure item.label is a string for AccordionItem value
+        const accordionValue = typeof item.label === 'string' ? item.label : item.href;
+        return (
+          <AccordionItem value={accordionValue} key={`${currentActivePhase}-${item.href}-acc`} className="border-none list-none">
+            <AccordionTrigger
+              className={cn(
+                "flex w-full items-center justify-between gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2",
+                "hover:no-underline",
+                // SidebarMenuButton specific classes for consistent look
+                "group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2",
+                // No specific active state for accordion trigger for now, or needs custom logic
+              )}
+            >
+              <div className="flex items-center gap-2 [&>svg]:size-5 [&>svg]:shrink-0">
+                <item.icon />
+                {sidebarState === 'expanded' && <span>{item.label}</span>}
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-0 pb-0 pl-4">
+              <SidebarMenu className="border-l border-sidebar-border ml-[7px] pl-2 py-1">
+                {item.children.map(childItem => (
+                  <SidebarMenuItem key={`${currentActivePhase}-${childItem.href}-child`}>
+                    <Link href={childItem.href} legacyBehavior passHref>
+                      <SidebarMenuButton
+                        asChild
+                        size="sm" // Smaller size for sub-items
+                        isActive={childItem.matchStartsWith ? currentPathname.startsWith(childItem.href) : currentPathname === childItem.href}
+                        tooltip={{ children: childItem.label, side: "right", align: "center", className: "bg-popover text-popover-foreground" }}
+                         className="!h-7 [&>svg]:!size-4" // Further style tuning
+                      >
+                        <a>
+                          <childItem.icon />
+                           {sidebarState === 'expanded' && <span>{childItem.label}</span>}
+                        </a>
+                      </SidebarMenuButton>
+                    </Link>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </AccordionContent>
+          </AccordionItem>
+        );
+      } else { // 'link' type or undefined (default to link)
+        return (
+          <SidebarMenuItem key={`${currentActivePhase}-${item.href}-link`}>
+            <Link href={item.href} legacyBehavior passHref>
+              <SidebarMenuButton
+                asChild
+                isActive={item.matchStartsWith ? currentPathname.startsWith(item.href) : currentPathname === item.href}
+                tooltip={{ children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground" }}
+              >
+                <a>
+                  <item.icon className="h-5 w-5" />
+                  {sidebarState === 'expanded' && <span>{item.label}</span>}
+                </a>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+        );
+      }
+    });
+  };
 
 
   return (
@@ -55,26 +122,14 @@ function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent className="flex-1 p-2">
-        <SidebarMenu>
-          {(currentPhaseNavItems).map((item) => (
-            <SidebarMenuItem key={`${activePhase}-${item.href}`}>
-               <Link href={item.href} legacyBehavior passHref>
-                <SidebarMenuButton
-                  asChild
-                  isActive={item.matchStartsWith ? pathname.startsWith(item.href) : pathname === item.href}
-                  tooltip={{children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground"}}
-                >
-                  <a>
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </a>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
+        <Accordion type="multiple" className="w-full" collapsible>
+          <SidebarMenu>
+            {renderNavItems(currentPhaseNavItems, pathname, activePhase)}
+          </SidebarMenu>
+        </Accordion>
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-sidebar-border">
+         {/* Footer items remain non-accordion for now */}
         <SidebarMenu>
            {(constantFooterNavItems || []).map((item) => (
             <SidebarMenuItem key={item.href}>
@@ -86,7 +141,7 @@ function AppSidebar() {
                 >
                   <a>
                     <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
+                    {sidebarState === 'expanded' && <span>{item.label}</span>}
                   </a>
                 </SidebarMenuButton>
               </Link>
