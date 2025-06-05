@@ -26,6 +26,7 @@ import { ProjectProvider } from "@/contexts/ProjectContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray } from "@/contexts/PhaseContext";
 import { EventProvider } from "@/contexts/EventContext";
+import { UserProvider } from "@/contexts/UserContext"; // Import UserProvider
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
 import { LocalAgentStatusIndicator } from "@/components/local-agent-status-indicator";
@@ -185,15 +186,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsProvider>
       <LocalAgentProvider>
-        <OrganizationProvider>
-          <ProjectProvider>
-            <EventProvider>
-              <PhaseProvider>
-                <AppLayoutInternal>{children}</AppLayoutInternal>
-              </PhaseProvider>
-            </EventProvider>
-          </ProjectProvider>
-        </OrganizationProvider>
+        <UserProvider> {/* Wrap with UserProvider */}
+          <OrganizationProvider>
+            <ProjectProvider>
+              <EventProvider>
+                <PhaseProvider>
+                  <AppLayoutInternal>{children}</AppLayoutInternal>
+                </PhaseProvider>
+              </EventProvider>
+            </ProjectProvider>
+          </OrganizationProvider>
+        </UserProvider>
       </LocalAgentProvider>
     </SettingsProvider>
   );
