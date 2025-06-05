@@ -3,12 +3,13 @@
 
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LayoutGrid } from "lucide-react";
+import { LayoutGrid, CalendarDays } from "lucide-react"; // Added CalendarDays
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button"; 
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from '@/contexts/OrganizationContext';
 import { cn } from "@/lib/utils"; 
+import Image from 'next/image'; // Import next/image
 
 // Placeholder for client galleries data, eventually from a context or API
 interface MockGallery {
@@ -33,6 +34,24 @@ const mockClientGalleries: MockGallery[] = [
   { id: "gal009", name: "G9e Summit - VIP Portraits", client: "VIP Relations", date: "2024-10-02", lastUpdated: "2024-10-04T14:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
 ];
 
+interface MockDayGallery {
+  id: string; // e.g., "2024-10-01" (YYYY-MM-DD format for easy linking)
+  displayDate: string; // e.g., "October 1, 2024"
+  imageUrl: string;
+  imageHint: string;
+  eventCount?: number; // Optional: for display if needed
+  projectId: string;
+  organizationId: string;
+}
+
+const mockDayGalleriesData: MockDayGallery[] = [
+  { id: "2024-10-01", displayDate: "October 1, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "conference highlights", eventCount: 2, projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
+  { id: "2024-10-02", displayDate: "October 2, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "event stage", eventCount: 1, projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
+  { id: "2024-07-20", displayDate: "July 20, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "music festival", eventCount: 1, projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" }, // Example from existing gallery date
+  { id: "2024-11-01", displayDate: "November 1, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "charity gala", eventCount: 1, projectId: "proj_charity_event_2024", organizationId: "org_another_org" },
+];
+
+
 export default function GalleriesOverviewPage() {
   const { selectedProjectId, selectedProject } = useProjectContext();
   const { selectedOrganizationId, selectedOrganization } = useOrganizationContext();
@@ -53,14 +72,29 @@ export default function GalleriesOverviewPage() {
       .slice(0, 4);
   }, [selectedProjectId, selectedOrganizationId]); 
 
+  const displayedDayGalleries = useMemo(() => {
+    let filtered = mockDayGalleriesData;
+
+    if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
+      filtered = filtered.filter(day => day.organizationId === selectedOrganizationId);
+    }
+
+    if (selectedProjectId) {
+      filtered = filtered.filter(day => day.projectId === selectedProjectId);
+    }
+    // Sort by date, descending (most recent first)
+    return [...filtered].sort((a,b) => new Date(b.id).getTime() - new Date(a.id).getTime());
+  }, [selectedProjectId, selectedOrganizationId]);
+
+
   const pageDescription = useMemo(() => {
     let desc = "Browse and access shared client galleries.";
     if (selectedProject) {
-      desc += ` Showing the last 4 updated for project: ${selectedProject.name}.`;
+      desc += ` Showing content for project: ${selectedProject.name}.`;
     } else if (selectedOrganization) {
-      desc += ` Showing the last 4 updated for organization: ${selectedOrganization.name}.`;
+      desc += ` Showing content for organization: ${selectedOrganization.name}.`;
     } else {
-      desc += ` Showing the last 4 updated across all your organizations.`;
+      desc += ` Showing content across all your organizations.`;
     }
     return desc;
   }, [selectedProject, selectedOrganization]);
@@ -92,9 +126,9 @@ export default function GalleriesOverviewPage() {
                     <CardDescription>Client: {gallery.client} | Date: {gallery.date}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <img src="https://placehold.co/600x400.png?text=Gallery+Preview" alt={`Preview of ${gallery.name}`} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
+                    <Image src="https://placehold.co/600x400.png" alt={`Preview of ${gallery.name}`} width={600} height={400} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
                   </CardContent>
-                  <CardContent className="pt-4"> {/* Removed border-t */}
+                  <CardContent className="pt-4"> 
                     <Link href={`/gallery/${gallery.id}`} passHref legacyBehavior>
                       <a className={cn(buttonVariants({ variant: 'ghost', className: 'w-full text-accent hover:text-accent/90' }))}>
                         View Gallery
@@ -106,11 +140,57 @@ export default function GalleriesOverviewPage() {
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No client galleries found matching your current selection.
+              No client galleries found matching your current selection for "Recently Updated".
             </p>
           )}
         </CardContent>
       </Card>
+
+      {/* New Browse by Day Section */}
+      <Card className="border-0">
+        <CardHeader>
+          <p className="text-lg font-semibold flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" /> Browse by Day
+          </p>
+          <div className="text-sm text-muted-foreground">
+            Select a day to view all associated event galleries.
+          </div>
+        </CardHeader>
+        <CardContent>
+          {displayedDayGalleries.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {displayedDayGalleries.map(day => (
+                <Link key={day.id} href={`/galleries/day/${day.id}`} passHref legacyBehavior>
+                  <a className="block hover:no-underline">
+                    <Card className="hover:shadow-md transition-shadow border-0 h-full flex flex-col">
+                      <CardContent className="p-0">
+                        <Image src={day.imageUrl} alt={`Events from ${day.displayDate}`} width={600} height={300} className="w-full h-48 object-cover rounded-none" data-ai-hint={day.imageHint} />
+                      </CardContent>
+                      <CardHeader className="flex-grow">
+                        <CardTitle className="text-base">{day.displayDate}</CardTitle>
+                        {day.eventCount && <CardDescription>{day.eventCount} event(s) this day</CardDescription>}
+                      </CardHeader>
+                       <CardContent className="pt-2 pb-4">
+                          <span className={cn(buttonVariants({ variant: 'ghost', className: 'w-full text-accent hover:text-accent/90 justify-start' }))}>
+                            View Day's Galleries
+                          </span>
+                      </CardContent>
+                    </Card>
+                  </a>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              No specific event days found matching your current selection for "Browse by Day".
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
     </div>
   );
 }
+
+
+    
