@@ -30,8 +30,8 @@ const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Can
 
 // Define UserRole type locally for this page's mock implementation
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Editor"; 
-const MOCK_CURRENT_USER_ID: string = "user_ava_m"; 
+const MOCK_CURRENT_USER_ROLE: UserRole = "Guest"; 
+const MOCK_CURRENT_USER_ID: string = "user_guest_viewer"; 
 
 export default function ProjectsPage() {
   const { projects: projectsFromContext, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
@@ -71,13 +71,16 @@ export default function ProjectsPage() {
     if (MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor") {
       return "Projects you are involved in. View status and event timelines.";
     }
+     if (MOCK_CURRENT_USER_ROLE === "Guest") {
+      return "Projects shared with you. View status and event timelines.";
+    }
     return "Overview of projects. Manage event timelines and project setups.";
   }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
 
   const displayProjects = useMemo(() => {
     let filtered = projectsFromContext; 
 
-    if (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor") {
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") {
       filtered = filtered.filter(project =>
         project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
       );
@@ -94,6 +97,7 @@ export default function ProjectsPage() {
     }
     return filtered;
   }, [projectsFromContext, filterText, statusFilter, MOCK_CURRENT_USER_ROLE, MOCK_CURRENT_USER_ID]);
+
 
   if (isLoadingProjects || isLoadingOrganizations) {
     return <div className="p-4">Loading projects and organizations...</div>;
@@ -196,7 +200,7 @@ export default function ProjectsPage() {
               <div className="text-sm text-muted-foreground">
                 {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
                   ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
-                  : (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" ? "Showing your assigned/involved projects. " : "Showing projects for all your organizations. ")
+                  : (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest" ? "Showing your assigned/involved projects. " : "Showing projects for all your organizations. ")
                 }
                 ({displayProjects.length} projects shown)
               </div>
@@ -288,7 +292,7 @@ export default function ProjectsPage() {
                         </Button>
                         </TableCell>
                     ) : (MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") ? (
-                      <TableCell className="text-right"></TableCell> 
+                       <TableCell className="text-right"></TableCell> // Render an empty cell for roles that don't see actions
                     ) : null }
                   </TableRow>
                 ))}
@@ -298,14 +302,14 @@ export default function ProjectsPage() {
             <p className="text-muted-foreground text-center py-8">
               {filterText || statusFilter !== "all"
                 ? `No projects found matching your filters ${
-                    MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor"
+                    MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest"
                       ? "among your assigned/involved projects"
                       : selectedOrganizationId !== ALL_ORGANIZATIONS_ID
                       ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}`
                       : ""
                   }.`
-                : MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor"
-                ? "You are not assigned to/involved in any projects."
+                : MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest"
+                ? "You are not assigned to/involved in any projects, or no projects are shared with you."
                 : `No projects found ${
                     selectedOrganizationId !== ALL_ORGANIZATIONS_ID
                       ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}`
