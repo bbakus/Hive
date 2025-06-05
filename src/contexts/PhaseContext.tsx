@@ -18,7 +18,8 @@ import {
   LayoutGrid,
   FolderTree, 
   Star,
-  Zap, // Added Zap for Highlights
+  Zap, 
+  Lock, // Added Lock icon
 } from "lucide-react";
 
 export type NavItem = {
@@ -57,7 +58,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "View": [
     { href: "/galleries", label: "All Galleries Overview", icon: LayoutGrid, matchStartsWith: true, type: 'link' },
-    { href: "/gallery/mockId?type=highlights", label: "Highlights Gallery", icon: Zap, type: 'link', matchStartsWith: false }, // Added Highlights Gallery
+    { href: "/gallery/mockId?type=highlights", label: "Highlights Gallery", icon: Zap, type: 'link', matchStartsWith: false },
     {
       href: "#day1_events_accordion", 
       label: "Day 1 Events",
@@ -78,6 +79,7 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
         { href: "/gallery/mockId?event=Day2Panel", label: "Expert Panel Discussion", icon: Star, type: 'link', matchStartsWith: false },
       ]
     },
+    { href: "/gallery/mockId?type=private_password", label: "Private Gallery (Password)", icon: Lock, type: 'link', matchStartsWith: false },
   ],
 };
 
