@@ -54,13 +54,8 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
     { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true },
     { href: "/deliver/organize", label: "Organize Galleries", icon: FolderTree, matchStartsWith: true }, // Changed here
   ],
-  "View": [ // Renamed and added sub-items
+  "View": [
     { href: "/galleries", label: "Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
-    // Placeholder sub-items - these will link to placeholder or specific gallery views eventually
-    { href: "/gallery/mockId?album=day1", label: "Day 1 (Event)", icon: CalendarDays, matchStartsWith: false }, // Example with query param
-    { href: "/gallery/mockId?album=day2", label: "Day 2 (Event)", icon: CalendarDays, matchStartsWith: false },
-    { href: "/gallery/mockId?album=highlights", label: "Highlights", icon: Star, matchStartsWith: false },
-    { href: "/gallery/mockId?album=quickturn", label: "Quick Turnaround", icon: Zap, matchStartsWith: false },
   ],
 };
 
