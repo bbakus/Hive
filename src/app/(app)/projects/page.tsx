@@ -29,12 +29,13 @@ import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/moda
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Client"; 
-const MOCK_CURRENT_USER_ID: string = "user_client_liaison"; 
+const MOCK_CURRENT_USER_ROLE: UserRole = "HIVE"; 
+const MOCK_CURRENT_USER_ID: string = "user_hive_god_mode"; 
 
 export default function ProjectsPage() {
   const { projects, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
   const { organizations, selectedOrganizationId, isLoadingOrganizations } = useOrganizationContext();
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -42,39 +43,45 @@ export default function ProjectsPage() {
   const { toast } = useToast();
   const [filterText, setFilterText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-
+  
   const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
 
   const pageDescription = useMemo(() => {
     const selectedOrgName = organizations.find(o => o.id === selectedOrganizationId)?.name;
-    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
-      return "Your assigned projects. Manage your event timelines and project setups.";
+    
+    if (MOCK_CURRENT_USER_ROLE === "HIVE") {
+      if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
+        return `Global view: Projects for ${selectedOrgName}. Manage all event timelines and project setups.`;
+      }
+      return "Global view: All projects across all organizations. Manage event timelines and project setups.";
     }
     if (MOCK_CURRENT_USER_ROLE === "Admin") {
-        if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
-            return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
-        }
-        return "All projects you administer across your organizations. Manage event timelines and project setups.";
+      if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
+        return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
+      }
+      return "All projects you administer across your organizations. Manage event timelines and project setups.";
+    }
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
+      return "Your assigned projects. Manage your event timelines and project setups.";
     }
     if (MOCK_CURRENT_USER_ROLE === "Client") {
       return "Your projects. View status and event timelines.";
     }
-    // Default for HIVE or other roles
-    if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
-        return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
-    }
-    return "All projects across all organizations. Manage event timelines and project setups.";
+    // Default for other roles or if no specific match
+    return "Overview of projects. Manage event timelines and project setups.";
   }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
 
 
   const displayProjects = useMemo(() => {
-    let filtered = projects;
+    let filtered = projects; // 'projects' from context is already filtered by selectedOrganizationId
 
     if (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client") {
+      // For PM and Client, further filter to only projects they are part of, *within the already org-filtered list*.
       filtered = filtered.filter(project =>
         project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
       );
     }
+    // HIVE and Admin see all projects from the org-filtered list from context.
 
     if (filterText) {
       filtered = filtered.filter(project =>
@@ -87,9 +94,12 @@ export default function ProjectsPage() {
     return filtered;
   }, [projects, filterText, statusFilter, MOCK_CURRENT_USER_ROLE, MOCK_CURRENT_USER_ID]);
 
+
+  // Moved hook calls before this conditional return
   if (isLoadingProjects || isLoadingOrganizations) {
     return <div className="p-4">Loading projects and organizations...</div>;
   }
+
 
   const handleEditProjectSubmit = (data: ProjectFormDialogData) => {
     if (editingProject) {
@@ -130,6 +140,9 @@ export default function ProjectsPage() {
     }
     setIsDeleteDialogOpen(false);
   };
+
+  const canEditDeleteProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin" || MOCK_CURRENT_USER_ROLE === "Project Manager";
+
 
   return (
 
@@ -217,12 +230,12 @@ export default function ProjectsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Project Name</TableHead>
-                  {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager" && MOCK_CURRENT_USER_ROLE !== "Client") && <TableHead>Organization</TableHead>}
+                  {(MOCK_CURRENT_USER_ROLE === "HIVE" && selectedOrganizationId === ALL_ORGANIZATIONS_ID) && <TableHead>Organization</TableHead>}
                   <TableHead>Location</TableHead>
                   <TableHead>Dates</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Key Personnel</TableHead>
-                  {(MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin" || MOCK_CURRENT_USER_ROLE === "Project Manager") && (
+                  {canEditDeleteProject && (
                     <TableHead className="text-right">Actions</TableHead>
                   )}
                 </TableRow>
@@ -231,7 +244,7 @@ export default function ProjectsPage() {
                 {displayProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
-                    {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager" && MOCK_CURRENT_USER_ROLE !== "Client") &&
+                    {(MOCK_CURRENT_USER_ROLE === "HIVE" && selectedOrganizationId === ALL_ORGANIZATIONS_ID) &&
                       <TableCell className="text-xs text-muted-foreground">
                         {organizations.find(o => o.id === project.organizationId)?.name || "N/A"}
                       </TableCell>
@@ -261,7 +274,7 @@ export default function ProjectsPage() {
                         ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ')
                         : "N/A"}
                     </TableCell>
-                    {(MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin" || MOCK_CURRENT_USER_ROLE === "Project Manager") && (
+                    {canEditDeleteProject && (
                         <TableCell className="text-right">
                         <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
                             <Edit className="h-4 w-4" />
@@ -301,4 +314,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
