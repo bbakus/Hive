@@ -1,15 +1,18 @@
 
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react'; // Added useEffect, useState
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LayoutGrid, CalendarDays } from "lucide-react"; // Added CalendarDays
+import { LayoutGrid, CalendarDays } from "lucide-react";
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button"; 
+import { buttonVariants } from "@/components/ui/button";
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from '@/contexts/OrganizationContext';
-import { cn } from "@/lib/utils"; 
-import Image from 'next/image'; // Import next/image
+import { cn } from "@/lib/utils";
+import Image from 'next/image';
+import { useEventContext, type Event } from '@/contexts/EventContext'; // Added
+import { useSettingsContext } from '@/contexts/SettingsContext'; // Added
+import { format, parseISO } from 'date-fns'; // Added
 
 // Placeholder for client galleries data, eventually from a context or API
 interface MockGallery {
@@ -39,25 +42,25 @@ interface MockDayGallery {
   displayDate: string; // e.g., "October 1, 2024"
   imageUrl: string;
   imageHint: string;
-  eventCount?: number; // Optional: for display if needed
+  eventCount: number;
   projectId: string;
   organizationId: string;
 }
 
-const mockDayGalleriesData: MockDayGallery[] = [
-  { id: "2024-10-01", displayDate: "October 1, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "conference highlights", eventCount: 2, projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "2024-10-02", displayDate: "October 2, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "event stage", eventCount: 1, projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "2024-07-20", displayDate: "July 20, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "music festival", eventCount: 1, projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" }, // Example from existing gallery date
-  { id: "2024-11-01", displayDate: "November 1, 2024", imageUrl: "https://placehold.co/600x400.png", imageHint: "charity gala", eventCount: 1, projectId: "proj_charity_event_2024", organizationId: "org_another_org" },
-];
-
-
 export default function GalleriesOverviewPage() {
   const { selectedProjectId, selectedProject } = useProjectContext();
   const { selectedOrganizationId, selectedOrganization } = useOrganizationContext();
+  const { eventsForSelectedProjectAndOrg, isLoadingEvents } = useEventContext(); // Added
+  const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext(); // Added
+  const [isLoadingDynamicData, setIsLoadingDynamicData] = useState(true);
+
+
+  useEffect(() => {
+    setIsLoadingDynamicData(isLoadingEvents || isLoadingSettings);
+  }, [isLoadingEvents, isLoadingSettings]);
 
   const displayedGalleries = useMemo(() => {
-    let filtered = mockClientGalleries;
+    let filtered = mockClientGalleries; // This mock data is static for now
 
     if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
       filtered = filtered.filter(gallery => gallery.organizationId === selectedOrganizationId);
@@ -70,21 +73,47 @@ export default function GalleriesOverviewPage() {
     return [...filtered]
       .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
       .slice(0, 4);
-  }, [selectedProjectId, selectedOrganizationId]); 
+  }, [selectedProjectId, selectedOrganizationId]);
 
   const displayedDayGalleries = useMemo(() => {
-    let filtered = mockDayGalleriesData;
-
-    if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
-      filtered = filtered.filter(day => day.organizationId === selectedOrganizationId);
+    if (isLoadingDynamicData || !useDemoData) {
+      return [];
     }
 
-    if (selectedProjectId) {
-      filtered = filtered.filter(day => day.projectId === selectedProjectId);
-    }
-    // Sort by date, descending (most recent first)
-    return [...filtered].sort((a,b) => new Date(b.id).getTime() - new Date(a.id).getTime());
-  }, [selectedProjectId, selectedOrganizationId]);
+    const eventsToConsider = eventsForSelectedProjectAndOrg || [];
+    
+    const groupedByDate: Record<string, { events: Event[], projectId: string, organizationId: string }> = {};
+
+    eventsToConsider.forEach(event => {
+      const dateKey = event.date; // YYYY-MM-DD
+      if (!groupedByDate[dateKey]) {
+        groupedByDate[dateKey] = { events: [], projectId: event.projectId, organizationId: event.organizationId || "org_g9e" };
+      }
+      groupedByDate[dateKey].events.push(event);
+    });
+
+    return Object.entries(groupedByDate)
+      .map(([dateStr, data]) => {
+        let displayDate = "Invalid Date";
+        try {
+          displayDate = format(parseISO(dateStr), "MMMM d, yyyy");
+        } catch (e) {
+          console.error("Error parsing date for gallery day:", dateStr, e);
+        }
+        
+        return {
+          id: dateStr,
+          displayDate: displayDate,
+          imageUrl: `https://placehold.co/600x400.png`,
+          imageHint: "event day overview", // Could be made more specific if needed
+          eventCount: data.events.length,
+          projectId: data.projectId,
+          organizationId: data.organizationId,
+        };
+      })
+      .sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime()); // Sort by date, most recent first
+
+  }, [isLoadingDynamicData, useDemoData, eventsForSelectedProjectAndOrg, selectedProjectId, selectedOrganizationId]);
 
 
   const pageDescription = useMemo(() => {
@@ -99,6 +128,26 @@ export default function GalleriesOverviewPage() {
     return desc;
   }, [selectedProject, selectedOrganization]);
 
+  if (isLoadingDynamicData) {
+    return (
+         <div className="flex flex-col gap-8">
+            <div>
+                <p className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                <LayoutGrid className="h-8 w-8 text-accent" /> Client Galleries Overview
+                </p>
+                <p className="text-muted-foreground mt-1">Loading gallery data...</p>
+            </div>
+            <Card className="border-0">
+                <CardHeader><p className="text-lg font-semibold">Recently Updated Galleries</p></CardHeader>
+                <CardContent><p>Loading...</p></CardContent>
+            </Card>
+             <Card className="border-0">
+                <CardHeader><p className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary" /> Browse by Day</p></CardHeader>
+                <CardContent><p>Loading days...</p></CardContent>
+            </Card>
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -128,7 +177,7 @@ export default function GalleriesOverviewPage() {
                   <CardContent>
                     <Image src="https://placehold.co/600x400.png" alt={`Preview of ${gallery.name}`} width={600} height={400} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
                   </CardContent>
-                  <CardContent className="pt-4"> 
+                  <CardContent className="pt-4">
                     <Link href={`/gallery/${gallery.id}`} passHref legacyBehavior>
                       <a className={cn(buttonVariants({ variant: 'ghost', className: 'w-full text-accent hover:text-accent/90' }))}>
                         View Gallery
@@ -146,14 +195,13 @@ export default function GalleriesOverviewPage() {
         </CardContent>
       </Card>
 
-      {/* New Browse by Day Section */}
       <Card className="border-0">
         <CardHeader>
           <p className="text-lg font-semibold flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-primary" /> Browse by Day
           </p>
           <div className="text-sm text-muted-foreground">
-            Select a day to view all associated event galleries.
+            Select a day to view all associated event galleries from the demo data.
           </div>
         </CardHeader>
         <CardContent>
@@ -164,11 +212,17 @@ export default function GalleriesOverviewPage() {
                   <a className="block hover:no-underline">
                     <Card className="hover:shadow-md transition-shadow border-0 h-full flex flex-col">
                       <CardContent className="p-0">
-                        <Image src={day.imageUrl} alt={`Events from ${day.displayDate}`} width={600} height={300} className="w-full h-48 object-cover rounded-none" data-ai-hint={day.imageHint} />
+                        <Image 
+                            src={day.imageUrl} 
+                            alt={`Events from ${day.displayDate}`} 
+                            width={600} height={300} 
+                            className="w-full h-48 object-cover rounded-none" 
+                            data-ai-hint={day.imageHint} 
+                        />
                       </CardContent>
                       <CardHeader className="flex-grow">
                         <CardTitle className="text-base">{day.displayDate}</CardTitle>
-                        {day.eventCount && <CardDescription>{day.eventCount} event(s) this day</CardDescription>}
+                        <CardDescription>{day.eventCount} event(s) this day</CardDescription>
                       </CardHeader>
                        <CardContent className="pt-2 pb-4">
                           <span className={cn(buttonVariants({ variant: 'ghost', className: 'w-full text-accent hover:text-accent/90 justify-start' }))}>
@@ -182,7 +236,7 @@ export default function GalleriesOverviewPage() {
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No specific event days found matching your current selection for "Browse by Day".
+              {useDemoData ? "No event days found in the demo data matching your current project/organization selection." : "Demo data is disabled, or no days with events to display."}
             </p>
           )}
         </CardContent>
@@ -191,6 +245,6 @@ export default function GalleriesOverviewPage() {
     </div>
   );
 }
-
+    
 
     
