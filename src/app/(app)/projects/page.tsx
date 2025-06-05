@@ -23,17 +23,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useProjectContext, type Project, type KeyPersonnel, type ProjectFormData as ProjectContextFormData } from "@/contexts/ProjectContext";
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from "@/contexts/OrganizationContext";
+import { useUserContext, type UserRole } from "@/contexts/UserContext"; // Import UserContext and UserRole
 import { cn } from "@/lib/utils";
 import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/modals/ProjectFormDialog";
 
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
-// Define UserRole type locally for this page's mock implementation
-type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Guest"; 
-const MOCK_CURRENT_USER_ID: string = "user_guest_viewer"; 
-
 export default function ProjectsPage() {
+  const { user, isLoadingUser } = useUserContext(); // Get user from context
   const { projects: projectsFromContext, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
   const { organizations, selectedOrganizationId, isLoadingOrganizations } = useOrganizationContext();
   
@@ -45,6 +42,9 @@ export default function ProjectsPage() {
   const [filterText, setFilterText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   
+  const MOCK_CURRENT_USER_ROLE = user?.role;
+  const MOCK_CURRENT_USER_ID = user?.id;
+
   const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
 
   const pageDescription = useMemo(() => {
@@ -71,8 +71,8 @@ export default function ProjectsPage() {
     if (MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor") {
       return "Projects you are involved in. View status and event timelines.";
     }
-     if (MOCK_CURRENT_USER_ROLE === "Guest") {
-      return "Projects shared with you. View status and event timelines.";
+    if (MOCK_CURRENT_USER_ROLE === "Guest") {
+        return "Projects shared with you. View status and event timelines.";
     }
     return "Overview of projects. Manage event timelines and project setups.";
   }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
@@ -85,7 +85,6 @@ export default function ProjectsPage() {
         project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
       );
     }
-    // HIVE and Admin see all projects from the org-filtered list from context.
 
     if (filterText) {
       filtered = filtered.filter(project =>
@@ -98,9 +97,8 @@ export default function ProjectsPage() {
     return filtered;
   }, [projectsFromContext, filterText, statusFilter, MOCK_CURRENT_USER_ROLE, MOCK_CURRENT_USER_ID]);
 
-
-  if (isLoadingProjects || isLoadingOrganizations) {
-    return <div className="p-4">Loading projects and organizations...</div>;
+  if (isLoadingProjects || isLoadingOrganizations || isLoadingUser) {
+    return <div className="p-4">Loading projects, organizations, and user data...</div>;
   }
 
   const handleEditProjectSubmit = (data: ProjectFormDialogData) => {
@@ -292,7 +290,7 @@ export default function ProjectsPage() {
                         </Button>
                         </TableCell>
                     ) : (MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") ? (
-                       <TableCell className="text-right"></TableCell> // Render an empty cell for roles that don't see actions
+                       <TableCell className="text-right"></TableCell>
                     ) : null }
                   </TableRow>
                 ))}
@@ -323,3 +321,4 @@ export default function ProjectsPage() {
   );
 }
 
+    
