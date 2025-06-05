@@ -16,7 +16,7 @@ import {
   UploadCloud,
   ListChecks,
   LayoutGrid,
-  FolderTree, // Changed from Folders
+  FolderTree, 
   Star,
   Zap,
 } from "lucide-react";
@@ -34,7 +34,7 @@ export const PHASES: Phase[] = ["Plan", "Shoot", "Edit", "Deliver", "View"];
 export const AppPhasesArray: Phase[] = ["Dashboard", ...PHASES];
 
 export const phaseNavConfigs: Record<Phase, NavItem[]> = {
-  "Dashboard": [], // Dashboard has no specific sub-nav items in sidebar typically
+  "Dashboard": [], 
   "Plan": [
     { href: "/projects", label: "Projects", icon: FolderKanban, matchStartsWith: true },
     { href: "/events", label: "Events Setup", icon: CalendarDays, matchStartsWith: true },
@@ -44,7 +44,6 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Shoot": [
     { href: "/shoot", label: "Live Schedule & Tracking", icon: RadioTower, matchStartsWith: true },
-    // Sub-items could be specific views like "My Schedule", "All Active Shoots" if needed later
   ],
   "Edit": [
     { href: "/post-production", label: "Post-Production", icon: ImageIcon, matchStartsWith: true },
@@ -52,10 +51,18 @@ export const phaseNavConfigs: Record<Phase, NavItem[]> = {
   ],
   "Deliver": [
     { href: "/deliverables", label: "Deliverables & Galleries", icon: PackageCheck, matchStartsWith: true },
-    { href: "/deliver/organize", label: "Organize Galleries", icon: FolderTree, matchStartsWith: true }, // Changed here
+    { href: "/deliver/organize", label: "Organize Galleries", icon: FolderTree, matchStartsWith: true }, 
   ],
   "View": [
-    { href: "/galleries", label: "Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
+    { href: "/galleries", label: "All Galleries Overview", icon: LayoutGrid, matchStartsWith: true },
+    // Mocked structure for Day 1 (using existing icons for now)
+    { href: "#day1_label", label: "Day 1 (Sample Events)", icon: CalendarDays, matchStartsWith: false }, // Non-functional, acts as visual header
+    { href: "/gallery/event_day1_breakfast", label: "  - Grand Opening Breakfast", icon: Star, matchStartsWith: false },
+    { href: "/gallery/event_day1_keynote", label: "  - Keynote Speech", icon: Star, matchStartsWith: false },
+    // Mocked structure for Day 2
+    { href: "#day2_label", label: "Day 2 (Sample Events)", icon: CalendarDays, matchStartsWith: false }, // Non-functional
+    { href: "/gallery/event_day2_workshop", label: "  - Workshop ABC", icon: Star, matchStartsWith: false },
+    { href: "/gallery/event_day2_panel", label: "  - Expert Panel Discussion", icon: Star, matchStartsWith: false },
   ],
 };
 
@@ -69,16 +76,16 @@ type PhaseContextType = {
   setActivePhase: (phase: Phase) => void;
   getNavItemsForPhase: (phase: Phase) => NavItem[];
   constantFooterNavItems: NavItem[];
-  PHASES: Phase[]; // Exporting PHASES for use in TopPhaseNavigation
+  PHASES: Phase[]; 
 };
 
 const PhaseContext = createContext<PhaseContextType | undefined>(undefined);
 
 export function PhaseProvider({ children }: { children: ReactNode }) {
-  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); // Default to Dashboard
+  const [activePhase, setActivePhase] = useState<Phase>("Dashboard"); 
 
   const getNavItemsForPhase = (phase: Phase): NavItem[] => {
-    if (phase === "Dashboard") return []; // Dashboard might not have its own items in sidebar if it's just a top-level link
+    if (phase === "Dashboard") return []; 
     return phaseNavConfigs[phase] || [];
   };
 
@@ -87,7 +94,7 @@ export function PhaseProvider({ children }: { children: ReactNode }) {
     setActivePhase,
     getNavItemsForPhase,
     constantFooterNavItems,
-    PHASES, // Make sure PHASES is part of the context value
+    PHASES, 
   }), [activePhase]);
 
   return (
