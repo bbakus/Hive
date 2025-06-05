@@ -24,21 +24,12 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// Define a default mock user (e.g., Admin)
-// const MOCK_DEFAULT_USER: User = {
-//   id: "user_admin_global",
-//   name: "Global Admin",
-//   email: "admin@hive.com",
-//   role: "Admin",
-//   organizationId: "org_g9e", 
-// };
-
-const MOCK_PROJECT_MANAGER_USER: User = {
-  id: "user_liam_w", // Liam Wilson's ID from personnel mock
-  name: "Liam Wilson",
-  email: "liam@hive.com",
-  role: "Project Manager",
-  organizationId: "org_g9e", // Assuming Liam is part of G9e
+const MOCK_PHOTOGRAPHER_USER: User = {
+  id: "user_maria_s", // Maria Sanchez's ID from personnel mock
+  name: "Maria Sanchez",
+  email: "maria@hive.com",
+  role: "Photographer",
+  organizationId: "org_g9e", // Assuming Maria is part of G9e
 };
 
 
@@ -50,7 +41,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     // In a real app, you'd fetch the user session here.
     // For now, we'll use a mock user after a slight delay to simulate loading.
     setTimeout(() => {
-      setUser(MOCK_PROJECT_MANAGER_USER); // Changed to Project Manager
+      setUser(MOCK_PHOTOGRAPHER_USER); 
       setIsLoadingUser(false);
     }, 200); // Simulate a short loading period
   }, []);
