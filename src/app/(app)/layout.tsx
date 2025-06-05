@@ -122,7 +122,7 @@ function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent className="flex-1 p-2">
-        <Accordion type="multiple" className="w-full" collapsible>
+        <Accordion type="multiple" className="w-full">
           <SidebarMenu>
             {renderNavItems(currentPhaseNavItems, pathname, activePhase)}
           </SidebarMenu>
