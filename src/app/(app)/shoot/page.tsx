@@ -11,7 +11,7 @@ import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
-import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO } from "date-fns";
+import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO, isValid } from "date-fns"; // Ensure isValid is imported
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
