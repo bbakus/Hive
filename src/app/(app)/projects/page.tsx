@@ -29,8 +29,8 @@ import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/moda
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Admin";
-const MOCK_CURRENT_USER_ID: string = "user_liam_w";
+const MOCK_CURRENT_USER_ROLE: UserRole = "Client"; 
+const MOCK_CURRENT_USER_ID: string = "user_client_liaison"; 
 
 export default function ProjectsPage() {
   const { projects, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
@@ -56,6 +56,9 @@ export default function ProjectsPage() {
         }
         return "All projects you administer across your organizations. Manage event timelines and project setups.";
     }
+    if (MOCK_CURRENT_USER_ROLE === "Client") {
+      return "Your projects. View status and event timelines.";
+    }
     // Default for HIVE or other roles
     if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
         return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
@@ -67,7 +70,7 @@ export default function ProjectsPage() {
   const displayProjects = useMemo(() => {
     let filtered = projects;
 
-    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client") {
       filtered = filtered.filter(project =>
         project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
       );
@@ -178,7 +181,7 @@ export default function ProjectsPage() {
               <div className="text-sm text-muted-foreground">
                 {selectedOrganizationId !== ALL_ORGANIZATIONS_ID && organizations.find(o => o.id === selectedOrganizationId)
                   ? `Showing projects for ${organizations.find(o => o.id === selectedOrganizationId)?.name}. `
-                  : (MOCK_CURRENT_USER_ROLE === "Project Manager" ? "Showing your assigned projects. " : "Showing projects for all your organizations. ")
+                  : (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" ? "Showing your assigned projects. " : "Showing projects for all your organizations. ")
                 }
                 ({displayProjects.length} projects shown)
               </div>
@@ -214,19 +217,21 @@ export default function ProjectsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Project Name</TableHead>
-                  {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager") && <TableHead>Organization</TableHead>}
+                  {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager" && MOCK_CURRENT_USER_ROLE !== "Client") && <TableHead>Organization</TableHead>}
                   <TableHead>Location</TableHead>
                   <TableHead>Dates</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Key Personnel</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {(MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin" || MOCK_CURRENT_USER_ROLE === "Project Manager") && (
+                    <TableHead className="text-right">Actions</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.name}</TableCell>
-                    {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager") &&
+                    {(selectedOrganizationId === ALL_ORGANIZATIONS_ID && MOCK_CURRENT_USER_ROLE !== "Project Manager" && MOCK_CURRENT_USER_ROLE !== "Client") &&
                       <TableCell className="text-xs text-muted-foreground">
                         {organizations.find(o => o.id === project.organizationId)?.name || "N/A"}
                       </TableCell>
@@ -256,16 +261,18 @@ export default function ProjectsPage() {
                         ? project.keyPersonnel.map(kp => `${kp.name} (${kp.projectRole.substring(0,15)}${kp.projectRole.length > 15 ? '...' : ''})`).join(', ')
                         : "N/A"}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
-                        <Edit className="h-4 w-4" />
-                        <span className="sr-only">Edit</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(project.id)}>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </TableCell>
+                    {(MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin" || MOCK_CURRENT_USER_ROLE === "Project Manager") && (
+                        <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="hover:text-destructive" onClick={() => handleDeleteClick(project.id)}>
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete</span>
+                        </Button>
+                        </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -274,13 +281,13 @@ export default function ProjectsPage() {
             <p className="text-muted-foreground text-center py-8">
               {filterText || statusFilter !== "all"
                 ? `No projects found matching your filters ${
-                    MOCK_CURRENT_USER_ROLE === "Project Manager"
+                    MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client"
                       ? "among your assigned projects"
                       : selectedOrganizationId !== ALL_ORGANIZATIONS_ID
                       ? `for ${organizations.find(o => o.id === selectedOrganizationId)?.name}`
                       : ""
                   }.`
-                : MOCK_CURRENT_USER_ROLE === "Project Manager"
+                : MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client"
                 ? "You are not assigned to any projects."
                 : `No projects found ${
                     selectedOrganizationId !== ALL_ORGANIZATIONS_ID
@@ -294,3 +301,4 @@ export default function ProjectsPage() {
     </div>
   );
 }
+

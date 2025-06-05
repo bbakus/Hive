@@ -64,6 +64,7 @@ const getInitialMockProjects = (): Project[] => [
       { personnelId: "user_david_l", name: "David Lee", projectRole: "Lead Photographer Day 2" },
       { personnelId: "user_sophia_c", name: "Sophia Chen", projectRole: "Lead Photographer Day 3" },
       { personnelId: "user_event_lead_ops", name: "Ops Event Lead", projectRole: "Event Lead"},
+      { personnelId: "user_client_liaison", name: "Client Liaison (PBCC)", projectRole: "Client Primary Contact" },
     ],
     organizationId: CULINARY_ORG_ID,
     createdByUserId: "user_admin_demo",
@@ -84,13 +85,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       const loadedProjects = useDemoData ? getInitialMockProjects() : [];
       setAllProjects(loadedProjects);
       if (loadedProjects.length > 0) {
-        setSelectedProjectIdState(loadedProjects[0].id);
+        // If there's a selected org, try to select the first project of that org.
+        // Otherwise, select the first project overall.
+        const projectsInCurrentOrg = selectedOrganizationId === ALL_ORGANIZATIONS_ID 
+          ? loadedProjects 
+          : loadedProjects.filter(p => p.organizationId === selectedOrganizationId);
+        
+        setSelectedProjectIdState(projectsInCurrentOrg.length > 0 ? projectsInCurrentOrg[0].id : (loadedProjects.length > 0 ? loadedProjects[0].id : null));
       } else {
         setSelectedProjectIdState(null);
       }
       setIsLoadingProjects(false);
     }
-  }, [useDemoData, isLoadingSettings]);
+  }, [useDemoData, isLoadingSettings, selectedOrganizationId]);
 
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
@@ -124,15 +131,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         createdByUserId: userId,
       };
       const updatedProjects = [...prevProjects, newProject];
-      const currentOrgProjects = selectedOrganizationId === ALL_ORGANIZATIONS_ID 
-                                ? updatedProjects 
-                                : updatedProjects.filter(p => p.organizationId === selectedOrganizationId);
-      if (currentOrgProjects.length === 1 || (currentOrgProjects.length > 0 && selectedProjectId === null) ) {
-        setSelectedProjectIdState(newProject.id);
+      
+      // Auto-select new project if it matches current org filter or if no org filter
+      const shouldSelectNewProject = 
+        (selectedOrganizationId === ALL_ORGANIZATIONS_ID || organizationId === selectedOrganizationId) &&
+        (selectedProjectId === null || projectsForSelectedOrg.length === 0);
+
+      if (shouldSelectNewProject) {
+         setSelectedProjectIdState(newProject.id);
+      } else if (selectedOrganizationId === ALL_ORGANIZATIONS_ID && selectedProjectId === null && updatedProjects.length === 1) {
+         setSelectedProjectIdState(newProject.id);
       }
+
+
       return updatedProjects;
     });
-  }, [selectedOrganizationId, selectedProjectId]);
+  }, [selectedOrganizationId, selectedProjectId, projectsForSelectedOrg]);
 
   const updateProject = useCallback((projectId: string, projectData: Partial<ProjectFormData>) => {
     setAllProjects((prevProjects) =>
