@@ -25,6 +25,14 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 // Mock Users - Keep these definitions for easy switching during development
+const MOCK_HIVE_USER: User = {
+  id: "user_hive_super_admin",
+  name: "HIVE Super Admin",
+  email: "super@hive.com",
+  role: "HIVE",
+  organizationId: "org_g9e", // Can be a default or handled specially
+};
+
 const MOCK_ADMIN_USER: User = {
   id: "user_admin_global",
   name: "Global Admin",
@@ -75,7 +83,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     // In a real app, you'd fetch the user session here.
     // For now, we'll use a mock user after a slight delay to simulate loading.
     setTimeout(() => {
-      setUser(MOCK_EDITOR_USER); // Switch to MOCK_EDITOR_USER
+      setUser(MOCK_HIVE_USER); // Switch to HIVE User
       setIsLoadingUser(false);
     }, 200); // Simulate a short loading period
   }, []);
