@@ -26,6 +26,7 @@ import { BlockedReasonDialog } from "@/components/modals/BlockedReasonDialog";
 import { EventShootAccordionItem } from "@/components/shoot/EventShootAccordionItem";
 
 const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
+const SIMULATED_DEMO_DATE_ISO = "2025-06-04T12:00:00Z"; // Midday, Wednesday June 4th, 2025
 
 type EventTimeStatus = "past" | "in_progress" | "upcoming";
 
@@ -54,10 +55,16 @@ export default function ShootPage() {
 
 
   useEffect(() => {
-    setCurrentTime(new Date());
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
-    return () => clearInterval(timer);
-  }, []);
+    if (useDemoData) {
+      setCurrentTime(new Date(SIMULATED_DEMO_DATE_ISO));
+      // For demo data, we don't need to set an interval to update currentTime
+      // as we want it fixed to the simulated date.
+    } else {
+      setCurrentTime(new Date());
+      const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
+      return () => clearInterval(timer);
+    }
+  }, [useDemoData]); // Effect re-runs if useDemoData changes
 
   const getPersonnelNameById = useCallback((id?: string): string => {
     if (!id) return "Unknown";
@@ -86,22 +93,31 @@ export default function ShootPage() {
       in_progress: 1,
       upcoming: 2,
     };
+    
+    // Determine if an event is "today" based on the (possibly simulated) currentTime
+    const isEventToday = (eventDateStr: string): boolean => {
+        const eventDate = parseISO(eventDateStr);
+        if (!isValid(eventDate)) return false;
+        return (
+            eventDate.getUTCFullYear() === currentTime.getUTCFullYear() &&
+            eventDate.getUTCMonth() === currentTime.getUTCMonth() &&
+            eventDate.getUTCDate() === currentTime.getUTCDate()
+        );
+    };
 
     return eventsForSelectedProjectAndOrg
       .filter(event => {
-        const eventTimes = parseEventTimes(event.date, event.time);
-        if (!eventTimes) return false;
-        const eventStartDate = eventTimes.start;
-        return eventStartDate && isToday(eventStartDate) && event.isCovered;
+        return isEventToday(event.date) && event.isCovered;
       })
       .sort((a, b) => {
         const statusA = getEventStatus(a, currentTime);
         const statusB = getEventStatus(b, currentTime);
 
         if (statusOrder[statusA] !== statusOrder[statusB]) {
-          return statusOrder[statusA] - statusOrder[statusB];
+          return statusOrder[statusA] - statusOrder[statusB]; // Sort by status first (past, in_progress, upcoming)
         }
-
+        
+        // If statuses are the same, sort by start time
         const timeA = parseEventTimes(a.date, a.time)?.start.getTime() || 0;
         const timeB = parseEventTimes(b.date, b.time)?.start.getTime() || 0;
         return timeA - timeB;
@@ -129,13 +145,10 @@ export default function ShootPage() {
   
   useEffect(() => {
     if (filteredTodaysEvents.length > 0 && !activeAccordionItem) {
-      // Open the first event by default if no item is active and there are events
       setActiveAccordionItem(filteredTodaysEvents[0].id);
     } else if (filteredTodaysEvents.length === 0 && activeAccordionItem) {
-      // Clear active item if no events are shown (e.g., due to filtering)
       setActiveAccordionItem(undefined);
     } else if (filteredTodaysEvents.length > 0 && activeAccordionItem && !filteredTodaysEvents.find(e => e.id === activeAccordionItem)) {
-      // If the currently active item is filtered out, open the new first one
       setActiveAccordionItem(filteredTodaysEvents[0].id);
     }
   }, [filteredTodaysEvents, activeAccordionItem]);
@@ -290,8 +303,8 @@ export default function ShootPage() {
           <RadioTower className="h-8 w-8 text-accent" /> Shoot Day Operations
         </h1>
         <p className="text-muted-foreground">
-          Today&apos;s covered events for: <span className="font-semibold text-foreground">{selectedProject.name}</span>.
-          (As of: {format(currentTime, "PPPp")})
+          {useDemoData ? `Today's (Simulated: ${format(currentTime, "PPP")})` : "Today's"} covered events for: <span className="font-semibold text-foreground">{selectedProject.name}</span>.
+          {useDemoData ? "" : ` (As of: ${format(currentTime, "p")})`}
         </p>
       </div>
 
@@ -337,7 +350,7 @@ export default function ShootPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>No Covered Events Today Matching Filters</AlertTitle>
           <AlertDescription>
-            There are no events marked for production coverage scheduled for today ({currentTime ? format(currentTime, "PPP") : 'N/A'}) in &quot;{selectedProject.name}&quot; that match your current filter criteria.
+            There are no events marked for production coverage scheduled for {useDemoData ? `the simulated date (${format(currentTime, "PPP")})` : `today (${format(currentTime, "PPP")})`} in &quot;{selectedProject.name}&quot; that match your current filter criteria.
             Adjust filters or check &quot;Events Setup&quot; under the Plan phase.
           </AlertDescription>
         </Alert>
@@ -363,7 +376,7 @@ export default function ShootPage() {
               onShotAction={handleShotAction}
               getEventStatusBadgeInfo={getEventStatusBadgeInfo}
               getShotProgress={getShotProgress}
-              isActive={activeAccordionItem === event.id} // Pass isActive prop
+              isActive={activeAccordionItem === event.id}
             />
           ))}
         </Accordion>
@@ -374,5 +387,3 @@ export default function ShootPage() {
     
 
     
-
-
