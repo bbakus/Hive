@@ -28,15 +28,9 @@ import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/moda
 
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
-// --- Placeholder for User Role & ID ---
-// In a real app, this would come from an authentication context
 type UserRole = "HIVE" | "Admin" | "Project Manager" | "Client" | "Photographer" | "Editor" | "Guest";
-const MOCK_CURRENT_USER_ROLE: UserRole = "Admin"; // CORRECTED: Set to Admin
-// Assuming an Admin might not have a specific user ID tied to project assignment in this simplified mock,
-// or we can define one if Admin project assignment becomes a feature.
-// For now, Admins see projects by Organization. Project Managers see by assignment.
-const MOCK_CURRENT_USER_ID: string = "user_org_admin_g9e"; // Example Admin user ID
-// --- End Placeholder ---
+const MOCK_CURRENT_USER_ROLE: UserRole = "Admin";
+const MOCK_CURRENT_USER_ID: string = "user_liam_w";
 
 export default function ProjectsPage() {
   const { projects, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
@@ -48,6 +42,51 @@ export default function ProjectsPage() {
   const { toast } = useToast();
   const [filterText, setFilterText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
+
+  const pageDescription = useMemo(() => {
+    const selectedOrgName = organizations.find(o => o.id === selectedOrganizationId)?.name;
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
+      return "Your assigned projects. Manage your event timelines and project setups.";
+    }
+    if (MOCK_CURRENT_USER_ROLE === "Admin") {
+        if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
+            return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
+        }
+        return "All projects you administer across your organizations. Manage event timelines and project setups.";
+    }
+    // Default for HIVE or other roles
+    if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
+        return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
+    }
+    return "All projects across all organizations. Manage event timelines and project setups.";
+  }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
+
+
+  const displayProjects = useMemo(() => {
+    let filtered = projects;
+
+    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
+      filtered = filtered.filter(project =>
+        project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
+      );
+    }
+
+    if (filterText) {
+      filtered = filtered.filter(project =>
+        project.name.toLowerCase().includes(filterText.toLowerCase())
+      );
+    }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(project => project.status === statusFilter);
+    }
+    return filtered;
+  }, [projects, filterText, statusFilter, MOCK_CURRENT_USER_ROLE, MOCK_CURRENT_USER_ID]);
+
+  if (isLoadingProjects || isLoadingOrganizations) {
+    return <div className="p-4">Loading projects and organizations...</div>;
+  }
 
   const handleEditProjectSubmit = (data: ProjectFormDialogData) => {
     if (editingProject) {
@@ -88,54 +127,6 @@ export default function ProjectsPage() {
     }
     setIsDeleteDialogOpen(false);
   };
-
-  const displayProjects = useMemo(() => {
-    let filtered = projects;
-
-    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
-      filtered = filtered.filter(project =>
-        project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
-      );
-    }
-    // Admins and HIVE roles see all projects for the selected organization (or all if no org filter)
-    // This is implicitly handled by the `projects` from `useProjectContext()` which is already org-filtered.
-
-    if (filterText) {
-      filtered = filtered.filter(project =>
-        project.name.toLowerCase().includes(filterText.toLowerCase())
-      );
-    }
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(project => project.status === statusFilter);
-    }
-    return filtered;
-  }, [projects, filterText, statusFilter]);
-
-
-  if (isLoadingProjects || isLoadingOrganizations) {
-    return <div className="p-4">Loading projects and organizations...</div>;
-  }
-
-  const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
-
-  const pageDescription = useMemo(() => {
-    const selectedOrgName = organizations.find(o => o.id === selectedOrganizationId)?.name;
-    if (MOCK_CURRENT_USER_ROLE === "Project Manager") {
-      return "Your assigned projects. Manage your event timelines and project setups.";
-    }
-    if (MOCK_CURRENT_USER_ROLE === "Admin") {
-      if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
-        return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
-      }
-      return "All projects you administer across your organizations. Manage event timelines and project setups.";
-    }
-    // Default for HIVE or other roles if not covered above
-    if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
-      return `Projects for ${selectedOrgName}. Manage event timelines and project setups.`;
-    }
-    return "All projects across all organizations. Manage event timelines and project setups.";
-  }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
-
 
   return (
 
@@ -303,4 +294,3 @@ export default function ProjectsPage() {
     </div>
   );
 }
-
