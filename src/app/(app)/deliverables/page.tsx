@@ -69,7 +69,7 @@ export default function DeliverablesPage() {
         try {
           const response = await default_api.read_file({ path: "public/demo/demo_data.json" });
           if (response.status === 'succeeded') {
-            const demoData = JSON.parse(response.result);
+            const demoData = JSON.parse(response.result || "{}");
             
             if (demoData && Array.isArray(demoData.deliverables)) {
               loadedDeliverables = demoData.deliverables.map((d: any) => {

@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UploadCloud, Loader2, CheckCircle, XCircle, Info, FolderInput, HardDrive, RefreshCw, HelpCircle, ScanLine, KeySquare } from 'lucide-react'; 
 import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequestFormData } from '@/contexts/EventContext';
@@ -30,13 +29,7 @@ import { default_api } from '@/lib/utils';
 
 export default function IngestionUtilityPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
-  const {
-    allEvents, // Need all events to find event names by ID
-    isLoadingEvents,
-    getEventById,
-    updateShotRequest,
-    getShotRequestsForEvent,
-  } = useEventContext();
+  const { allEvents, isLoadingEvents, getShotRequestsForEvent, updateShotRequest, getEventById } = useEventContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   // Use the personnel context
   const { personnelList, isLoadingPersonnel } = usePersonnelContext();
@@ -58,7 +51,7 @@ export default function IngestionUtilityPage() {
   }, [personnelList]); // Depend on personnelList from context
 
   const getEventName = useCallback((eventId?: string) => {
-    if (!eventId || !allEvents) return "Unknown Event";
+    if (!eventId || !allEvents) return "Unknown Event"; // TODO: Add a more specific type if known
     return allEvents.find(e => e.id === eventId)?.name || "Unknown Event";
   }, [allEvents]); // Depend on allEvents from EventContext
 
@@ -69,7 +62,7 @@ export default function IngestionUtilityPage() {
 
     const processedJobs = jobs.map(job => {
         if (job.status === 'completed' && !job.hiveProcessedCompletion && job.determinedEventId && job.determinedPhotographerId) {
-            const shotsToUpdateCount = job.filesMatchedToEvents ?? job.filesProcessed ?? 0;
+            const shotsToUpdateCount = (job.filesMatchedToEvents ?? job.filesProcessed ?? 0);
             if (shotsToUpdateCount > 0) {
                 const shotsForEvent = getShotRequestsForEvent(job.determinedEventId);
                 const unassignedOrAssignedShots = shotsForEvent.filter(s => s.status === "Unassigned" || s.status === "Assigned");
@@ -77,7 +70,7 @@ export default function IngestionUtilityPage() {
 
                 for (let i = 0; i < Math.min(shotsToUpdateCount, unassignedOrAssignedShots.length); i++) {
                     const shotToUpdate = unassignedOrAssignedShots[i];
-                    // Only update if the shot hasn't already been marked as captured by this or another job
+                    // Only update if the shot hasn't already been marked as captured by this or another job, and if updateShotRequest is available
                     if (shotToUpdate.status !== 'Captured' && shotToUpdate.status !== 'Completed') {
                         updateShotRequest(job.determinedEventId, shotToUpdate.id, {
                             status: 'Captured',
@@ -101,7 +94,7 @@ export default function IngestionUtilityPage() {
 
     if (shotsUpdatedCount > 0) {
       toast({ title: "HIVE Shot Statuses Updated", description: `${shotsUpdatedCount} shot(s) marked 'Captured' based on completed ingest jobs.`});
-    }
+    } 
     // Return all jobs, including those not just processed, but with the flag potentially updated
     return processedJobs;
 
@@ -123,7 +116,7 @@ export default function IngestionUtilityPage() {
               if (demoData && Array.isArray(demoData.ingestionJobs)) {
                 // Map demo data structure to IngestJobStatus type
                 fetchedJobs = demoData.ingestionJobs.map((job: any) => ({
-                   jobId: job.jobId,
+                   jobId: job.jobId.toString(), // Ensure jobId is a string
                    status: job.status, // Assuming status exists
                    progress: job.progress, // Assuming progress exists
                    message: job.message,
@@ -171,7 +164,7 @@ export default function IngestionUtilityPage() {
       // Process newly fetched jobs (either demo or live) for completions
       const processedJobs = processJobCompletions(fetchedJobs);
       setIngestionJobs(processedJobs);
-      setIsLoadingJobs(false);
+    setIsLoadingJobs(false);
   }, [useDemoData, isLoadingSettings, isLoadingEvents, isLoadingProjects, isLoadingPersonnel, logHiveActivity, processJobCompletions, toast]); // Added isLoadingPersonnel to dependencies
   
   // Initial data load effect
@@ -311,7 +304,7 @@ export default function IngestionUtilityPage() {
           </CardHeader>
           <CardContent>
             <Textarea
-              readOnly
+              readOnly={true}
               value={hiveActivityLog.join('
 ')}
               className="h-40 font-mono text-xs bg-muted/30"

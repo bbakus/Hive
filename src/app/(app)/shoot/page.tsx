@@ -1,35 +1,32 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon } from "lucide-react";
-import { useProjectContext } from "@/contexts/ProjectContext";
+import { useProjectContext } from '@/contexts/ProjectContext';
 import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
-import { useSettingsContext } from "@/contexts/SettingsContext";
+import { useSettingsContext } from '@/contexts/SettingsContext';
+import { usePersonnelContext, type Personnel } from "@/contexts/PersonnelContext";
 import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
-import { isToday, isAfter, isBefore, isWithinInterval, format, parseISO, isValid } from "date-fns"; // Ensure isValid is imported
+import { format, parseISO, isValid, isWithinInterval, isAfter, isBefore, isToday } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Accordion,
-} from "@/components/ui/accordion";
+import { Accordion } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { initialPersonnelMock, type Personnel } from "@/app/(app)/personnel/page";
 import { cn } from "@/lib/utils";
 import { BlockedReasonDialog } from "@/components/modals/BlockedReasonDialog";
 import { EventShootAccordionItem } from "@/components/shoot/EventShootAccordionItem";
 
-const MOCK_CURRENT_USER_ID = "user_photog_field_sim"; 
+const MOCK_CURRENT_USER_ID = "user_photog_field_sim";
 const SIMULATED_DEMO_DATE_ISO = "2025-06-04T12:00:00Z"; // Midday, Wednesday June 4th, 2025
 
 type EventTimeStatus = "past" | "in_progress" | "upcoming";
-
 
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
@@ -42,6 +39,7 @@ export default function ShootPage() {
     checkOutUserFromEvent
   } = useEventContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
+  const { personnelList, isLoadingPersonnel } = usePersonnelContext();
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const { toast } = useToast();
 
@@ -52,50 +50,64 @@ export default function ShootPage() {
   const [isBlockedReasonDialogOpen, setIsBlockedReasonDialogOpen] = useState(false);
   const [shotForBlockedReasonDialog, setShotForBlockedReasonDialog] = useState<{ eventId: string; shotId: string; description: string; currentReason: string } | null>(null);
   const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
+  const nowISO = useMemo(() => new Date().toISOString(), []);
 
 
   useEffect(() => {
     if (useDemoData) {
       setCurrentTime(new Date(SIMULATED_DEMO_DATE_ISO));
-      // For demo data, we don't need to set an interval to update currentTime
-      // as we want it fixed to the simulated date.
     } else {
       setCurrentTime(new Date());
-      const timer = setInterval(() => setCurrentTime(new Date()), 60000); 
+      const timer = setInterval(() => setCurrentTime(new Date()), 60000);
       return () => clearInterval(timer);
     }
-  }, [useDemoData]); // Effect re-runs if useDemoData changes
+  }, [useDemoData]);
 
   const getPersonnelNameById = useCallback((id?: string): string => {
-    if (!id) return "Unknown";
-    const person = initialPersonnelMock.find(p => p.id === id);
+    if (!id || !personnelList) return "Unknown";
+    const person = personnelList.find(p => p.id === id);
     return person ? person.name : "Unknown User";
-  }, []);
+  }, [personnelList]);
 
   const getEventStatus = useCallback((event: Event, now: Date): EventTimeStatus => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return "upcoming"; 
+    if (!times) return "upcoming"; // Default to upcoming if times can't be parsed
 
+    // Check if the event is today based on the 'now' date
+    const eventDate = parseISO(event.date);
+    if (!isValid(eventDate)) return "upcoming"; // Should not happen if data is clean
+
+    const isEventDateToday = 
+        eventDate.getUTCFullYear() === now.getUTCFullYear() &&
+        eventDate.getUTCMonth() === now.getUTCMonth() &&
+        eventDate.getUTCDate() === now.getUTCDate();
+
+    if (!isEventDateToday) {
+        // If the event date is not 'now', determine if it's past or upcoming based on the date part only
+        return isBefore(eventDate, startOfDay(now)) ? "past" : "upcoming";
+    }
+
+    // If the event is today, check time
     if (isWithinInterval(now, { start: times.start, end: times.end })) {
       return "in_progress";
     }
     if (isAfter(times.start, now)) {
       return "upcoming";
     }
-    return "past";
+    return "past"; // If event is today but start time is passed and not in progress -> past
   }, []);
+
 
   const todaysCoveredEvents = useMemo(() => {
     if (!currentTime || !eventsForSelectedProjectAndOrg) return [];
-    
+
     const statusOrder: Record<EventTimeStatus, number> = {
+      in_progress: 2, // Highest priority for display
+      upcoming: 1,
       past: 0,
-      in_progress: 1,
-      upcoming: 2,
     };
-    
-    // Determine if an event is "today" based on the (possibly simulated) currentTime
-    const isEventToday = (eventDateStr: string): boolean => {
+
+    const isEventDateMatchingCurrentTime = (eventDateStr: string): boolean => {
         const eventDate = parseISO(eventDateStr);
         if (!isValid(eventDate)) return false;
         return (
@@ -107,20 +119,19 @@ export default function ShootPage() {
 
     return eventsForSelectedProjectAndOrg
       .filter(event => {
-        return isEventToday(event.date) && event.isCovered;
+        return isEventDateMatchingCurrentTime(event.date) && event.isCovered;
       })
       .sort((a, b) => {
         const statusA = getEventStatus(a, currentTime);
         const statusB = getEventStatus(b, currentTime);
 
         if (statusOrder[statusA] !== statusOrder[statusB]) {
-          return statusOrder[statusA] - statusOrder[statusB]; // Sort by status first (past, in_progress, upcoming)
+          return statusOrder[statusB] - statusOrder[statusA]; // Sort by status first (reversed order)
         }
-        
-        // If statuses are the same, sort by start time
+
         const timeA = parseEventTimes(a.date, a.time)?.start.getTime() || 0;
         const timeB = parseEventTimes(b.date, b.time)?.start.getTime() || 0;
-        return timeA - timeB;
+        return timeA - timeB; // Then by start time
       });
   }, [currentTime, eventsForSelectedProjectAndOrg, getEventStatus]);
 
@@ -142,7 +153,7 @@ export default function ShootPage() {
     }
     return filtered;
   }, [todaysCoveredEvents, filterTimeStatus, filterQuickTurnaround, filterHidePastEvents, currentTime, getEventStatus]);
-  
+
   useEffect(() => {
     if (filteredTodaysEvents.length > 0 && !activeAccordionItem) {
       setActiveAccordionItem(filteredTodaysEvents[0].id);
@@ -166,10 +177,10 @@ export default function ShootPage() {
   }, [currentTime, getEventStatus]);
 
   const getShotProgress = useCallback((eventId: string) => {
-    const shots = getShotRequestsForEvent(eventId);
+    const shots: ShotRequest[] = getShotRequestsForEvent(eventId);
     if (!shots) return { captured: 0, total: 0 };
-    const capturedOrCompleted = shots.filter(s => s.status === "Captured" || s.status === "Completed").length;
-    return {
+    const capturedOrCompleted = shots.filter((s: ShotRequest) => s.status === "Captured" || s.status === "Completed").length;
+ return {
       captured: capturedOrCompleted,
       total: shots.length,
     };
@@ -177,21 +188,20 @@ export default function ShootPage() {
 
   const handleShotAction = useCallback((eventId: string, shotId: string, actionType: "toggleCapture" | "toggleBlock") => {
     const shots = getShotRequestsForEvent(eventId);
-    const shotToUpdate = shots.find(s => s.id === shotId);
+    const shotToUpdate = shots.find((s: ShotRequest) => s.id === shotId);
     if (!shotToUpdate) return;
 
-    let updatePayload: Partial<ShotRequestFormData> = {};
-    const nowISO = new Date().toISOString();
+    let updatePayload: Partial<ShotRequest> = {};
 
     if (actionType === 'toggleCapture') {
       if (shotToUpdate.status === "Captured" || shotToUpdate.status === "Completed") {
-        updatePayload.status = "Assigned"; 
+        updatePayload.status = "Assigned"; // Or "Unassigned" if no one was assigned
       } else {
         updatePayload.status = "Captured";
         if (!shotToUpdate.initialCapturerId) {
           updatePayload.initialCapturerId = MOCK_CURRENT_USER_ID;
         }
-      }
+     }
       updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
       updatePayload.lastStatusModifiedAt = nowISO;
       updateShotRequest(eventId, shotId, updatePayload);
@@ -199,28 +209,28 @@ export default function ShootPage() {
 
     } else if (actionType === 'toggleBlock') {
       if (shotToUpdate.status === "Blocked") {
-        updatePayload.status = "Assigned";
-        updatePayload.blockedReason = ""; 
+        updatePayload.status = "Assigned"; // Or "Unassigned"
+        updatePayload.blockedReason = "";
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
         updateShotRequest(eventId, shotId, updatePayload);
         toast({ title: "Shot Unblocked", description: "Shot status set to Assigned."});
       } else {
-        setShotForBlockedReasonDialog({ 
-            eventId, 
-            shotId, 
+        setShotForBlockedReasonDialog({
+            eventId,
+            shotId,
             description: shotToUpdate.description,
             currentReason: shotToUpdate.blockedReason || ""
         });
         setIsBlockedReasonDialogOpen(true);
       }
     }
-  }, [getShotRequestsForEvent, updateShotRequest, toast, setIsBlockedReasonDialogOpen, setShotForBlockedReasonDialog]);
-  
+  }, [getShotRequestsForEvent, updateShotRequest, toast, setIsBlockedReasonDialogOpen, setShotForBlockedReasonDialog, nowISO]);
+
   const handleSaveBlockedReason = useCallback((reason: string) => {
     if (!shotForBlockedReasonDialog) return;
     const { eventId, shotId, description } = shotForBlockedReasonDialog;
-    
+
     const updatePayload: Partial<ShotRequestFormData> = {
       status: "Blocked",
       blockedReason: reason.trim() || "Blocked - (Reason not specified via quick action)",
@@ -258,7 +268,7 @@ export default function ShootPage() {
     });
   }, [checkOutUserFromEvent, getPersonnelNameById, eventsForSelectedProjectAndOrg, toast]);
 
-  if (isLoadingProjects || isLoadingEvents || isLoadingSettings || currentTime === null) {
+  if (isLoadingProjects || isLoadingEvents || isLoadingSettings || isLoadingPersonnel || currentTime === null) {
     return (
       <div className="flex flex-col gap-8">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -325,22 +335,22 @@ export default function ShootPage() {
                 </Select>
             </div>
             <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-end sm:justify-end gap-x-6 gap-y-2">
-              <div className="flex items-center space-x-2 justify-end">
+                <div className="flex items-center space-x-2 justify-end">
                   <Checkbox
                       id="filter-quick-turnaround"
                       checked={filterQuickTurnaround}
                       onCheckedChange={(checked) => setFilterQuickTurnaround(!!checked)}
                   />
                   <Label htmlFor="filter-quick-turnaround" className="font-normal text-sm whitespace-nowrap">Quick Turnaround Only</Label>
-              </div>
-              <div className="flex items-center space-x-2 justify-end">
-                  <Checkbox
-                      id="filter-hide-past"
-                      checked={filterHidePastEvents}
-                      onCheckedChange={(checked) => setFilterHidePastEvents(!!checked)}
-                  />
-                  <Label htmlFor="filter-hide-past" className="font-normal text-sm whitespace-nowrap">Hide Past Events</Label>
-              </div>
+                </div>
+                <div className="flex items-center space-x-2 justify-end">
+                    <Checkbox
+                        id="filter-hide-past"
+                        checked={filterHidePastEvents}
+                        onCheckedChange={(checked: boolean | string) => setFilterHidePastEvents(!!checked)}
+                    />
+                    <Label htmlFor="filter-hide-past" className="font-normal text-sm whitespace-nowrap">Hide Past Events</Label>
+                </div>
             </div>
         </div>
       </Card>
@@ -357,9 +367,9 @@ export default function ShootPage() {
       )}
 
       {filteredTodaysEvents.length > 0 && (
-        <Accordion 
-            type="single" 
-            collapsible 
+        <Accordion
+            type="single"
+            collapsible
             className="w-full space-y-3"
             value={activeAccordionItem}
             onValueChange={setActiveAccordionItem}
@@ -368,7 +378,7 @@ export default function ShootPage() {
             <EventShootAccordionItem
               key={event.id}
               event={event}
-              personnelList={initialPersonnelMock}
+              personnelList={personnelList}
               shotRequests={getShotRequestsForEvent(event.id)}
               getPersonnelNameById={getPersonnelNameById}
               onCheckIn={handleCheckIn}
@@ -384,6 +394,3 @@ export default function ShootPage() {
     </div>
   );
 }
-    
-
-    
