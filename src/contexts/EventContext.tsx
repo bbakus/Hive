@@ -4,12 +4,33 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 
-const EventContext = createContext(undefined);
+import { z } from 'zod';
+import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore, subDays, addDays } from 'date-fns';
+
+// --- Context Type Definition ---
+interface EventContextType {
+  allEvents: Event[];
+  eventsForSelectedProjectAndOrg: Event[];
+  addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string; projectId: string }) => string;
+  updateEvent: (eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => void;
+  deleteEvent: (eventId: string) => void;
+  isLoadingEvents: boolean;
+  getEventById: (id: string) => Event | undefined;
+  shotRequestsByEventId: Record<string, ShotRequest[]>;
+  getShotRequestsForEvent: (eventId: string) => ShotRequest[];
+  addShotRequest: (eventId: string, shotData: ShotRequestFormData) => void;
+  updateShotRequest: (eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => void;
+  deleteShotRequest: (eventId: string, shotId: string) => void;
+  checkInUserToEvent: (eventId: string, personnelId: string) => void;
+  checkOutUserFromEvent: (eventId: string, personnelId: string) => void;
+}
+
+// --- Event Context ---
 import { useSettingsContext } from './SettingsContext';
 import { useProjectContext } from './ProjectContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
-import { z } from 'zod';
-import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore, subDays, addDays } from 'date-fns';
+
+const EventContext = createContext<EventContextType | undefined>(undefined);
 
 // --- Shot Request Definitions ---
 export const shotRequestSchemaInternal = z.object({
@@ -21,7 +42,8 @@ export const shotRequestSchemaInternal = z.object({
   notes: z.string().optional(),
   blockedReason: z.string().optional(),
   initialCapturerId: z.string().optional(),
-  lastStatusModifierId: z.string().optional().refine(val => !val || isValid(parseISO(val)), {
+  lastStatusModifierId: z.string().optional(),
+  lastStatusModifiedAt: z.string().optional().refine(val => !val || isValid(parseISO(val)), {
     message: "Last status modified must be a valid ISO date string or empty.",
   }),
 });
@@ -32,13 +54,29 @@ export type ShotRequest = ShotRequestFormData & {
 };
 
 // --- Event Definition ---
-export type Event = { // Define Event type directly in this file
- name: string;
-   personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
+export type Event = {
+  name: string;
+  personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
+  date: string; // Add date property
   id: string;
-   organizationId?: string;
-   discipline?: "Photography" | "";
+  organizationId?: string;
+  projectId: string; // Add projectId here
+  project: string; // Project name for display
+  deliverables: number; // Count of deliverables
+  shotRequests: number; // Count of associated shot requests
+  hasOverlap?: boolean; // Add hasOverlap property
+  time: string; // Add time property
+  discipline?: "Photography" | "";
+  assignedPersonnelIds: string[]; // Add assignedPersonnelIds property
+  isCovered: boolean; // Add isCovered property
+  isQuickTurnaround: boolean; // Add isQuickTurnaround property
+  location?: string; // Add location property
+  status?: string; // Add status property
+  description?: string; // Add description property
+  deadline?: string; // Add deadline property
 };
+
+
 
 // Type for raw event data from backend or demo JSON
 type EventDataSource = {
@@ -89,32 +127,30 @@ export function EventProvider({ children }: { children: ReactNode }) {
         try {
           const response = await fetch('/demo/demo_data.json');
           if (response.ok) {
-            const demoData = await response.json(); // Correctly parse JSON
+            const demoData = await response.json(); 
             
             if (demoData && Array.isArray(demoData.events)) {
               loadedEvents = demoData.events.map((evtData: EventDataSource) => {
-                // Map demo data structure to Event type
-                const eventId = evtData.eventId || evtData.id; // Use eventId from demo, fallback to id
+                const eventId = evtData.eventId || evtData.id; 
                 if (!eventId) {
                     console.error("Demo event data missing id:", evtData);
-                    return null; // Skip events without an ID
+                    return null; 
                 }
 
-                // Process shots nested within the event data
                 if (Array.isArray(evtData.shots)) {
                     loadedShotsByEventId[eventId] = evtData.shots.map((shotData: ShotRequestDataSource, index) => ({
                         ...shotData,
-                        id: shotData.id || `demo_sr_${eventId}_${index}`, // Generate ID if missing
-                        eventId: eventId, // Ensure eventId is linked
-                        description: shotData.description || "", // Ensure description is string
-                        priority: shotData.priority || "Medium", // Default priority
-                        status: shotData.status || "Unassigned", // Default status
-                    })).filter(shot => shot !== null) as ShotRequest[]; // Filter out any nulls if mapping failed
+                        id: shotData.id || `demo_sr_${eventId}_${index}`, 
+                        eventId: eventId, 
+                        description: shotData.description || "", 
+                        priority: shotData.priority || "Medium", 
+                        status: shotData.status || "Unassigned", 
+                    })).filter(shot => shot !== null) as ShotRequest[]; 
                 } else {
-                     loadedShotsByEventId[eventId] = []; // Ensure event has a shots array entry
+                     loadedShotsByEventId[eventId] = []; 
                 }
 
-                const projectForEvent = projects.find(p => p.id === evtData.projectId); // Find project from ProjectContext
+                const projectForEvent = projects.find(p => p.id === evtData.projectId); 
 
                 return {
                   id: eventId,
@@ -122,28 +158,27 @@ export function EventProvider({ children }: { children: ReactNode }) {
                   projectId: evtData.projectId,
                   project: projectForEvent?.name || "Unknown Project",
                   date: evtData.date,
-                  time: evtData.time || "", // Default time
+                  time: evtData.time || "", 
                   location: evtData.location || "",
-                  status: evtData.status || "Upcoming", // Default status
+                  status: evtData.status || "Upcoming", 
                   description: evtData.description || "",
                   assignedPersonnelIds: evtData.assignedPersonnelIds || [],
                   isQuickTurnaround: evtData.isQuickTurnaround || false,
                   deadline: evtData.deadline,
-                  deliverables: 0, // Assuming deliverables aren't in this demo structure
-                  shotRequests: (loadedShotsByEventId[eventId]?.length || 0), // Count shots processed
-                  organizationId: evtData.organizationId || projectForEvent?.organizationId || "", // Derive from demo or project
+                  deliverables: 0, 
+                  shotRequests: (loadedShotsByEventId[eventId]?.length || 0), 
+                  organizationId: evtData.organizationId || projectForEvent?.organizationId || "", 
                   discipline: evtData.discipline || "",
                   isCovered: evtData.isCovered === undefined ? true : evtData.isCovered,
                   personnelActivity: evtData.personnelActivity || {},
-                  // hasOverlap can be calculated later if needed
                 };
-              }).filter(event => event !== null) as Event[]; // Filter out any null events
-              
+              }).filter((event: Event | null): event is Event => event !== null) as Event[];
+
             } else {
                console.error("Demo data file does not contain an 'events' array or is empty.");
             }
           } else {
-            console.error("Failed to read demo data file. Status:", response.status, response); // Log status and response object
+            console.error("Failed to read demo data file. Status:", response.status, response); 
           }
         } catch (error) {
           console.error("Error processing demo data JSON:", error);
@@ -151,58 +186,58 @@ export function EventProvider({ children }: { children: ReactNode }) {
       } else {
         // Fetch live data
         try {
-          // IMPORTANT: If your Python backend runs on a different port (e.g., 5000)
-          // than your Next.js app (e.g., 9002), you'll need a proxy for this fetch.
-          // Create a Next.js API route (e.g., /api/events) that forwards to your Python backend.
-          // For now, this assumes the fetch will work (e.g., proxy is set up, or same origin).
-          const response = await fetch('/api/events'); // Or your actual backend endpoint
+          const response = await fetch('/api/events'); 
           if (!response.ok) {
-            throw new Error(`Failed to fetch events: ${response.status}`);
+            // Log error but don't throw, allow fallback to empty data
+            console.error(`Failed to fetch events from /api/events. Status: ${response.status}. Message: ${await response.text()}`);
+            // loadedEvents will remain empty, as will loadedShotsByEventId
+          } else {
+            const data: { events: EventDataSource[] } = await response.json(); 
+            
+            data.events.forEach(be => {
+               const eventId = String(be.id || be.eventId); 
+               if (!eventId) return; 
+
+              const projectForEvent = projects.find(p => p.id === be.projectId); 
+
+              const frontendEvent: Event = {
+                id: eventId, 
+                name: be.name,
+                project: projectForEvent?.name || "Unknown Project", 
+                projectId: be.projectId || "unknown_project_id", 
+                date: be.date,
+                time: be.time || "", 
+                assignedPersonnelIds: be.assignedPersonnelIds || [],
+                shotRequests: (be.shots || []).length,
+                deliverables: 0, 
+                isQuickTurnaround: be.isQuickTurnaround || false,
+                deadline: be.deadline,
+                organizationId: be.organizationId || projectForEvent?.organizationId || "", 
+                discipline: be.discipline || "",
+                isCovered: be.isCovered === undefined ? true : be.isCovered,
+                personnelActivity: be.personnelActivity || {},
+                description: be.description || "", 
+                location: be.location || "", 
+                status: be.status || "Upcoming", 
+              };
+              loadedEvents.push(frontendEvent);
+
+              const shotsForThisEvent: ShotRequest[] = (be.shots || []).map((shotData, index) => ({
+                ...shotData,
+                id: shotData.id || `live_sr_${eventId}_${index}`, 
+                eventId: eventId,
+                 description: shotData.description || "", 
+                priority: shotData.priority || "Medium", 
+                status: shotData.status || "Unassigned", 
+              })).filter(shot => shot !== null) as ShotRequest[];
+              loadedShotsByEventId[eventId] = shotsForThisEvent;
+            });
           }
-          const data: { events: EventDataSource[] } = await response.json(); // Assuming backend returns array under 'events'
-          
-          data.events.forEach(be => {
-             const eventId = String(be.id || be.eventId); // Use backend id or eventId
-             if (!eventId) return; // Skip if no ID
-
-            const projectForEvent = projects.find(p => p.id === be.projectId); // Try to find project if projectId is in backend data
-
-            const frontendEvent: Event = {
-              id: eventId, 
-              name: be.name,
-              project: projectForEvent?.name || "Unknown Project", 
-              projectId: be.projectId || "unknown_project_id", 
-              date: be.date,
-              time: be.time || "", 
-              assignedPersonnelIds: be.assignedPersonnelIds || [],
-              shotRequests: (be.shots || []).length,
-              deliverables: 0, 
-              isQuickTurnaround: be.isQuickTurnaround || false,
-              deadline: be.deadline,
-              organizationId: be.organizationId || projectForEvent?.organizationId || "", 
-              discipline: be.discipline || "",
-              isCovered: be.isCovered === undefined ? true : be.isCovered,
-              personnelActivity: be.personnelActivity || {},
-              description: be.description || "", 
-              location: be.location || "", 
-              status: be.status || "Upcoming", 
-            };
-            loadedEvents.push(frontendEvent);
-
-            const shotsForThisEvent: ShotRequest[] = (be.shots || []).map((shotData, index) => ({
-              ...shotData,
-              id: shotData.id || `live_sr_${eventId}_${index}`, // Generate a unique ID if missing
-              eventId: eventId,
-               description: shotData.description || "", // Ensure description is string
-              priority: shotData.priority || "Medium", // Default priority
-              status: shotData.status || "Unassigned", // Default status
-            })).filter(shot => shot !== null) as ShotRequest[];
-            loadedShotsByEventId[eventId] = shotsForThisEvent;
-          });
-
         } catch (error) {
           console.error("Error fetching live event data:", error);
-          // Optionally, set an error state here to show in UI
+          // Fallback to empty data if live fetch fails entirely
+          loadedEvents = []; 
+          loadedShotsByEventId = {};
         }
       }
       
@@ -211,14 +246,12 @@ export function EventProvider({ children }: { children: ReactNode }) {
       setIsLoadingEvents(false);
     };
     
-    // Re-run effect if useDemoData or selectedProject/projects change after initial load
-    // Added projects as dependency because we look up project details here.
     loadData();
   }, [useDemoData, isLoadingSettings, selectedProject, projects]); 
 
 
-  const addEvent = useCallback((eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }): string => {
-    const projectForEvent = projects.find(p => p.id === eventData.projectId);
+  const addEvent = useCallback((eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string; projectId: string }): string => {
+    const projectForEvent = projects.find(p => p.id === eventData.projectId); 
     const newEventId = `evt_new_${Date.now()}`;
     const newEvent: Event = {
       ...eventData,
@@ -238,11 +271,10 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
     if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to add event:", newEvent);
-        // TODO: Implement real API call to add event
     }
 
     return newEventId;
-  }, [projects, useDemoData]); // Added useDemoData dependency
+  }, [projects, useDemoData]); 
 
   const updateEvent = useCallback((eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => {
     let projectName = eventData.projectId ? projects.find(p => p.id === eventData.projectId)?.name : undefined;
@@ -262,9 +294,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
             
             updatedEvent.personnelActivity = eventData.personnelActivity ? { ...evt.personnelActivity, ...eventData.personnelActivity} : (evt.personnelActivity || {});
             
-            // Do not update shotRequests count directly here, it's derived from shotRequestsByEventId state
-            // delete updatedEvent.shotRequests; // Or ensure it's not copied from eventData
-
             return updatedEvent;
         }
         return evt;
@@ -273,9 +302,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
     
     if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to update event:", eventId, eventData);
-        // TODO: Implement real API call to update event
     }
-  }, [projects, useDemoData]); // Added useDemoData dependency
+  }, [projects, useDemoData]); 
 
   const deleteEvent = useCallback((eventId: string) => {
     setAllEventsState((prevEvents) =>
@@ -288,9 +316,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
     });
      if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to delete event:", eventId);
-        // TODO: Implement real API call to delete event
     }
-  }, [useDemoData]); // Added useDemoData dependency
+  }, [useDemoData]); 
 
   const getShotRequestsForEvent = useCallback((eventId: string): ShotRequest[] => {
     return shotRequestsByEventId[eventId] || [];
@@ -307,6 +334,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
       blockedReason: shotData.blockedReason || undefined,
       initialCapturerId: shotData.initialCapturerId || undefined,
       lastStatusModifierId: shotData.lastStatusModifierId || undefined,
+      lastStatusModifiedAt: shotData.lastStatusModifiedAt || undefined,
       id: `sr_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       eventId: eventId,
     };
@@ -314,16 +342,14 @@ export function EventProvider({ children }: { children: ReactNode }) {
       ...prev,
       [eventId]: [...(prev[eventId] || []), newShot],
     }));
-    // Update event's shotRequests count
     setAllEventsState(prevEvents => prevEvents.map(evt =>
       evt.id === eventId ? { ...evt, shotRequests: (shotRequestsByEventId[eventId] ? shotRequestsByEventId[eventId].length + 1 : 1) } : evt
     ));
      if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to add shot request:", eventId, newShot);
-        // TODO: Implement real API call to add shot request
     }
 
-  }, [shotRequestsByEventId, useDemoData]); // Added useDemoData dependency
+  }, [shotRequestsByEventId, useDemoData]); 
 
   const updateShotRequest = useCallback((eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => {
     setShotRequestsByEventId(prev => {
@@ -348,9 +374,8 @@ export function EventProvider({ children }: { children: ReactNode }) {
     });
      if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to update shot request:", eventId, shotId, updatedData);
-        // TODO: Implement real API call to update shot request
     }
-  }, [useDemoData]); // Added useDemoData dependency
+  }, [useDemoData]); 
 
   const deleteShotRequest = useCallback((eventId: string, shotId: string) => {
     let newShotRequestsCount = 0;
@@ -362,20 +387,17 @@ export function EventProvider({ children }: { children: ReactNode }) {
       if (updatedShots.length > 0) {
         updatedShotsByEventId[eventId] = updatedShots;
       } else if (prev[eventId]) {
-         // Only delete the event key if it existed and is now empty
         delete updatedShotsByEventId[eventId];
       }
       return updatedShotsByEventId;
     });
-    // Update event's shotRequests count
     setAllEventsState(prevEvents => prevEvents.map(evt =>
       evt.id === eventId ? { ...evt, shotRequests: newShotRequestsCount } : evt
     ));
      if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to delete shot request:", eventId, shotId);
-        // TODO: Implement real API call to delete shot request
     }
-  }, [useDemoData]); // Added useDemoData dependency
+  }, [useDemoData]); 
 
   const checkInUserToEvent = useCallback((eventId: string, personnelId: string) => {
     setAllEventsState(prevEvents => 
@@ -392,14 +414,13 @@ export function EventProvider({ children }: { children: ReactNode }) {
           const updatedEvent = { ...event, personnelActivity: newPersonnelActivity };
            if (!useDemoData) {
               console.warn("Demo data mode is off. Implement actual API call for check-in:", eventId, personnelId);
-              // TODO: Implement real API call for check-in
            }
           return updatedEvent;
         }
         return event;
       })
     );
-  }, [useDemoData]); // Added useDemoData dependency
+  }, [useDemoData]); 
 
   const checkOutUserFromEvent = useCallback((eventId: string, personnelId: string) => {
     setAllEventsState(prevEvents =>
@@ -418,14 +439,13 @@ export function EventProvider({ children }: { children: ReactNode }) {
            const updatedEvent = { ...event, personnelActivity: newPersonnelActivity };
            if (!useDemoData) {
               console.warn("Demo data mode is off. Implement actual API call for check-out:", eventId, personnelId);
-              // TODO: Implement real API call for check-out
            }
           return updatedEvent;
         }
         return event;
       })
     );
-  }, [useDemoData]); // Added useDemoData dependency
+  }, [useDemoData]); 
 
   const eventsForSelectedProjectAndOrg = useMemo(() => {
     if (isLoadingEvents || isLoadingSettings) return [];
