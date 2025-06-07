@@ -28,38 +28,13 @@ import type { SubmitHandler } from "react-hook-form";
 import { format, parseISO } from "date-fns";
 import { DeliverableFormDialog, type DeliverableFormDialogData } from "@/components/modals/DeliverableFormDialog";
 import { ClientGalleryFormDialog, type ClientGalleryFormDialogData, type ClientGallery } from "@/components/modals/ClientGalleryFormDialog";
+import { default_api } from '@/lib/utils'; // Assuming default_api is imported via a utility file
 
 
 export type Deliverable = DeliverableFormDialogData & {
   id: string;
   projectName: string;
 };
-
-const initialDeliverablesMock: Deliverable[] = [
-  { id: "del001", name: "Highlight Reel - Day 1", event: "Main Stage - Day 1", dueDate: parseISO("2024-07-16"), status: "In Progress", type: "Video", projectName: "Summer Music Festival 2024", projectId: "proj001" },
-  { id: "del002", name: "Keynote Recording", event: "Keynote Speech", dueDate: parseISO("2024-09-15"), status: "Pending", type: "Video", projectName: "Tech Conference X", projectId: "proj002" },
-  { id: "del003", name: "Photo Album", event: "VIP Reception", dueDate: parseISO("2024-11-06"), status: "Completed", type: "Images", projectName: "Corporate Gala Dinner", projectId: "proj003" },
-  { id: "del004", name: "Full Event Recap", event: "Summer Music Festival 2024", dueDate: parseISO("2024-09-15"), status: "Blocked", type: "Report/Video", projectName: "Summer Music Festival 2024", projectId: "proj001" },
-  { id: "del005", name: "Sizzle Reel - Tech", event: "Tech Conference X", dueDate: parseISO("2024-09-20"), status: "In Progress", type: "Video", projectName: "Tech Conference X", projectId: "proj002" },
-];
-
-const initialClientGalleriesMock: ClientGallery[] = [
-    { id: "gal001", galleryName: "Summer Fest Highlights", clientEmail: "clientA@example.com", accessType: "password", password: "password123", allowHighResDownload: true, enableWatermarking: false, expiresOn: parseISO("2024-12-31"), welcomeMessage: "Enjoy the highlights!", deliverableContextName: "Summer Music Festival 2024" },
-    { id: "gal002", galleryName: "Tech Conference Keynotes", clientEmail: "clientB@example.com", accessType: "private", allowHighResDownload: false, enableWatermarking: true, expiresOn: null, welcomeMessage: "Keynote recordings for Tech Conference X.", deliverableContextName: "Tech Conference X" },
-    {
-      id: "gal003",
-      galleryName: "G9e Summit Live Previews",
-      clientEmail: "internal_stakeholder@g9e.com",
-      accessType: "private",
-      password: "",
-      allowHighResDownload: true,
-      enableWatermarking: true,
-      expiresOn: parseISO("2024-12-31"),
-      welcomeMessage: "Live previews from the G9e Annual Summit 2024.",
-      deliverableContextName: "G9e Annual Summit 2024"
-    },
-];
-
 
 export default function DeliverablesPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
@@ -84,17 +59,80 @@ export default function DeliverablesPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!isLoadingSettings) {
-      setDeliverablesList(useDemoData ? initialDeliverablesMock : []);
-      setClientGalleries(useDemoData ? initialClientGalleriesMock : []);
-    }
-  }, [useDemoData, isLoadingSettings]);
+    const loadDeliverablesData = async () => {
+      if (isLoadingSettings || isLoadingProjects) return; // Wait for settings and projects to load
+
+      let loadedDeliverables: Deliverable[] = [];
+      let loadedClientGalleries: ClientGallery[] = [];
+
+      if (useDemoData) {
+        try {
+          const response = await default_api.read_file({ path: "public/demo/demo_data.json" });
+          if (response.status === 'succeeded') {
+            const demoData = JSON.parse(response.result);
+            
+            if (demoData && Array.isArray(demoData.deliverables)) {
+              loadedDeliverables = demoData.deliverables.map((d: any) => {
+                // Find the project name using the projectId from demo data
+                const project = allProjectsFromContext.find(p => p.id === d.projectId);
+                return {
+                  id: d.deliverableId, // Map deliverableId from JSON to id in type
+                  name: d.name,
+                  event: d.eventId, // Assuming eventId maps to event field
+                  dueDate: d.dueDate ? parseISO(d.dueDate) : new Date(), // Parse date string
+                  status: d.status, // Assuming status exists
+                  type: d.type || "Unknown", // Default type
+                  projectId: d.projectId, // Keep projectId
+                  projectName: project?.name || "Unknown Project", // Map project name
+                };
+              });
+            } else {
+               console.error("Demo data file does not contain a 'deliverables' array or is empty.");
+            }
+
+            // Load client galleries if they exist in demo data
+             if (demoData && Array.isArray(demoData.clientGalleries)) {
+                loadedClientGalleries = demoData.clientGalleries.map((g: any) => ({
+                    id: g.id, // Assuming id is used in demo data
+                    galleryName: g.galleryName,
+                    clientEmail: g.clientEmail,
+                    accessType: g.accessType, // Assuming accessType exists
+                    password: g.password, // Assuming password exists
+                    allowHighResDownload: g.allowHighResDownload || false,
+                    enableWatermarking: g.enableWatermarking || false,
+                    expiresOn: g.expiresOn ? parseISO(g.expiresOn) : null, // Parse date string
+                    welcomeMessage: g.welcomeMessage || "",
+                    // Assuming deliverableContextName is used in demo data
+                    deliverableContextName: g.deliverableContextName || "", 
+                }));
+             } else {
+                 console.warn("Demo data file does not contain a 'clientGalleries' array or is empty.");
+             }
+
+          } else {
+            console.error("Failed to read demo data file:", response.error);
+          }
+        } catch (error) {
+          console.error("Error processing demo data JSON for deliverables/galleries:", error);
+        }
+      } else {
+        // TODO: Implement fetching real deliverables and client galleries data from backend API
+        console.warn("Demo data mode is off. Implement actual API calls to fetch deliverables and galleries.");
+        loadedDeliverables = []; // Start with empty arrays when not using demo data
+        loadedClientGalleries = [];
+      }
+      setDeliverablesList(loadedDeliverables);
+      setClientGalleries(loadedClientGalleries);
+    };
+
+    loadDeliverablesData();
+  }, [useDemoData, isLoadingSettings, isLoadingProjects, allProjectsFromContext]); // Depend on useDemoData, settings, projects loading, and projects list
   
   useEffect(() => {
     if (selectedProject) {
       setEventNameForSummary(selectedProject.name);
     } else {
-      setEventNameForSummary("All Projects");
+      setEventNameForSummary("All Projects"); // Default for summary when no project selected
     }
     setSummaryResult(null); 
   }, [selectedProject]);
@@ -104,13 +142,14 @@ export default function DeliverablesPage() {
     if (!selectedProject) {
       return deliverablesList;
     }
-    return deliverablesList.filter(d => d.projectName === selectedProject.name);
+    return deliverablesList.filter(d => d.projectId === selectedProject.id); // Filter by projectId now
   }, [selectedProject, deliverablesList]);
 
   const filteredClientGalleries = useMemo(() => {
     if (!selectedProject) {
       return clientGalleries;
     }
+     // Filter galleries by the selected project's name (as used in demo data)
     return clientGalleries.filter(g => g.deliverableContextName === selectedProject.name);
   }, [selectedProject, clientGalleries]);
   
@@ -128,6 +167,10 @@ export default function DeliverablesPage() {
         title: "Deliverable Updated",
         description: `"${data.name}" has been successfully updated.`,
       });
+       if (!useDemoData) {
+           console.warn("Demo data mode is off. Implement actual API call to update deliverable:", editingDeliverable.id, data);
+           // TODO: Implement real API call to update deliverable
+       }
     } else {
       const newDeliverable: Deliverable = {
         ...data,
@@ -139,6 +182,10 @@ export default function DeliverablesPage() {
         title: "Deliverable Added",
         description: `"${data.name}" has been successfully added.`,
       });
+       if (!useDemoData) {
+           console.warn("Demo data mode is off. Implement actual API call to add deliverable:", newDeliverable);
+           // TODO: Implement real API call to add deliverable
+       }
     }
     setIsDeliverableModalOpen(false);
     setEditingDeliverable(null);
@@ -168,6 +215,10 @@ export default function DeliverablesPage() {
         description: `Deliverable "${deliverable?.name}" has been deleted.`,
         variant: "destructive"
       });
+       if (!useDemoData) {
+           console.warn("Demo data mode is off. Implement actual API call to delete deliverable:", deliverableToDeleteId);
+           // TODO: Implement real API call to delete deliverable
+       }
       setDeliverableToDeleteId(null);
     }
     setIsDeleteDialogOpen(false);
@@ -215,6 +266,10 @@ export default function DeliverablesPage() {
         title: "Client Gallery Updated",
         description: `Gallery "${data.galleryName}" has been updated.`,
       });
+       if (!useDemoData) {
+           console.warn("Demo data mode is off. Implement actual API call to update client gallery:", editingClientGallery.id, data);
+           // TODO: Implement real API call to update client gallery
+       }
     } else {
       const newGallery: ClientGallery = {
         ...data,
@@ -226,6 +281,10 @@ export default function DeliverablesPage() {
         title: "Client Gallery Created (Simulated)",
         description: `Gallery "${data.galleryName}" for ${data.clientEmail} is ready.`,
       });
+       if (!useDemoData) {
+           console.warn("Demo data mode is off. Implement actual API call to create client gallery:", newGallery);
+           // TODO: Implement real API call to create client gallery
+       }
     }
     setIsClientGalleryModalOpen(false);
     setEditingClientGallery(null);
@@ -255,6 +314,10 @@ export default function DeliverablesPage() {
         description: `Gallery "${gallery?.galleryName}" has been deleted.`,
         variant: "destructive"
       });
+       if (!useDemoData) {
+           console.warn("Demo data mode is off. Implement actual API call to delete client gallery:", galleryToDeleteId);
+           // TODO: Implement real API call to delete client gallery
+       }
       setGalleryToDeleteId(null);
     }
     setIsDeleteGalleryDialogOpen(false);

@@ -45,7 +45,8 @@ import { cn } from "@/lib/utils";
 import { EventFormDialog, type EventFormDialogData } from "@/components/modals/EventFormDialog";
 import { BlockScheduleView } from "@/components/block-schedule-view";
 import { useEventContext, type Event } from "@/contexts/EventContext";
-import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
+import { usePersonnelContext, type Personnel } from "@/contexts/PersonnelContext"; // Import from PersonnelContext
+import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page"; // Still needed for roles definition
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
@@ -577,6 +578,7 @@ export default function EventsPage() {
   const { selectedProject, projects: allProjectsFromContext, isLoadingProjects } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { organizations, isLoadingOrganizations } = useOrganizationContext();
+  const { personnelList, isLoadingPersonnel } = usePersonnelContext(); // Use PersonnelContext
   const {
     eventsForSelectedProjectAndOrg = [],
     addEvent,
@@ -602,13 +604,13 @@ export default function EventsPage() {
   const { toast } = useToast();
 
   const assignedPersonnelForFilter = useMemo(() => {
-    if (isLoadingContextEvents || !eventsForSelectedProjectAndOrg) return [];
+    if (isLoadingContextEvents || !eventsForSelectedProjectAndOrg || isLoadingPersonnel) return [];
     const personnelIds = new Set<string>();
     (eventsForSelectedProjectAndOrg || []).forEach(event => {
       event.assignedPersonnelIds?.forEach(id => personnelIds.add(id));
     });
-    return initialPersonnelMock.filter(person => personnelIds.has(person.id));
-  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents]);
+    return personnelList.filter(person => personnelIds.has(person.id));
+  }, [eventsForSelectedProjectAndOrg, isLoadingContextEvents, personnelList, isLoadingPersonnel]);
 
   const displayableEvents = useMemo(() => {
     if (isLoadingContextEvents) return [];
@@ -851,7 +853,7 @@ export default function EventsPage() {
   }, [selectedEventDates, displayableEvents]);
 
 
-  if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents || isLoadingOrganizations) {
+  if (isLoadingSettings || isLoadingProjects || isLoadingContextEvents || isLoadingOrganizations || isLoadingPersonnel) {
       return <div>Loading event data and filters...</div>;
   }
 
@@ -919,7 +921,7 @@ export default function EventsPage() {
         editingEvent={editingEvent}
         onSubmit={handleEventSubmit}
         allProjects={allProjectsFromContext}
-        allPersonnel={initialPersonnelMock}
+        allPersonnel={personnelList} 
         activeBlockScheduleDate={firstSelectedDateForDialog}
       />
 
@@ -972,7 +974,7 @@ export default function EventsPage() {
                 openEditEventModal={openEditEventModal}
                 selectedProject={selectedProject}
                 useDemoData={useDemoData}
-                allPersonnel={initialPersonnelMock}
+                allPersonnel={personnelList} 
                 selectedEventDates={selectedEventDates}
             />
         </TabsContent>

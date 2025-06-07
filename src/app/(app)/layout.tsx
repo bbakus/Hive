@@ -27,6 +27,7 @@ import { SettingsProvider } from "@/contexts/SettingsContext";
 import { PhaseProvider, usePhaseContext, type Phase, AppPhasesArray, type NavItem } from "@/contexts/PhaseContext";
 import { EventProvider } from "@/contexts/EventContext";
 import { UserProvider } from "@/contexts/UserContext"; // Import UserProvider
+import { PersonnelProvider } from "@/contexts/PersonnelContext"; // Import PersonnelProvider
 import { ProjectSelector } from "@/components/project-selector";
 import { OrganizationSelector } from "@/components/organization-selector";
 import { LocalAgentStatusIndicator } from "@/components/local-agent-status-indicator";
@@ -93,7 +94,7 @@ function AppSidebar() {
             <Link href={item.href} legacyBehavior passHref>
               <SidebarMenuButton
                 asChild
-                isActive={item.matchStartsWith ? currentPathname.startsWith(item.href) : currentPathname === item.href}
+                isActive={item.matchStartsWith ? currentPathname.startsWith(item.href) : pathname === item.href}
                 tooltip={{ children: item.label, side: "right", align: "center", className: "bg-popover text-popover-foreground" }}
               >
                 <a>
@@ -241,14 +242,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SettingsProvider>
       <LocalAgentProvider>
-        <UserProvider> {/* Wrap with UserProvider */}
+        <UserProvider>
           <OrganizationProvider>
             <ProjectProvider>
-              <EventProvider>
-                <PhaseProvider>
-                  <AppLayoutInternal>{children}</AppLayoutInternal>
-                </PhaseProvider>
-              </EventProvider>
+              <PersonnelProvider> {/* Added PersonnelProvider */}
+                <EventProvider>
+                  <PhaseProvider>
+                    <AppLayoutInternal>{children}</AppLayoutInternal>
+                  </PhaseProvider>
+                </EventProvider>
+              </PersonnelProvider>
             </ProjectProvider>
           </OrganizationProvider>
         </UserProvider>

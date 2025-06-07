@@ -1,0 +1,125 @@
+{
+  "projects": [
+    {
+      "projectId": "proj_culinary_fest_2024",
+      "name": "Annual Culinary Arts Festival 2024",
+      "description": "Premier food and wine festival showcasing top chefs and culinary trends.",
+      "startDate": "2024-10-10",
+      "endDate": "2024-10-13"
+    },
+    {
+      "projectId": "proj_gourmet_summit",
+      "name": "Gourmet Innovation Summit",
+      "description": "Industry summit focused on the future of food technology and sustainable practices.",
+      "startDate": "2025-03-15",
+      "endDate": "2025-03-17"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "evt_culinary_fest_d1_chef_smith",
+      "projectId": "proj_culinary_fest_2024",
+      "name": "Chef Demo: Master Techniques with Chef Smith",
+      "date": "2024-10-10",
+      "startTime": "11:00",
+      "endTime": "12:00",
+      "location": "Main Stage",
+      "description": "Chef John Smith demonstrates molecular gastronomy techniques."
+    },
+    {
+      "eventId": "evt_culinary_fest_d1_wine_pairing",
+      "projectId": "proj_culinary_fest_2024",
+      "name": "Wine Pairing Masterclass: Italian Wines",
+      "date": "2024-10-10",
+      "startTime": "14:00",
+      "endTime": "15:30",
+      "location": "Workshop Room A",
+      "description": "Explore classic Italian wine pairings."
+    },
+    {
+      "eventId": "evt_culinary_fest_d2_book_jones",
+      "projectId": "proj_culinary_fest_2024",
+      "name": "Book Signing: 'The Art of Baking' by Jane Jones",
+      "date": "2024-10-11",
+      "startTime": "10:00",
+      "endTime": "11:00",
+      "location": "Book Nook",
+      "description": "Meet author Jane Jones and get your copy signed."
+    },
+     {
+      "eventId": "evt_gourmet_summit_d1_keynote",
+      "projectId": "proj_gourmet_summit",
+      "name": "Keynote: Future of Food Sustainability",
+      "date": "2025-03-15",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "location": "Grand Ballroom",
+      "description": "Opening keynote address on sustainable food practices."
+    }
+  ],
+  "personnel": [
+    {
+      "personnelId": "user001",
+      "name": "Alice Johnson",
+      "role": "Photographer",
+      "contact": "alice.johnson@example.com"
+    },
+    {
+      "personnelId": "user002",
+      "name": "Bob Williams",
+      "role": "Photographer",
+      "contact": "bob.williams@example.com"
+    },
+     {
+      "personnelId": "user003",
+      "name": "Charlie Brown",
+      "role": "Event Manager",
+      "contact": "charlie.brown@example.com"
+    }
+  ],
+  "deliverables": [
+    {
+      "deliverableId": "del_smith_demo_photos",
+      "eventId": "evt_culinary_fest_d1_chef_smith",
+      "name": "Photos from Chef Smith Demo",
+      "status": "Completed",
+      "dueDate": "2024-10-15",
+      "url": "/files/deliverables/smith_demo_photos.zip"
+    },
+    {
+      "deliverableId": "del_wine_masterclass_report",
+      "eventId": "evt_culinary_fest_d1_wine_pairing",
+      "name": "Wine Pairing Masterclass Summary Report",
+      "status": "In Progress",
+      "dueDate": "2024-10-18"
+    }
+  ],
+   "ingestionJobs": [
+    {
+      "jobId": "job_init_culinary_smith_001",
+      "status": "completed",
+      "progress": 100,
+      "message": "Images from Chef Smith demo ingested successfully.",
+      "filesProcessed": 150,
+      "filesMatchedToEvents": 145,
+      "filesUnmatched": 5,
+      "totalFiles": 150,
+      "totalSizeMB": 2048,
+      "checksumResult": "passed",
+      "errors": [],
+      "determinedPhotographerId": "user001",
+      "determinedEventId": "evt_culinary_fest_d1_chef_smith",
+      "reportUrl": "/reports/mock/job_smith_demo.json"
+    },
+     {
+      "jobId": "job_init_culinary_jones_002",
+      "status": "processing_files",
+      "progress": 65,
+      "message": "Processing photos from Jane Jones book signing...",
+      "filesProcessed": 80,
+      "totalFiles": 120,
+      "determinedPhotographerId": "user002",
+      "determinedEventId": "evt_culinary_fest_d2_book_jones"
+    }
+  ]
+}

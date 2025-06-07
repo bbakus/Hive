@@ -31,32 +31,32 @@ import { useProjectContext } from "@/contexts/ProjectContext";
 import { format, parseISO } from "date-fns";
 import { PersonnelFormDialog, type PersonnelFormDialogData } from "@/components/modals/PersonnelFormDialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+// Import usePersonnelContext and Personnel type from the new context
+import { usePersonnelContext, type Personnel } from "@/contexts/PersonnelContext";
 
 
 export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client", "Event Lead"] as const;
 
-export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
-  id: string;
-  cameraSerials?: string[];
-};
+// Removed Personnel type definition as it's now imported from the context
+// export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
+//   id: string;
+//   cameraSerials?: string[];
+//   contact?: string;
+// };
 
-export let initialPersonnelMock: Personnel[] = [
-  { id: "user_maria_s", name: "Maria Sanchez", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=MS", cameraSerials: ["SN_CANON_R5_001", "SN_SONY_A7IV_002"] },
-  { id: "user_david_l", name: "David Lee", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=DL", cameraSerials: ["SN_NIKON_Z7II_003", "SN_FUJI_XT4_004"] },
-  { id: "user_sophia_c", name: "Sophia Chen", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=SC", cameraSerials: ["SN_SONY_A1_005"] },
-  { id: "user_james_b", name: "James Brown", role: "Photographer", status: "Available", avatar: "https://placehold.co/40x40.png?text=JB", cameraSerials: ["SN_CANON_R6_006", "SN_LEICA_M11_007"] },
-  { id: "user_liam_w", name: "Liam Wilson", role: "Project Manager", status: "Available", avatar: "https://placehold.co/40x40.png?text=LW" },
-  { id: "user_ava_m", name: "Ava Miller", role: "Editor", status: "Available", avatar: "https://placehold.co/40x40.png?text=AM" },
-  { id: "user_client_liaison", name: "Client Liaison (PBCC)", role: "Client", status: "Available", avatar: "https://placehold.co/40x40.png?text=CL" },
-  { id: "user_event_lead_ops", name: "Ops Event Lead", role: "Event Lead", status: "Available", avatar: "https://placehold.co/40x40.png?text=EL" },
-];
+// Removed initialPersonnelMock as data is loaded via context
+// export let initialPersonnelMock: Personnel[] = [...];
 
 export default function PersonnelPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { allEvents, isLoadingEvents, getEventById, updateEvent, eventsForSelectedProjectAndOrg } = useEventContext(); 
   const { selectedProject } = useProjectContext();
+  // Use the personnel context
+  const { personnelList, isLoadingPersonnel, addPersonnel, updatePersonnel, deletePersonnel, getPersonnelById } = usePersonnelContext();
 
-  const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
+  // Removed local personnelList state
+  // const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
+
   const [isPersonnelModalOpen, setIsPersonnelModalOpen] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -72,11 +72,8 @@ export default function PersonnelPage() {
   const [selectedEventForAssignment, setSelectedEventForAssignment] = useState<string | null>(null);
   const [eventDetailsForAssignment, setEventDetailsForAssignment] = useState<Event | null>(null);
   
-  useEffect(() => {
-    if (!isLoadingSettings) {
-        setPersonnelList(useDemoData ? initialPersonnelMock : []);
-    }
-  }, [useDemoData, isLoadingSettings]);
+  // Removed useEffect for loading personnel data, now handled by context
+  // useEffect(() => { ... }, [useDemoData, isLoadingSettings]);
 
   useEffect(() => {
     if (selectedEventForAssignment && !isLoadingEvents) {
@@ -89,20 +86,15 @@ export default function PersonnelPage() {
 
   const handlePersonnelSubmit = (data: PersonnelFormDialogData) => {
     if (editingPersonnel) {
-      setPersonnelList(prevList => 
-        prevList.map(p => p.id === editingPersonnel.id ? { ...editingPersonnel, ...data, cameraSerials: data.cameraSerials || [] } : p)
-      );
+      // Use updatePersonnel from context
+      updatePersonnel(editingPersonnel.id, { ...data, cameraSerials: data.cameraSerials || [], contact: data.contact });
       toast({
         title: "Team Member Updated",
         description: `"${data.name}" has been successfully updated.`,
       });
     } else {
-      const newPersonnelMember: Personnel = {
-        ...data,
-        id: `user_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        cameraSerials: data.cameraSerials || [],
-      };
-      setPersonnelList((prevList) => [...prevList, newPersonnelMember]);
+      // Use addPersonnel from context
+      addPersonnel({ ...data, cameraSerials: data.cameraSerials || [], contact: data.contact });
       toast({
         title: "Team Member Added",
         description: `"${data.name}" has been successfully added to the roster.`,
@@ -130,7 +122,8 @@ export default function PersonnelPage() {
   const confirmDelete = () => {
     if (personnelToDeleteId) {
       const member = personnelList.find(p => p.id === personnelToDeleteId);
-      setPersonnelList(prevList => prevList.filter(p => p.id !== personnelToDeleteId));
+      // Use deletePersonnel from context
+      deletePersonnel(personnelToDeleteId);
       toast({
         title: "Team Member Deleted",
         description: `Team member "${member?.name}" has been deleted.`,
@@ -160,9 +153,10 @@ export default function PersonnelPage() {
     return personnelList.filter(member =>
       member.name.toLowerCase().includes(filterText.toLowerCase()) ||
       member.role.toLowerCase().includes(filterText.toLowerCase()) ||
+      (member.contact && member.contact.toLowerCase().includes(filterText.toLowerCase())) || 
       (member.cameraSerials && member.cameraSerials.join(', ').toLowerCase().includes(filterText.toLowerCase()))
     );
-  }, [personnelList, filterText]);
+  }, [personnelList, filterText]); // Depend on personnelList from context
 
   const handleAssignmentToggle = (personnelId: string, isAssigned: boolean) => {
     if (!eventDetailsForAssignment) return;
@@ -181,15 +175,15 @@ export default function PersonnelPage() {
     
     setEventDetailsForAssignment(prev => prev ? {...prev, assignedPersonnelIds: newAssignedPersonnelIds} : null);
 
-    const person = personnelList.find(p => p.id === personnelId);
+    const person = personnelList.find(p => p.id === personnelId); // Use personnelList from context
     toast({
       title: "Assignment Updated",
       description: `${person?.name || 'Team member'} ${isAssigned ? 'assigned to' : 'unassigned from'} ${eventDetailsForAssignment.name}.`,
     });
   };
 
-
-  if (isLoadingSettings || isLoadingEvents) { 
+  // Use isLoadingPersonnel from context
+  if (isLoadingSettings || isLoadingEvents || isLoadingPersonnel) { 
     return <div>Loading personnel data, event context, and project context...</div>;
   }
 
@@ -305,6 +299,7 @@ export default function PersonnelPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Contact</TableHead>{/* Added Contact Column */}
                   <TableHead>Camera S/Ns</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -323,6 +318,7 @@ export default function PersonnelPage() {
                       </div>
                     </TableCell>
                     <TableCell>{member.role}</TableCell>
+                     <TableCell>{member.contact || 'N/A'}</TableCell>{/* Display Contact */}
                     <TableCell>
                       {member.cameraSerials && member.cameraSerials.length > 0 ? (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -399,12 +395,14 @@ export default function PersonnelPage() {
                   <ScrollArea className="h-72 border rounded-none p-3">
                     <h4 className="text-sm font-medium mb-2">Assign team members to: <span className="text-foreground/80">{eventDetailsForAssignment.name}</span></h4>
                     <div className="space-y-2">
+                      {/* Use personnelList from context */}
                       {personnelList.filter(p => p.role !== "Client").map(person => {
                         const isAssigned = eventDetailsForAssignment.assignedPersonnelIds?.includes(person.id);
                         return (
                           <div key={`assign-${person.id}-${eventDetailsForAssignment.id}`} className="flex items-center justify-between p-2 rounded-none hover:bg-muted/50">
                             <div className="flex items-center gap-2">
                                <Avatar className="h-7 w-7">
+                                {/* Use avatar from personnel object */}
                                 <AvatarImage src={person.avatar || `https://placehold.co/40x40.png?text=${person.name.split(" ").map(n => n[0]).join("").toUpperCase()}`} alt={person.name} data-ai-hint="person avatar" />
                                 <AvatarFallback>{person.name.split(" ").map(n => n[0]).join("").toUpperCase()}</AvatarFallback>
                                </Avatar>
@@ -438,9 +436,11 @@ export default function PersonnelPage() {
             <div className="text-sm text-muted-foreground">View team member schedules and event commitments across all projects. Sorted by date.</div> 
           </CardHeader>
           <CardContent>
+             {/* Use personnelList from context */}
             {personnelList.filter(p => p.role !== "Client").length === 0 && <p className="text-sm text-muted-foreground">No team members (excluding Clients) to visualize schedules for.</p>}
             <ScrollArea className="h-[26rem]">
               <div className="space-y-4">
+                 {/* Use personnelList from context */}
                 {personnelList.filter(p => p.role !== "Client").map(person => {
                   const assignments = allEvents
                                       .filter(event => event.assignedPersonnelIds?.includes(person.id))

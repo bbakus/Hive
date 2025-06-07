@@ -20,8 +20,7 @@ export const shotRequestSchemaInternal = z.object({
   notes: z.string().optional(),
   blockedReason: z.string().optional(),
   initialCapturerId: z.string().optional(),
-  lastStatusModifierId: z.string().optional(),
-  lastStatusModifiedAt: z.string().optional().refine(val => !val || isValid(parseISO(val)), {
+  lastStatusModifierId: z.string().optional().refine(val => !val || isValid(parseISO(val)), {
     message: "Last status modified must be a valid ISO date string or empty.",
   }),
 });
@@ -38,199 +37,37 @@ export type Event = EventTypeDefinition & {
    discipline?: "Photography" | "";
 };
 
-// Type for raw event data from Python backend
-type BackendEvent = {
-  id: string; // Ensure this matches after str() conversion in backend
+// Type for raw event data from backend or demo JSON
+type EventDataSource = {
+  eventId: string; // From demo JSON
+  id?: string; // From backend/internal
   name: string;
   date: string;
-  location: string | null;
-  status: string | null;
-  description: string | null;
-  shots: ShotRequestFormData[]; // Assuming backend 'shots' is an array of objects matching ShotRequestFormData
+  time?: string; // Optional in demo data
+  location?: string | null;
+  status?: string | null; // Optional in demo data
+  description?: string | null;
+  assignedPersonnelIds?: string[]; // Optional in demo data
+  isQuickTurnaround?: boolean; // Optional in demo data
+  deadline?: string; // Optional in demo data
+  organizationId?: string; // Optional in demo data
+  discipline?: "Photography" | ""; // Optional in demo data
+  isCovered?: boolean; // Optional in demo data
+  personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>; // Optional
+  projectId: string; // Must be present in demo data
+  shots?: ShotRequestDataSource[]; // Shots within event in demo JSON
+};
+
+type ShotRequestDataSource = ShotRequestFormData & {
+  id?: string; // Optional in demo data
+  eventId?: string; // Optional in demo data, derived from parent event
 };
 
 
-const CULINARY_PROJECT_ID = "proj_pb_culinary_classic_2025";
-const CULINARY_ORG_ID = "org_g9e";
-
-const CULINARY_PHOTOGRAPHERS_IDS = ["user_maria_s", "user_david_l", "user_sophia_c", "user_james_b"];
-const CULINARY_SUPPORT_STAFF_IDS = ["user_liam_w", "user_ava_m", "user_event_lead_ops"];
-
-const generateCulinaryClassicEventsAndShots = (): { events: Event[], shotsByEventId: Record<string, ShotRequest[]> } => {
-  const culinaryEvents: Event[] = [];
-  const shotsByEventId: Record<string, ShotRequest[]> = {};
-  let eventIdCounter = 1000;
-  let shotIdCounter = 5000;
-
-  // Adjusted dates to be around June 4th, 2025 for demo purposes
-  const eventDates = ["2025-06-03", "2025-06-04", "2025-06-05"]; // Tue, Wed, Thu
-
-  const eventTemplates = [
-    { namePrefix: "Grand Opening Breakfast", time: "08:00 - 10:00", priority: "High", photographers: 2, shots: 5, quickTurn: true, deadlineOffset: 12, discipline: "Photography"},
-    { namePrefix: "Celebrity Chef Demo:", time: "10:30 - 12:00", priority: "Critical", photographers: 1, shots: 7, quickTurn: true, deadlineOffset: 15, discipline: "Photography"},
-    { namePrefix: "Wine Pairing Luncheon", time: "12:30 - 14:00", priority: "High", photographers: 2, shots: 6, discipline: "Photography"},
-    { namePrefix: "Artisan Food Fair Roaming", time: "14:00 - 17:00", priority: "Medium", photographers: 1, shots: 4, discipline: "Photography"},
-    { namePrefix: "Masterclass:", time: "15:00 - 16:30", priority: "Medium", photographers: 1, shots: 5, discipline: "Photography"},
-    { namePrefix: "VIP Welcome Reception", time: "18:00 - 20:00", priority: "Critical", photographers: 2, shots: 7, quickTurn: true, deadlineOffset: 22, discipline: "Photography"},
-    { namePrefix: "Sunset Beach BBQ", time: "19:00 - 21:30", priority: "High", photographers: 1, shots: 6, discipline: "Photography"},
-    { namePrefix: "Gourmet Gala Dinner", time: "20:00 - 23:00", priority: "Critical", photographers: 2, shots: 7, discipline: "Photography"},
-    { namePrefix: "Morning Yoga & Mimosas", time: "07:00 - 08:30", priority: "Low", photographers: 1, shots: 3, discipline: "Photography"},
-    { namePrefix: "Farm-to-Table Brunch", time: "11:00 - 13:00", priority: "High", photographers: 2, shots: 5, discipline: "Photography"},
-    { namePrefix: "Book Signing:", time: "14:30 - 15:30", priority: "Medium", photographers: 1, shots: 3, discipline: "Photography"},
-    { namePrefix: "Mixology Challenge Finale", time: "16:00 - 17:30", priority: "High", photographers: 1, shots: 6, quickTurn: true, deadlineOffset: 19, discipline: "Photography"},
-    { namePrefix: "Silent Auction Viewing", time: "17:00 - 18:30", priority: "Low", photographers: 1, shots: 3, discipline: "Photography"},
-    { namePrefix: "Closing Awards Ceremony", time: "19:30 - 21:00", priority: "Critical", photographers: 2, shots: 7, quickTurn: true, deadlineOffset: 23, discipline: "Photography"},
-    { namePrefix: "Beachside Taco Fiesta", time: "13:00 - 15:00", priority: "Medium", photographers: 1, shots: 4, discipline: "Photography"},
-  ];
-  
-  const celebrityChefs = ["Gordon Ramsay", "Massimo Bottura", "Dominique Crenn", "José Andrés", "Clare Smyth"];
-  const masterclassTopics = ["Sourdough Secrets", "Advanced Pastry Techniques", "Sustainable Seafood", "The Art of Plating", "Molecular Gastronomy 101"];
-  const winePairingRegions = ["Napa Valley Reds", "Burgundy Whites", "Italian Sparkling", "New Zealand Sauvignon Blanc", "Rhône Valley Syrah"];
-
-  const shotTitleTemplates = ["Overall Ambiance", "Key Speaker Close-up", "Guest Interaction", "Food Presentation Detail", "Branding & Signage", "Candid Moments", "Wide Shot of Venue Setup"];
-  const shotDescriptionTemplates = [
-    "Capture the overall atmosphere and decor.", "Tight shots of the main personality speaking.", "Guests mingling and enjoying the event.",
-    "Detailed shots of the food and its presentation.", "Photos of event branding, logos, and signage.", "Spontaneous, unposed moments of guests and staff.",
-    "A comprehensive wide shot showing the entire event space and setup."
-  ];
-  const shotPriorities: ShotRequest['priority'][] = ["High", "Medium", "Critical", "Low"];
-  const shotStatuses: ShotRequest['status'][] = ["Unassigned", "Assigned", "Captured", "Blocked", "Request More", "Completed"];
-
-  const createShotsForEvent = (eventId: string, eventNameForShot: string, numShots: number, assignedPersonnelIds: string[], eventDateStr: string) => {
-    if (!shotsByEventId[eventId]) {
-      shotsByEventId[eventId] = [];
-    }
-    for (let i = 0; i < numShots; i++) {
-      const shotStatus = shotStatuses[(shotIdCounter + i + eventIdCounter) % shotStatuses.length];
-      let initialCapturerId: string | undefined;
-      let lastStatusModifierId: string | undefined;
-      let lastStatusModifiedAt: string | undefined;
-      let currentAssignedPersonnelId: string | undefined;
-
-      const mainPhotographer = assignedPersonnelIds.length > 0 ? assignedPersonnelIds[i % assignedPersonnelIds.length] : CULINARY_PHOTOGRAPHERS_IDS[i % CULINARY_PHOTOGRAPHERS_IDS.length];
-      const supportStaffMember = CULINARY_SUPPORT_STAFF_IDS[i % CULINARY_SUPPORT_STAFF_IDS.length];
-
-      if (shotStatus === "Captured" || shotStatus === "Completed") {
-        initialCapturerId = mainPhotographer;
-        lastStatusModifierId = mainPhotographer;
-        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.floor(Math.random() * 2)).toISOString();
-      } else if (shotStatus === "Blocked") {
-        lastStatusModifierId = supportStaffMember;
-        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.floor(Math.random() * 2)).toISOString();
-      } else if (shotStatus === "Assigned" || shotStatus === "Request More") {
-        currentAssignedPersonnelId = mainPhotographer;
-        lastStatusModifierId = supportStaffMember;
-        lastStatusModifiedAt = subDays(parseISO(eventDateStr), Math.floor(Math.random() * 2)).toISOString();
-      }
-      
-      shotsByEventId[eventId].push({
-        id: `pbcc_sr_${shotIdCounter++}`, eventId: eventId,
-        title: `${shotTitleTemplates[(shotIdCounter + i) % shotTitleTemplates.length]} - ${eventNameForShot.substring(0,15)}`,
-        description: `${shotDescriptionTemplates[(shotIdCounter + i) % shotDescriptionTemplates.length]} for ${eventNameForShot}.`,
-        priority: shotPriorities[(i + eventIdCounter) % shotPriorities.length], status: shotStatus,
-        assignedPersonnelId: currentAssignedPersonnelId,
-        initialCapturerId: initialCapturerId,
-        lastStatusModifierId: lastStatusModifierId,
-        lastStatusModifiedAt: lastStatusModifiedAt,
-        blockedReason: shotStatus === "Blocked" ? "Equipment issue (mock)" : undefined,
-        notes: shotStatus === "Request More" ? "Client requested more angles." : (Math.random() < 0.3 ? "Standard setup." : undefined),
-      });
-    }
-  };
-  
-  let photographerRotationIndex = 0;
-  eventDates.forEach((dateStr, dayIdx) => {
-    let eventCountForDay = 0;
-    
-    while(eventCountForDay < (10 + dayIdx) && eventCountForDay < eventTemplates.length) {
-        const templateIndex = (eventIdCounter + dayIdx * 10 + eventCountForDay) % eventTemplates.length;
-        const template = eventTemplates[templateIndex];
-        let eventName = template.namePrefix;
-        if (template.namePrefix.endsWith(":")) {
-            if (template.namePrefix.includes("Chef Demo")) eventName += ` ${celebrityChefs[(eventIdCounter + eventCountForDay) % celebrityChefs.length]}`;
-            else if (template.namePrefix.includes("Masterclass")) eventName += ` ${masterclassTopics[(eventIdCounter + eventCountForDay) % masterclassTopics.length]}`;
-            else if (template.namePrefix.includes("Book Signing")) eventName += ` ${celebrityChefs[(eventIdCounter + eventCountForDay + 1) % celebrityChefs.length]}`;
-        } else if (template.namePrefix.includes("Wine Pairing")) {
-             eventName = `${winePairingRegions[(eventIdCounter + eventCountForDay) % winePairingRegions.length]} ${template.namePrefix}`;
-        }
-        
-        const eventId = `pbcc_evt_${eventIdCounter++}`;
-        const assignedPhotographers: string[] = [];
-        for(let i=0; i<template.photographers; i++) {
-            assignedPhotographers.push(CULINARY_PHOTOGRAPHERS_IDS[(photographerRotationIndex + i) % CULINARY_PHOTOGRAPHERS_IDS.length]);
-        }
-        photographerRotationIndex = (photographerRotationIndex + template.photographers) % CULINARY_PHOTOGRAPHERS_IDS.length;
-
-        const personnelActivity: Event['personnelActivity'] = {};
-        // Check if the event is "today" (June 4th, 2025) or "yesterday" (June 3rd, 2025) relative to our new demo date
-        const isTodayOrYesterday = dateStr === "2025-06-04" || dateStr === "2025-06-03";
-
-        if (isTodayOrYesterday) { 
-            assignedPhotographers.forEach(pId => {
-                if (Math.random() < 0.7) { 
-                    const eventStartTime = parseISO(`${dateStr}T${template.time.split(" - ")[0]}:00`);
-                    const checkInTime = subHours(eventStartTime, Math.random() * 0.5); 
-                    personnelActivity[pId] = { checkInTime: checkInTime.toISOString() };
-                    
-                    const isPastEvent = dateStr === "2025-06-03" || (dateStr === "2025-06-04" && isBefore(eventStartTime, subHours(new Date("2025-06-04T12:00:00"), 2)));
-                    if (isPastEvent) { 
-                        const eventEndTime = parseISO(`${dateStr}T${template.time.split(" - ")[1]}:00`);
-                        personnelActivity[pId]!.checkOutTime = addHours(eventEndTime, Math.random() * 0.5).toISOString();
-                    }
-                }
-            });
-        }
-
-        culinaryEvents.push({
-            id: eventId, name: eventName,
-            projectId: CULINARY_PROJECT_ID, project: "Pebble Beach Culinary Classic 2025",
-            date: dateStr, time: template.time, priority: template.priority as Event['priority'],
-            assignedPersonnelIds: [...assignedPhotographers, CULINARY_SUPPORT_STAFF_IDS[dayIdx % CULINARY_SUPPORT_STAFF_IDS.length]],
-            isQuickTurnaround: template.quickTurn,
-            deadline: template.quickTurn ? `${dateStr}T${String(template.deadlineOffset).padStart(2, '0')}:00:00Z` : undefined,
-            deliverables: 0, shotRequests: 0,
-            organizationId: CULINARY_ORG_ID,
-            discipline: template.discipline as Event['discipline'],
-            isCovered: true,
-            personnelActivity: personnelActivity,
-        });
-        createShotsForEvent(eventId, eventName, template.shots, assignedPhotographers, dateStr);
-        eventCountForDay++;
-    }
-  });
-  
-  culinaryEvents.forEach(event => {
-    event.shotRequests = shotsByEventId[event.id]?.length || 0;
-  });
-
-  return { events: culinaryEvents, shotsByEventId };
-};
-
-
-type EventContextType = {
-  allEvents: Event[];
-  eventsForSelectedProjectAndOrg: Event[];
-  addEvent: (eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }) => string;
-  updateEvent: (eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => void;
-  deleteEvent: (eventId: string) => void;
-  isLoadingEvents: boolean;
-  getEventById: (eventId: string) => Event | undefined;
-  
-  shotRequestsByEventId: Record<string, ShotRequest[]>;
-  getShotRequestsForEvent: (eventId: string) => ShotRequest[];
-  addShotRequest: (eventId: string, shotData: ShotRequestFormData) => void;
-  updateShotRequest: (eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => void;
-  deleteShotRequest: (eventId: string, shotId: string) => void;
-
-  checkInUserToEvent: (eventId: string, personnelId: string) => void;
-  checkOutUserFromEvent: (eventId: string, personnelId: string) => void;
-};
-
-const EventContext = createContext<EventContextType | undefined>(undefined);
 
 export function EventProvider({ children }: { children: ReactNode }) {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { selectedProjectId, projects, selectedProject } = useProjectContext(); // Added selectedProject
+  const { selectedProjectId, projects, selectedProject } = useProjectContext();
   const { selectedOrganizationId } = useOrganizationContext();
 
   const [allEventsState, setAllEventsState] = useState<Event[]>([]);
@@ -242,10 +79,72 @@ export function EventProvider({ children }: { children: ReactNode }) {
       if (isLoadingSettings) return;
 
       setIsLoadingEvents(true);
+      let loadedEvents: Event[] = [];
+      let loadedShotsByEventId: Record<string, ShotRequest[]> = {};
+
       if (useDemoData) {
-        const { events: culinaryClassicEvents, shotsByEventId: culinaryClassicShots } = generateCulinaryClassicEventsAndShots();
-        setAllEventsState(culinaryClassicEvents);
-        setShotRequestsByEventId(culinaryClassicShots);
+        try {
+          const response = await default_api.read_file({ path: "public/demo/demo_data.json" });
+          if (response.status === 'succeeded') {
+            const demoData = JSON.parse(response.result);
+            
+            if (demoData && Array.isArray(demoData.events)) {
+              loadedEvents = demoData.events.map((evtData: EventDataSource) => {
+                // Map demo data structure to Event type
+                const eventId = evtData.eventId || evtData.id; // Use eventId from demo, fallback to id
+                if (!eventId) {
+                    console.error("Demo event data missing id:", evtData);
+                    return null; // Skip events without an ID
+                }
+
+                // Process shots nested within the event data
+                if (Array.isArray(evtData.shots)) {
+                    loadedShotsByEventId[eventId] = evtData.shots.map((shotData: ShotRequestDataSource, index) => ({
+                        ...shotData,
+                        id: shotData.id || `demo_sr_${eventId}_${index}`, // Generate ID if missing
+                        eventId: eventId, // Ensure eventId is linked
+                        description: shotData.description || "", // Ensure description is string
+                        priority: shotData.priority || "Medium", // Default priority
+                        status: shotData.status || "Unassigned", // Default status
+                    })).filter(shot => shot !== null) as ShotRequest[]; // Filter out any nulls if mapping failed
+                } else {
+                     loadedShotsByEventId[eventId] = []; // Ensure event has a shots array entry
+                }
+
+                const projectForEvent = projects.find(p => p.id === evtData.projectId); // Find project from ProjectContext
+
+                return {
+                  id: eventId,
+                  name: evtData.name,
+                  projectId: evtData.projectId,
+                  project: projectForEvent?.name || "Unknown Project",
+                  date: evtData.date,
+                  time: evtData.time || "", // Default time
+                  location: evtData.location || "",
+                  status: evtData.status || "Upcoming", // Default status
+                  description: evtData.description || "",
+                  assignedPersonnelIds: evtData.assignedPersonnelIds || [],
+                  isQuickTurnaround: evtData.isQuickTurnaround || false,
+                  deadline: evtData.deadline,
+                  deliverables: 0, // Assuming deliverables aren't in this demo structure
+                  shotRequests: (loadedShotsByEventId[eventId]?.length || 0), // Count shots processed
+                  organizationId: evtData.organizationId || projectForEvent?.organizationId || "", // Derive from demo or project
+                  discipline: evtData.discipline || "",
+                  isCovered: evtData.isCovered === undefined ? true : evtData.isCovered,
+                  personnelActivity: evtData.personnelActivity || {},
+                  // hasOverlap can be calculated later if needed
+                };
+              }).filter(event => event !== null) as Event[]; // Filter out any null events
+              
+            } else {
+               console.error("Demo data file does not contain an 'events' array or is empty.");
+            }
+          } else {
+            console.error("Failed to read demo data file:", response.error);
+          }
+        } catch (error) {
+          console.error("Error processing demo data JSON:", error);
+        }
       } else {
         // Fetch live data
         try {
@@ -257,80 +156,91 @@ export function EventProvider({ children }: { children: ReactNode }) {
           if (!response.ok) {
             throw new Error(`Failed to fetch events: ${response.status}`);
           }
-          const data: { events: BackendEvent[] } = await response.json();
+          const data: { events: EventDataSource[] } = await response.json(); // Assuming backend returns array under 'events'
           
-          const liveEvents: Event[] = [];
-          const liveShotsByEventId: Record<string, ShotRequest[]> = {};
-
           data.events.forEach(be => {
+             const eventId = String(be.id || be.eventId); // Use backend id or eventId
+             if (!eventId) return; // Skip if no ID
+
+            const projectForEvent = projects.find(p => p.id === be.projectId); // Try to find project if projectId is in backend data
+
             const frontendEvent: Event = {
-              id: String(be.id), // Ensure ID is string
+              id: eventId, 
               name: be.name,
-              project: selectedProject?.name || "Unknown Project", // Derive from context
-              projectId: selectedProject?.id || "unknown_project_id", // Derive from context
+              project: projectForEvent?.name || "Unknown Project", 
+              projectId: be.projectId || "unknown_project_id", 
               date: be.date,
-              time: "09:00 - 17:00", // Default, backend doesn't provide this
-              priority: "Medium", // Default
-              assignedPersonnelIds: [], // Default, or backend needs to provide
+              time: be.time || "", 
+              priority: be.priority || "Medium", 
+              assignedPersonnelIds: be.assignedPersonnelIds || [],
               shotRequests: (be.shots || []).length,
-              deliverables: 0, // Default
-              isQuickTurnaround: false, // Default
-              organizationId: selectedProject?.organizationId || "", // Derive from context
-              discipline: "", // Default
-              isCovered: true, // Default
-              personnelActivity: {},
-              description: be.description || "", // Map from backend
-              location: be.location || "", // Map from backend
-              status: be.status || "Upcoming", // Map from backend
-              // hasOverlap can be calculated later if needed
+              deliverables: 0, 
+              isQuickTurnaround: be.isQuickTurnaround || false,
+              deadline: be.deadline,
+              organizationId: be.organizationId || projectForEvent?.organizationId || "", 
+              discipline: be.discipline || "",
+              isCovered: be.isCovered === undefined ? true : be.isCovered,
+              personnelActivity: be.personnelActivity || {},
+              description: be.description || "", 
+              location: be.location || "", 
+              status: be.status || "Upcoming", 
             };
-            liveEvents.push(frontendEvent);
+            loadedEvents.push(frontendEvent);
 
             const shotsForThisEvent: ShotRequest[] = (be.shots || []).map((shotData, index) => ({
               ...shotData,
-              id: `live_sr_${be.id}_${index}`, // Generate a unique ID for live shots
-              eventId: String(be.id),
-            }));
-            liveShotsByEventId[String(be.id)] = shotsForThisEvent;
+              id: shotData.id || `live_sr_${eventId}_${index}`, // Generate a unique ID if missing
+              eventId: eventId,
+               description: shotData.description || "", // Ensure description is string
+              priority: shotData.priority || "Medium", // Default priority
+              status: shotData.status || "Unassigned", // Default status
+            })).filter(shot => shot !== null) as ShotRequest[];
+            loadedShotsByEventId[eventId] = shotsForThisEvent;
           });
-
-          setAllEventsState(liveEvents);
-          setShotRequestsByEventId(liveShotsByEventId);
 
         } catch (error) {
           console.error("Error fetching live event data:", error);
-          setAllEventsState([]);
-          setShotRequestsByEventId({});
           // Optionally, set an error state here to show in UI
         }
       }
+      
+      setAllEventsState(loadedEvents);
+      setShotRequestsByEventId(loadedShotsByEventId);
       setIsLoadingEvents(false);
     };
+    
+    // Re-run effect if useDemoData or selectedProject/projects change after initial load
+    // Added projects as dependency because we look up project details here.
     loadData();
-  }, [useDemoData, isLoadingSettings, selectedProject]);
+  }, [useDemoData, isLoadingSettings, selectedProject, projects]); 
 
 
   const addEvent = useCallback((eventData: Omit<Event, 'id' | 'deliverables' | 'shotRequests' | 'project' | 'hasOverlap' | 'personnelActivity'> & { organizationId: string }): string => {
     const projectForEvent = projects.find(p => p.id === eventData.projectId);
     const newEventId = `evt_new_${Date.now()}`;
-    setAllEventsState((prevEvents) => {
-      const newEvent: Event = {
-        ...eventData,
-        id: newEventId,
-        project: projectForEvent?.name || "Unknown Project",
-        deliverables: 0, 
-        shotRequests: 0, 
-        hasOverlap: false, 
-        organizationId: eventData.organizationId || projectForEvent?.organizationId || "",
-        discipline: eventData.discipline === "Photography" ? "Photography" : "",
-        isCovered: eventData.isCovered === undefined ? true : eventData.isCovered,
-        personnelActivity: {},
-      };
-      return [...prevEvents, newEvent];
-    });
+    const newEvent: Event = {
+      ...eventData,
+      id: newEventId,
+      project: projectForEvent?.name || "Unknown Project",
+      deliverables: 0, 
+      shotRequests: 0, 
+      hasOverlap: false, 
+      organizationId: eventData.organizationId || projectForEvent?.organizationId || "",
+      discipline: eventData.discipline === "Photography" ? "Photography" : "",
+      isCovered: eventData.isCovered === undefined ? true : eventData.isCovered,
+      personnelActivity: {},
+    };
+    
+    setAllEventsState(prevEvents => [...prevEvents, newEvent]);
     setShotRequestsByEventId(prev => ({ ...prev, [newEventId]: [] }));
+
+    if (!useDemoData) {
+        console.warn("Demo data mode is off. Implement actual API call to add event:", newEvent);
+        // TODO: Implement real API call to add event
+    }
+
     return newEventId;
-  }, [projects]);
+  }, [projects, useDemoData]); // Added useDemoData dependency
 
   const updateEvent = useCallback((eventId: string, eventData: Partial<Omit<Event, 'id' | 'project' | 'hasOverlap'>>) => {
     let projectName = eventData.projectId ? projects.find(p => p.id === eventData.projectId)?.name : undefined;
@@ -350,12 +260,20 @@ export function EventProvider({ children }: { children: ReactNode }) {
             
             updatedEvent.personnelActivity = eventData.personnelActivity ? { ...evt.personnelActivity, ...eventData.personnelActivity} : (evt.personnelActivity || {});
             
+            // Do not update shotRequests count directly here, it's derived from shotRequestsByEventId state
+            // delete updatedEvent.shotRequests; // Or ensure it's not copied from eventData
+
             return updatedEvent;
         }
         return evt;
       })
     );
-  }, [projects]);
+    
+    if (!useDemoData) {
+        console.warn("Demo data mode is off. Implement actual API call to update event:", eventId, eventData);
+        // TODO: Implement real API call to update event
+    }
+  }, [projects, useDemoData]); // Added useDemoData dependency
 
   const deleteEvent = useCallback((eventId: string) => {
     setAllEventsState((prevEvents) =>
@@ -366,7 +284,11 @@ export function EventProvider({ children }: { children: ReactNode }) {
       delete newShots[eventId];
       return newShots;
     });
-  }, []);
+     if (!useDemoData) {
+        console.warn("Demo data mode is off. Implement actual API call to delete event:", eventId);
+        // TODO: Implement real API call to delete event
+    }
+  }, [useDemoData]); // Added useDemoData dependency
 
   const getShotRequestsForEvent = useCallback((eventId: string): ShotRequest[] => {
     return shotRequestsByEventId[eventId] || [];
@@ -391,10 +313,16 @@ export function EventProvider({ children }: { children: ReactNode }) {
       ...prev,
       [eventId]: [...(prev[eventId] || []), newShot],
     }));
+    // Update event's shotRequests count
     setAllEventsState(prevEvents => prevEvents.map(evt =>
       evt.id === eventId ? { ...evt, shotRequests: (shotRequestsByEventId[eventId] ? shotRequestsByEventId[eventId].length + 1 : 1) } : evt
     ));
-  }, [shotRequestsByEventId]);
+     if (!useDemoData) {
+        console.warn("Demo data mode is off. Implement actual API call to add shot request:", eventId, newShot);
+        // TODO: Implement real API call to add shot request
+    }
+
+  }, [shotRequestsByEventId, useDemoData]); // Added useDemoData dependency
 
   const updateShotRequest = useCallback((eventId: string, shotId: string, updatedData: Partial<ShotRequestFormData>) => {
     setShotRequestsByEventId(prev => {
@@ -417,7 +345,11 @@ export function EventProvider({ children }: { children: ReactNode }) {
         [eventId]: newEventShots 
       };
     });
-  }, []);
+     if (!useDemoData) {
+        console.warn("Demo data mode is off. Implement actual API call to update shot request:", eventId, shotId, updatedData);
+        // TODO: Implement real API call to update shot request
+    }
+  }, [useDemoData]); // Added useDemoData dependency
 
   const deleteShotRequest = useCallback((eventId: string, shotId: string) => {
     let newShotRequestsCount = 0;
@@ -425,20 +357,24 @@ export function EventProvider({ children }: { children: ReactNode }) {
       const eventShots = prev[eventId] || [];
       const updatedShots = eventShots.filter(shot => shot.id !== shotId);
       newShotRequestsCount = updatedShots.length;
-      if (updatedShots.length === 0 && prev[eventId]) { 
-        const updatedShotsByEventId = {...prev};
+      const updatedShotsByEventId = {...prev};
+      if (updatedShots.length > 0) {
+        updatedShotsByEventId[eventId] = updatedShots;
+      } else if (prev[eventId]) {
+         // Only delete the event key if it existed and is now empty
         delete updatedShotsByEventId[eventId];
-        return updatedShotsByEventId;
       }
-      return {
-        ...prev,
-        [eventId]: updatedShots,
-      };
+      return updatedShotsByEventId;
     });
+    // Update event's shotRequests count
     setAllEventsState(prevEvents => prevEvents.map(evt =>
       evt.id === eventId ? { ...evt, shotRequests: newShotRequestsCount } : evt
     ));
-  }, []);
+     if (!useDemoData) {
+        console.warn("Demo data mode is off. Implement actual API call to delete shot request:", eventId, shotId);
+        // TODO: Implement real API call to delete shot request
+    }
+  }, [useDemoData]); // Added useDemoData dependency
 
   const checkInUserToEvent = useCallback((eventId: string, personnelId: string) => {
     setAllEventsState(prevEvents => 
@@ -452,12 +388,17 @@ export function EventProvider({ children }: { children: ReactNode }) {
               checkOutTime: undefined, 
             }
           };
-          return { ...event, personnelActivity: newPersonnelActivity };
+          const updatedEvent = { ...event, personnelActivity: newPersonnelActivity };
+           if (!useDemoData) {
+              console.warn("Demo data mode is off. Implement actual API call for check-in:", eventId, personnelId);
+              // TODO: Implement real API call for check-in
+           }
+          return updatedEvent;
         }
         return event;
       })
     );
-  }, []);
+  }, [useDemoData]); // Added useDemoData dependency
 
   const checkOutUserFromEvent = useCallback((eventId: string, personnelId: string) => {
     setAllEventsState(prevEvents =>
@@ -473,12 +414,17 @@ export function EventProvider({ children }: { children: ReactNode }) {
               checkOutTime: new Date().toISOString(),
             }
           };
-          return { ...event, personnelActivity: newPersonnelActivity };
+           const updatedEvent = { ...event, personnelActivity: newPersonnelActivity };
+           if (!useDemoData) {
+              console.warn("Demo data mode is off. Implement actual API call for check-out:", eventId, personnelId);
+              // TODO: Implement real API call for check-out
+           }
+          return updatedEvent;
         }
         return event;
       })
     );
-  }, []);
+  }, [useDemoData]); // Added useDemoData dependency
 
   const eventsForSelectedProjectAndOrg = useMemo(() => {
     if (isLoadingEvents || isLoadingSettings) return [];
