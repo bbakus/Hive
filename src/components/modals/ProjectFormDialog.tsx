@@ -22,8 +22,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Project, KeyPersonnel, ProjectFormData } from "@/contexts/ProjectContext";
 import type { Organization } from "@/contexts/OrganizationContext";
-import { useEffect } from "react";
-import { initialPersonnelMock } from "@/app/(app)/personnel/page"; // Using this as the source of available personnel
+import { useEffect, useMemo } from "react";
+import { usePersonnelContext, type Personnel } from "@/contexts/PersonnelContext"; // Import context
 
 const keyPersonnelEditSchema = z.object({
   personnelId: z.string(),
@@ -56,15 +56,6 @@ interface ProjectFormDialogProps {
   isLoadingOrganizations: boolean;
 }
 
-// Adapt initialPersonnelMock to WizardAvailablePersonnel structure for consistency
-const availablePersonnelListForEdit: { id: string; name: string; capabilities: string[] }[] = 
-  initialPersonnelMock.map(p => ({
-    id: p.id,
-    name: p.name,
-    capabilities: [p.role] // Simplified for this context, or use actual PHOTOGRAPHY_ROLES if defined
-  }));
-
-
 export function ProjectFormDialog({
   isOpen,
   onOpenChange,
@@ -73,6 +64,19 @@ export function ProjectFormDialog({
   organizations,
   isLoadingOrganizations
 }: ProjectFormDialogProps) {
+  const { personnelList, isLoadingPersonnel } = usePersonnelContext(); // Get personnel from context
+
+  const availablePersonnelListForEdit = useMemo(() => {
+    if (isLoadingPersonnel) return [];
+    return personnelList.map(p => ({
+      id: p.id,
+      name: p.name,
+      // Assuming 'role' from Personnel type can be used as 'capabilities' here.
+      // If capabilities need to be more diverse, this mapping might need adjustment.
+      capabilities: p.role ? [p.role] : [] 
+    }));
+  }, [personnelList, isLoadingPersonnel]);
+
   const {
     register,
     handleSubmit,
@@ -123,58 +127,58 @@ export function ProjectFormDialog({
         selectedPersonnelMap: initialSelectedMap,
       });
     } else if (!editingProject && isOpen) {
-        reset({ 
-            name: "", startDate: new Date().toISOString().split('T')[0], 
-            endDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0], 
-            description: "", status: "Planning", 
-            organizationId: organizations.length > 0 ? organizations[0].id : "", 
+        reset({
+            name: "", startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+            description: "", status: "Planning",
+            organizationId: organizations.length > 0 ? organizations[0].id : "",
             location: "", keyPersonnel: [], selectedPersonnelMap: {}
           });
     }
   }, [editingProject, isOpen, reset, organizations]);
 
   useEffect(() => {
-    if (!isOpen || !selectedPersonnelMapEdit) return;
+    if (!isOpen || !selectedPersonnelMapEdit || isLoadingPersonnel) return;
 
     const currentKeyPersonnelValues = getValues("keyPersonnel") || [];
     const newKeyPersonnelArray: KeyPersonnel[] = [];
     let changed = false;
-    
+
     availablePersonnelListForEdit.forEach(person => {
         if (selectedPersonnelMapEdit[person.id]) {
             const existingEntry = currentKeyPersonnelValues.find(kp => kp.personnelId === person.id);
             newKeyPersonnelArray.push({
                 personnelId: person.id,
                 name: person.name,
-                projectRole: existingEntry?.projectRole || "", 
+                projectRole: existingEntry?.projectRole || "",
             });
              if (!existingEntry) changed = true; // New person added
         }
     });
-    
+
     // Check if array length or content changed
     if (newKeyPersonnelArray.length !== currentKeyPersonnelValues.length) {
         changed = true;
     } else {
       for(let i = 0; i < newKeyPersonnelArray.length; i++) {
-        if(newKeyPersonnelArray[i].personnelId !== currentKeyPersonnelValues[i].personnelId ||
-           newKeyPersonnelArray[i].projectRole !== currentKeyPersonnelValues[i].projectRole) {
+        const currentKp = currentKeyPersonnelValues.find(kp => kp.personnelId === newKeyPersonnelArray[i].personnelId);
+        if(!currentKp || newKeyPersonnelArray[i].projectRole !== currentKp.projectRole) {
           changed = true;
           break;
         }
       }
     }
-    
+
     if (changed) {
         setValue("keyPersonnel", newKeyPersonnelArray.sort((a,b) => a.personnelId.localeCompare(b.personnelId)), { shouldValidate: true, shouldDirty: true });
     }
 
-  }, [selectedPersonnelMapEdit, isOpen, setValue, getValues]);
+  }, [selectedPersonnelMapEdit, isOpen, setValue, getValues, availablePersonnelListForEdit, isLoadingPersonnel]);
 
   const internalOnSubmit: SubmitHandler<ProjectFormDialogData> = (data) => {
     onSubmit(data);
   };
-  
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
@@ -281,6 +285,8 @@ export function ProjectFormDialog({
                         <Label htmlFor={`edit-project-person-select-${person.id}`} className="font-normal text-sm">{person.name}</Label>
                       </div>
                     ))}
+                    {isLoadingPersonnel && <p className="text-xs text-muted-foreground">Loading personnel...</p>}
+                    {!isLoadingPersonnel && availablePersonnelListForEdit.length === 0 && <p className="text-xs text-muted-foreground">No personnel available.</p>}
                 </ScrollArea>
                 <ScrollArea className="h-48 w-full space-y-2.5 border p-2 rounded-none">
                     {keyPersonnelFields.map((kpField, index) => {
@@ -331,3 +337,5 @@ export function ProjectFormDialog({
     </Dialog>
   );
 }
+
+    
