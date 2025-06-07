@@ -3,10 +3,11 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { useProjectContext } from './ProjectContext';
+
+const EventContext = createContext(undefined);
 import { useSettingsContext } from './SettingsContext';
+import { useProjectContext } from './ProjectContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
-import type { Event as EventTypeDefinition } from '@/app/(app)/events/page';
 import { z } from 'zod';
 import { format, addHours, subHours, setHours, setMinutes, startOfDay, parseISO, isValid, isBefore, subDays, addDays } from 'date-fns';
 
@@ -31,8 +32,10 @@ export type ShotRequest = ShotRequestFormData & {
 };
 
 // --- Event Definition ---
-export type Event = EventTypeDefinition & {
+export type Event = { // Define Event type directly in this file
+ name: string;
    personnelActivity?: Record<string, { checkInTime?: string; checkOutTime?: string }>;
+  id: string;
    organizationId?: string;
    discipline?: "Photography" | "";
 };
@@ -84,9 +87,9 @@ export function EventProvider({ children }: { children: ReactNode }) {
 
       if (useDemoData) {
         try {
-          const response = await default_api.read_file({ path: "public/demo/demo_data.json" });
-          if (response.status === 'succeeded') {
-            const demoData = JSON.parse(response.result);
+          const response = await fetch('/demo/demo_data.json');
+          if (response.ok) {
+            const demoData = await response.json(); // Correctly parse JSON
             
             if (demoData && Array.isArray(demoData.events)) {
               loadedEvents = demoData.events.map((evtData: EventDataSource) => {
@@ -140,7 +143,7 @@ export function EventProvider({ children }: { children: ReactNode }) {
                console.error("Demo data file does not contain an 'events' array or is empty.");
             }
           } else {
-            console.error("Failed to read demo data file:", response.error);
+            console.error("Failed to read demo data file. Status:", response.status, response); // Log status and response object
           }
         } catch (error) {
           console.error("Error processing demo data JSON:", error);
@@ -171,7 +174,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
               projectId: be.projectId || "unknown_project_id", 
               date: be.date,
               time: be.time || "", 
-              priority: be.priority || "Medium", 
               assignedPersonnelIds: be.assignedPersonnelIds || [],
               shotRequests: (be.shots || []).length,
               deliverables: 0, 
@@ -305,7 +307,6 @@ export function EventProvider({ children }: { children: ReactNode }) {
       blockedReason: shotData.blockedReason || undefined,
       initialCapturerId: shotData.initialCapturerId || undefined,
       lastStatusModifierId: shotData.lastStatusModifierId || undefined,
-      lastStatusModifiedAt: shotData.lastStatusModifiedAt || new Date().toISOString(),
       id: `sr_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       eventId: eventId,
     };

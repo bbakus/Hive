@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RadioTower, ListChecks, Clock, AlertTriangle as AlertTriangleIcon, Info, Zap, CheckSquare, LogIn, LogOut, Filter, Camera as CameraIcon } from "lucide-react";
 import { useProjectContext } from '@/contexts/ProjectContext';
-import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from "@/contexts/EventContext";
 import { useSettingsContext } from '@/contexts/SettingsContext';
+import { useEventContext, type Event, type ShotRequest, type ShotRequestFormData } from '@/contexts/EventContext';
 import { usePersonnelContext, type Personnel } from "@/contexts/PersonnelContext";
 import { parseEventTimes, formatDeadline } from "@/app/(app)/events/page";
-import { format, parseISO, isValid, isWithinInterval, isAfter, isBefore, isToday } from "date-fns";
+import { format, parseISO, isValid, isWithinInterval, isAfter, isBefore, startOfDay } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,7 +31,7 @@ type EventTimeStatus = "past" | "in_progress" | "upcoming";
 export default function ShootPage() {
   const { selectedProject, isLoadingProjects } = useProjectContext();
   const {
-    eventsForSelectedProjectAndOrg,
+    eventsForSelectedProjectAndOrg, // Ensure this is destructured
     isLoadingEvents,
     getShotRequestsForEvent,
     updateShotRequest,
@@ -71,30 +71,27 @@ export default function ShootPage() {
 
   const getEventStatus = useCallback((event: Event, now: Date): EventTimeStatus => {
     const times = parseEventTimes(event.date, event.time);
-    if (!times) return "upcoming"; // Default to upcoming if times can't be parsed
+    if (!times) return "upcoming"; 
 
-    // Check if the event is today based on the 'now' date
     const eventDate = parseISO(event.date);
-    if (!isValid(eventDate)) return "upcoming"; // Should not happen if data is clean
+    if (!isValid(eventDate)) return "upcoming"; 
 
-    const isEventDateToday = 
+    const isEventDateToday =
         eventDate.getUTCFullYear() === now.getUTCFullYear() &&
         eventDate.getUTCMonth() === now.getUTCMonth() &&
         eventDate.getUTCDate() === now.getUTCDate();
 
     if (!isEventDateToday) {
-        // If the event date is not 'now', determine if it's past or upcoming based on the date part only
         return isBefore(eventDate, startOfDay(now)) ? "past" : "upcoming";
     }
 
-    // If the event is today, check time
     if (isWithinInterval(now, { start: times.start, end: times.end })) {
       return "in_progress";
     }
     if (isAfter(times.start, now)) {
       return "upcoming";
     }
-    return "past"; // If event is today but start time is passed and not in progress -> past
+    return "past"; 
   }, []);
 
 
@@ -102,7 +99,7 @@ export default function ShootPage() {
     if (!currentTime || !eventsForSelectedProjectAndOrg) return [];
 
     const statusOrder: Record<EventTimeStatus, number> = {
-      in_progress: 2, // Highest priority for display
+      in_progress: 2, 
       upcoming: 1,
       past: 0,
     };
@@ -118,20 +115,20 @@ export default function ShootPage() {
     };
 
     return eventsForSelectedProjectAndOrg
-      .filter(event => {
+      .filter((event: Event) => {
         return isEventDateMatchingCurrentTime(event.date) && event.isCovered;
       })
-      .sort((a, b) => {
+      .sort((a: Event, b: Event) => {
         const statusA = getEventStatus(a, currentTime);
         const statusB = getEventStatus(b, currentTime);
 
         if (statusOrder[statusA] !== statusOrder[statusB]) {
-          return statusOrder[statusB] - statusOrder[statusA]; // Sort by status first (reversed order)
+          return statusOrder[statusB] - statusOrder[statusA]; 
         }
 
         const timeA = parseEventTimes(a.date, a.time)?.start.getTime() || 0;
         const timeB = parseEventTimes(b.date, b.time)?.start.getTime() || 0;
-        return timeA - timeB; // Then by start time
+        return timeA - timeB; 
       });
   }, [currentTime, eventsForSelectedProjectAndOrg, getEventStatus]);
 
@@ -141,15 +138,15 @@ export default function ShootPage() {
     let filtered = todaysCoveredEvents;
 
     if (filterQuickTurnaround) {
-      filtered = filtered.filter(event => event.isQuickTurnaround);
+      filtered = filtered.filter((event: Event) => event.isQuickTurnaround);
     }
 
     if (filterTimeStatus !== "all") {
-      filtered = filtered.filter(event => getEventStatus(event, currentTime) === filterTimeStatus);
+      filtered = filtered.filter((event: Event) => getEventStatus(event, currentTime) === filterTimeStatus);
     }
 
     if (filterHidePastEvents) {
-      filtered = filtered.filter(event => getEventStatus(event, currentTime) !== "past");
+      filtered = filtered.filter((event: Event) => getEventStatus(event, currentTime) !== "past");
     }
     return filtered;
   }, [todaysCoveredEvents, filterTimeStatus, filterQuickTurnaround, filterHidePastEvents, currentTime, getEventStatus]);
@@ -159,7 +156,7 @@ export default function ShootPage() {
       setActiveAccordionItem(filteredTodaysEvents[0].id);
     } else if (filteredTodaysEvents.length === 0 && activeAccordionItem) {
       setActiveAccordionItem(undefined);
-    } else if (filteredTodaysEvents.length > 0 && activeAccordionItem && !filteredTodaysEvents.find(e => e.id === activeAccordionItem)) {
+    } else if (filteredTodaysEvents.length > 0 && activeAccordionItem && !filteredTodaysEvents.find((e: Event) => e.id === activeAccordionItem)) {
       setActiveAccordionItem(filteredTodaysEvents[0].id);
     }
   }, [filteredTodaysEvents, activeAccordionItem]);
@@ -191,11 +188,11 @@ export default function ShootPage() {
     const shotToUpdate = shots.find((s: ShotRequest) => s.id === shotId);
     if (!shotToUpdate) return;
 
-    let updatePayload: Partial<ShotRequest> = {};
+    let updatePayload: Partial<ShotRequestFormData> = {};
 
     if (actionType === 'toggleCapture') {
       if (shotToUpdate.status === "Captured" || shotToUpdate.status === "Completed") {
-        updatePayload.status = "Assigned"; // Or "Unassigned" if no one was assigned
+        updatePayload.status = "Assigned"; 
       } else {
         updatePayload.status = "Captured";
         if (!shotToUpdate.initialCapturerId) {
@@ -209,7 +206,7 @@ export default function ShootPage() {
 
     } else if (actionType === 'toggleBlock') {
       if (shotToUpdate.status === "Blocked") {
-        updatePayload.status = "Assigned"; // Or "Unassigned"
+        updatePayload.status = "Assigned"; 
         updatePayload.blockedReason = "";
         updatePayload.lastStatusModifierId = MOCK_CURRENT_USER_ID;
         updatePayload.lastStatusModifiedAt = nowISO;
@@ -251,7 +248,7 @@ export default function ShootPage() {
   const handleCheckIn = useCallback((eventId: string, personnelId: string) => {
     checkInUserToEvent(eventId, personnelId);
     const personName = getPersonnelNameById(personnelId);
-    const eventName = eventsForSelectedProjectAndOrg.find(e => e.id === eventId)?.name || "the event";
+    const eventName = eventsForSelectedProjectAndOrg?.find((e: Event) => e.id === eventId)?.name || "the event";
     toast({
       title: "Checked In",
       description: `${personName} successfully checked in to ${eventName}.`,
@@ -261,7 +258,7 @@ export default function ShootPage() {
   const handleCheckOut = useCallback((eventId: string, personnelId: string) => {
     checkOutUserFromEvent(eventId, personnelId);
     const personName = getPersonnelNameById(personnelId);
-    const eventName = eventsForSelectedProjectAndOrg.find(e => e.id === eventId)?.name || "the event";
+    const eventName = eventsForSelectedProjectAndOrg?.find((e: Event) => e.id === eventId)?.name || "the event";
      toast({
       title: "Checked Out",
       description: `${personName} successfully checked out from ${eventName}.`,
@@ -322,7 +319,7 @@ export default function ShootPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div>
                 <Label htmlFor="filter-time-status" className="text-xs text-muted-foreground">Event Status</Label>
-                <Select value={filterTimeStatus} onValueChange={(value) => setFilterTimeStatus(value as any)}>
+                <Select value={filterTimeStatus} onValueChange={(value: "all" | EventTimeStatus) => setFilterTimeStatus(value)}>
                     <SelectTrigger id="filter-time-status" className="h-9">
                         <SelectValue placeholder="Filter by time status" />
                     </SelectTrigger>
@@ -347,7 +344,7 @@ export default function ShootPage() {
                     <Checkbox
                         id="filter-hide-past"
                         checked={filterHidePastEvents}
-                        onCheckedChange={(checked: boolean | string) => setFilterHidePastEvents(!!checked)}
+                        onCheckedChange={(checked) => setFilterHidePastEvents(!!checked)}
                     />
                     <Label htmlFor="filter-hide-past" className="font-normal text-sm whitespace-nowrap">Hide Past Events</Label>
                 </div>
@@ -374,7 +371,7 @@ export default function ShootPage() {
             value={activeAccordionItem}
             onValueChange={setActiveAccordionItem}
         >
-          {filteredTodaysEvents.map(event => (
+          {filteredTodaysEvents.map((event: Event) => (
             <EventShootAccordionItem
               key={event.id}
               event={event}
@@ -394,3 +391,5 @@ export default function ShootPage() {
     </div>
   );
 }
+
+    
