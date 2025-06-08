@@ -27,6 +27,7 @@ import { useUserContext, type UserRole } from "@/contexts/UserContext"; // Impor
 import { cn } from "@/lib/utils";
 import { ProjectFormDialog, type ProjectFormDialogData } from "@/components/modals/ProjectFormDialog";
 
+// Define the possible statuses for projects
 const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Cancelled"] as const;
 
 export default function ProjectsPage() {
@@ -41,8 +42,10 @@ export default function ProjectsPage() {
   const { toast } = useToast();
   const [filterText, setFilterText] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  
+
+  // Mock user data for access control and filtering based on role and ID
   const MOCK_CURRENT_USER_ROLE = user?.role;
+  // Note: In a real application, this would come from an authenticated user session.
   const MOCK_CURRENT_USER_ID = user?.id;
 
   const canCreateProject = MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin";
@@ -50,7 +53,7 @@ export default function ProjectsPage() {
   const pageDescription = useMemo(() => {
     const selectedOrgName = organizations.find(o => o.id === selectedOrganizationId)?.name;
     
-    if (MOCK_CURRENT_USER_ROLE === "HIVE") {
+    if (MOCK_CURRENT_USER_ROLE === "HIVE") { // HIVE user sees global or org-specific view
       if (selectedOrganizationId !== ALL_ORGANIZATIONS_ID && selectedOrgName) {
         return `Global view: Projects for ${selectedOrgName}. Manage all event timelines and project setups.`;
       }
@@ -71,13 +74,14 @@ export default function ProjectsPage() {
     if (MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor") {
       return "Projects you are involved in. View status and event timelines.";
     }
-    if (MOCK_CURRENT_USER_ROLE === "Guest") {
+    if (MOCK_CURRENT_USER_ROLE === "Guest") { // Guest sees projects shared with them
         return "Projects shared with you. View status and event timelines.";
     }
     return "Overview of projects. Manage event timelines and project setups.";
   }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
 
   const displayProjects = useMemo(() => {
+    // Start with all projects from the context
     let filtered = projectsFromContext; 
 
     if (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") {
@@ -85,15 +89,18 @@ export default function ProjectsPage() {
         project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)
       );
     }
-
+    
+    // Apply text filter if present
     if (filterText) {
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(filterText.toLowerCase())
       );
     }
+    // Apply status filter if not 'all'
     if (statusFilter !== "all") {
       filtered = filtered.filter(project => project.status === statusFilter);
     }
+    // Return the filtered list
     return filtered;
   }, [projectsFromContext, filterText, statusFilter, MOCK_CURRENT_USER_ROLE, MOCK_CURRENT_USER_ID]);
 
@@ -102,10 +109,12 @@ export default function ProjectsPage() {
   }
 
   const handleEditProjectSubmit = (data: ProjectFormDialogData) => {
+    // Handle submission of the project edit form
     if (editingProject) {
+      // Filter out key personnel entries that are incomplete
       const finalKeyPersonnel = data.keyPersonnel?.filter(kp => kp.personnelId && data.selectedPersonnelMap?.[kp.personnelId] && kp.projectRole) || [];
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { selectedPersonnelMap, ...dataToUpdate } = data;
+      const { selectedPersonnelMap, ...dataToUpdate } = data; // Exclude the temporary map
 
       updateProject(editingProject.id, {...dataToUpdate, keyPersonnel: finalKeyPersonnel });
       toast({
@@ -118,11 +127,13 @@ export default function ProjectsPage() {
   };
 
   const openEditProjectModal = (project: Project) => {
+    // Set the project to be edited and open the modal
     setEditingProject(project);
     setIsEditModalOpen(true);
   };
 
   const handleDeleteClick = (projectId: string) => {
+    // Set the project ID to be deleted and open the confirmation dialog
     setProjectToDeleteId(projectId);
     setIsDeleteDialogOpen(true);
   };
@@ -130,6 +141,7 @@ export default function ProjectsPage() {
   const confirmDelete = () => {
     if (projectToDeleteId) {
       const project = projectsFromContext.find(p => p.id === projectToDeleteId);
+      // Call context function to delete the project
       deleteProject(projectToDeleteId);
       toast({
         title: "Project Deleted",
@@ -142,8 +154,10 @@ export default function ProjectsPage() {
   };
 
   const showActionsForProject = (project: Project): boolean => {
+    // Determine if the current user role allows editing/deleting this project
     if (MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin") return true;
     if (MOCK_CURRENT_USER_ROLE === "Project Manager" && project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)) return true;
+    // Other roles (Client, Photographer, Editor, Guest) generally do not have edit/delete rights
     return false;
   };
 
@@ -166,6 +180,7 @@ export default function ProjectsPage() {
         )}
       </div>
 
+      {/* Project Edit Form Dialog */}
       <ProjectFormDialog
         isOpen={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
@@ -175,6 +190,7 @@ export default function ProjectsPage() {
         isLoadingOrganizations={isLoadingOrganizations}
       />
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -190,6 +206,7 @@ export default function ProjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Project List Card */}
       <Card className="border-0">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -204,6 +221,7 @@ export default function ProjectsPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {/* Filter Input */}
               <div className="relative w-full sm:w-64">
                 <Input
                   type="text"
@@ -214,6 +232,7 @@ export default function ProjectsPage() {
                 />
                 <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               </div>
+              {/* Status Filter Select */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by status" />
@@ -228,6 +247,7 @@ export default function ProjectsPage() {
             </div>
           </div>
         </CardHeader>
+        {/* Project Table */}
         <CardContent>
           {displayProjects.length > 0 ? (
             <Table>
@@ -280,6 +300,7 @@ export default function ProjectsPage() {
                     </TableCell>
                     {showActionsForProject(project) ? (
                         <TableCell className="text-right">
+                        {/* Edit Button */}
                         <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Edit</span>
@@ -288,6 +309,7 @@ export default function ProjectsPage() {
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Delete</span>
                         </Button>
+                        {/* Empty cell for roles that cannot edit/delete */}
                         </TableCell>
                     ) : (MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") ? (
                        <TableCell className="text-right"></TableCell>

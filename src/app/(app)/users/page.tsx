@@ -13,7 +13,7 @@ function UserManagementPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [users, setUsers] = useState<User[]>([]);
-      // } else {
+  const [userIdToDelete, setUserIdToDelete] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedUserDetails, setSelectedUserDetails] = useState<User | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);

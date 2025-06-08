@@ -139,26 +139,16 @@ export default function IngestionUtilityPage() {
                  logHiveActivity("Demo data file does not contain an 'ingestionJobs' array or is empty.", 'error');
               }
             } else {
-              console.error("Failed to read demo data file:", response.error);
-               logHiveActivity(`Failed to read demo data file: ${response.error}`, 'error');
+              console.error("Failed to read demo data file:", response.error ?? 'Unknown error');
+               logHiveActivity(`Failed to read demo data file: ${response.error || 'Unknown error'}`, 'error');
             }
           } catch (error) {
             console.error("Error processing demo data JSON for ingestion jobs:", error);
-             logHiveActivity(`Error processing demo data JSON for ingestion jobs: ${error instanceof Error ? error.message : String(error)}`, 'error');
+             logHiveActivity(`Error processing demo data JSON for ingestion jobs: ${error instanceof Error ? error.message : String(error)}`, 'error'); // Line 123
           }
       } else {
-        // Fetch live data from the actual backend API
-        logHiveActivity("Fetching ingestion job data from HIVE backend...");
-        try {
-           // This should call your actual backend API to get live jobs
-          const liveJobs = await localUtility.getIngestionJobsFromHIVE(); // Assuming this utility function hits your real API proxy
-           logHiveActivity(`Successfully fetched ${liveJobs.length} live job(s).`, 'success');
-           fetchedJobs = liveJobs.map(job => ({...job, hiveProcessedCompletion: false})); // Initialize flag for live jobs
-        } catch (error) {
-           const errorMessage = error instanceof Error ? error.message : String(error);
-           logHiveActivity(`Error fetching live ingestion jobs: ${errorMessage}`, 'error');
-           toast({ title: "Failed to Fetch Live Jobs", description: errorMessage, variant: "destructive" });
-        }
+        // Ingestion page currently only supports demo data loading for job status display.
+        // Live fetching from a local utility is not implemented in this mock HIVE frontend.
       }
       
       // Process newly fetched jobs (either demo or live) for completions
@@ -304,9 +294,7 @@ export default function IngestionUtilityPage() {
           </CardHeader>
           <CardContent>
             <Textarea
-              readOnly={true}
-              value={hiveActivityLog.join('
-')}
+              value={hiveActivityLog.join('\n')}
               className="h-40 font-mono text-xs bg-muted/30"
               placeholder="No HIVE activity logged yet..."
             />

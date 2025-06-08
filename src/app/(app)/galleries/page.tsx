@@ -13,6 +13,8 @@ import Image from 'next/image';
 import { useEventContext, type Event } from '@/contexts/EventContext'; // Added
 import { useSettingsContext } from '@/contexts/SettingsContext'; // Added
 import { format, parseISO } from 'date-fns'; // Added
+import { type Project } from '@/contexts/ProjectContext';
+import { type Organization } from '@/contexts/OrganizationContext';
 
 // Placeholder for client galleries data, eventually from a context or API
 interface MockGallery {
@@ -48,9 +50,9 @@ interface MockDayGallery {
 }
 
 export default function GalleriesOverviewPage() {
-  const { selectedProjectId, selectedProject } = useProjectContext();
-  const { selectedOrganizationId, selectedOrganization } = useOrganizationContext();
-  const { eventsForSelectedProjectAndOrg, isLoadingEvents } = useEventContext(); // Added
+  const { projects, selectedProjectId, selectedProject, isLoadingProjects } = useProjectContext(); // Added projects, isLoadingProjects
+  const { organizations, selectedOrganizationId, selectedOrganization, isLoadingOrganizations } = useOrganizationContext(); // Added organizations, isLoadingOrganizations
+  const { eventsForSelectedProjectAndOrg, isLoadingEvents } = useEventContext(); // Removed events
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext(); // Added
   const [isLoadingDynamicData, setIsLoadingDynamicData] = useState(true);
 
@@ -60,7 +62,7 @@ export default function GalleriesOverviewPage() {
   }, [isLoadingEvents, isLoadingSettings]);
 
   const displayedGalleries = useMemo(() => {
-    let filtered = mockClientGalleries; // This mock data is static for now
+    let filtered = mockClientGalleries.filter(gallery => projects.some(p => p.id === gallery.projectId) && organizations.some(o => o.id === gallery.organizationId)); // Filter by available projects/orgs
 
     if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
       filtered = filtered.filter(gallery => gallery.organizationId === selectedOrganizationId);
@@ -74,13 +76,15 @@ export default function GalleriesOverviewPage() {
       .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
       .slice(0, 4);
   }, [selectedProjectId, selectedOrganizationId]);
-
+  
   const displayedDayGalleries = useMemo(() => {
-    if (isLoadingDynamicData || !useDemoData) {
+    // Always use events data from context when in demo mode
+    if (isLoadingDynamicData) {
       return [];
     }
 
-    const eventsToConsider = eventsForSelectedProjectAndOrg || [];
+    // Group events by date
+    const eventsToConsider = eventsForSelectedProjectAndOrg || []; // Kept one declaration
     
     const groupedByDate: Record<string, { events: Event[], projectId: string, organizationId: string }> = {};
 
@@ -114,7 +118,7 @@ export default function GalleriesOverviewPage() {
       .sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime()); // Sort by date, most recent first
 
   }, [isLoadingDynamicData, useDemoData, eventsForSelectedProjectAndOrg, selectedProjectId, selectedOrganizationId]);
-
+  
 
   const pageDescription = useMemo(() => {
     let desc = "Browse and access shared client galleries.";
@@ -127,7 +131,7 @@ export default function GalleriesOverviewPage() {
     }
     return desc;
   }, [selectedProject, selectedOrganization]);
-
+  
   if (isLoadingDynamicData) {
     return (
          <div className="flex flex-col gap-8">
@@ -138,7 +142,7 @@ export default function GalleriesOverviewPage() {
                 <p className="text-muted-foreground mt-1">Loading gallery data...</p>
             </div>
             <Card className="border-0">
-                <CardHeader><p className="text-lg font-semibold">Recently Updated Galleries</p></CardHeader>
+                 <CardHeader><p className="text-lg font-semibold">Recently Updated Galleries</p></CardHeader>
                 <CardContent><p>Loading...</p></CardContent>
             </Card>
              <Card className="border-0">
@@ -167,7 +171,7 @@ export default function GalleriesOverviewPage() {
         </CardHeader>
         <CardContent>
           {displayedGalleries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {displayedGalleries.map(gallery => (
                 <Card key={gallery.id} className="hover:shadow-md transition-shadow border-0">
                   <CardHeader>
@@ -206,7 +210,7 @@ export default function GalleriesOverviewPage() {
         </CardHeader>
         <CardContent>
           {displayedDayGalleries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {displayedDayGalleries.map(day => (
                 <Link key={day.id} href={`/galleries/day/${day.id}`} passHref legacyBehavior>
                   <a className="block hover:no-underline">
@@ -235,7 +239,7 @@ export default function GalleriesOverviewPage() {
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8">
+             <p className="text-muted-foreground text-center py-8">
               {useDemoData ? "No event days found in the demo data matching your current project/organization selection." : "Demo data is disabled, or no days with events to display."}
             </p>
           )}

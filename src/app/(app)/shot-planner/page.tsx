@@ -18,7 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { initialPersonnelMock } from '@/app/(app)/personnel/page';
+import { usePersonnelContext } from '@/contexts/PersonnelContext'; // Import the personnel context
 
 export default function ShotPlannerPage() {
   const searchParams = useSearchParams();
@@ -34,6 +34,7 @@ export default function ShotPlannerPage() {
     addShotRequest,
     deleteShotRequest,
   } = useEventContext();
+  const { personnelList, isLoadingPersonnel } = usePersonnelContext(); // Use personnel context
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const { toast } = useToast();
 
@@ -45,11 +46,11 @@ export default function ShotPlannerPage() {
   const [activeAccordionItem, setActiveAccordionItem] = useState<string | undefined>(undefined);
   const [shotLists, setShotLists] = useState<Record<string, ShotRequest[]>>({});
 
-  const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const getPersonnelNameById = useCallback((id?: string): string => {
     if (!id) return "Unknown";
-    const person = initialPersonnelMock.find(p => p.id === id);
+    // Use personnel from context
+    const person = personnelList.find(p => p.id === id);
     return person ? person.name : "Unknown User";
   }, []);
 
@@ -90,6 +91,8 @@ export default function ShotPlannerPage() {
     getShotRequestsForEvent,
     shotLists 
   ]);
+
+  const titleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleAddShot = (e: FormEvent<HTMLFormElement>, eventId: string) => {
     e.preventDefault();

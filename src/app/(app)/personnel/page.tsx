@@ -26,8 +26,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { useEventContext, type Event } from "@/contexts/EventContext"; 
-import { useProjectContext } from "@/contexts/ProjectContext"; 
+import { useEventContext, type Event } from "@/contexts/EventContext";
+import { useProjectContext } from "@/contexts/ProjectContext";
 import { format, parseISO } from "date-fns";
 import { PersonnelFormDialog, type PersonnelFormDialogData } from "@/components/modals/PersonnelFormDialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
@@ -35,25 +35,23 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { usePersonnelContext, type Personnel } from "@/contexts/PersonnelContext";
 
 
-export const PHOTOGRAPHY_ROLES = ["Photographer", "Editor", "Project Manager", "Client", "Event Lead"] as const;
+export const PHOTOGRAPHY_ROLES = [
+  "Photographer",
+  "Videographer",
+  "Editor",
+  "Assistant",
+  "Producer",
+  "Project Manager",
+  "Client",
+] as const;
 
-// Removed Personnel type definition as it's now imported from the context
-// export type Personnel = Omit<PersonnelFormDialogData, 'cameraSerialsInput'> & {
-//   id: string;
-//   cameraSerials?: string[];
-//   contact?: string;
-// };
-
-// Removed initialPersonnelMock as data is loaded via context
-// export let initialPersonnelMock: Personnel[] = [...];
 
 export default function PersonnelPage() {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { allEvents, isLoadingEvents, getEventById, updateEvent, eventsForSelectedProjectAndOrg } = useEventContext(); 
+  const { allEvents, isLoadingEvents, getEventById, updateEvent, eventsForSelectedProjectAndOrg } = useEventContext();
   const { selectedProject } = useProjectContext();
   // Use the personnel context
   const { personnelList, isLoadingPersonnel, addPersonnel, updatePersonnel, deletePersonnel, getPersonnelById } = usePersonnelContext();
-
   // Removed local personnelList state
   // const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
 
@@ -61,7 +59,7 @@ export default function PersonnelPage() {
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [personnelToDeleteId, setPersonnelToDeleteId] = useState<string | null>(null);
-  
+
   const [isViewScheduleModalOpen, setIsViewScheduleModalOpen] = useState(false);
   const [viewingScheduleForPersonnel, setViewingScheduleForPersonnel] = useState<Personnel | null>(null);
   const [eventsForSelectedPersonnelInModal, setEventsForSelectedPersonnelInModal] = useState<Event[]>([]);
@@ -71,9 +69,6 @@ export default function PersonnelPage() {
 
   const [selectedEventForAssignment, setSelectedEventForAssignment] = useState<string | null>(null);
   const [eventDetailsForAssignment, setEventDetailsForAssignment] = useState<Event | null>(null);
-  
-  // Removed useEffect for loading personnel data, now handled by context
-  // useEffect(() => { ... }, [useDemoData, isLoadingSettings]);
 
   useEffect(() => {
     if (selectedEventForAssignment && !isLoadingEvents) {
@@ -87,7 +82,7 @@ export default function PersonnelPage() {
   const handlePersonnelSubmit = (data: PersonnelFormDialogData) => {
     if (editingPersonnel) {
       // Use updatePersonnel from context
-      updatePersonnel(editingPersonnel.id, { ...data, cameraSerials: data.cameraSerials || [], contact: data.contact });
+      updatePersonnel(editingPersonnel.id, { ...data, name: data.name, role: data.role, cameraSerials: data.cameraSerials || [], contact: data.contact });
       toast({
         title: "Team Member Updated",
         description: `"${data.name}" has been successfully updated.`,
@@ -137,8 +132,8 @@ export default function PersonnelPage() {
   const handleViewSchedule = (person: Personnel) => {
     setViewingScheduleForPersonnel(person);
     let assignedEvents: Event[] = [];
-    if (!isLoadingEvents && allEvents) { 
-        assignedEvents = allEvents.filter(event => 
+    if (!isLoadingEvents && allEvents) {
+        assignedEvents = allEvents.filter(event =>
             event.assignedPersonnelIds?.includes(person.id)
         ).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
@@ -153,7 +148,7 @@ export default function PersonnelPage() {
     return personnelList.filter(member =>
       member.name.toLowerCase().includes(filterText.toLowerCase()) ||
       member.role.toLowerCase().includes(filterText.toLowerCase()) ||
-      (member.contact && member.contact.toLowerCase().includes(filterText.toLowerCase())) || 
+      (member.contact && member.contact.toLowerCase().includes(filterText.toLowerCase())) ||
       (member.cameraSerials && member.cameraSerials.join(', ').toLowerCase().includes(filterText.toLowerCase()))
     );
   }, [personnelList, filterText]); // Depend on personnelList from context
@@ -169,10 +164,10 @@ export default function PersonnelPage() {
     } else {
       newAssignedPersonnelIds = newAssignedPersonnelIds.filter(id => id !== personnelId);
     }
-    
+
     const updatedEventData = { assignedPersonnelIds: newAssignedPersonnelIds };
     updateEvent(eventDetailsForAssignment.id, updatedEventData);
-    
+
     setEventDetailsForAssignment(prev => prev ? {...prev, assignedPersonnelIds: newAssignedPersonnelIds} : null);
 
     const person = personnelList.find(p => p.id === personnelId); // Use personnelList from context
@@ -183,7 +178,7 @@ export default function PersonnelPage() {
   };
 
   // Use isLoadingPersonnel from context
-  if (isLoadingSettings || isLoadingEvents || isLoadingPersonnel) { 
+  if (isLoadingSettings || isLoadingEvents || isLoadingPersonnel) {
     return <div>Loading personnel data, event context, and project context...</div>;
   }
 
@@ -274,9 +269,9 @@ export default function PersonnelPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <p className="text-lg font-semibold flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Team Roster</p> 
-              <div className="text-sm text-muted-foreground"> 
-                List of all team members and their current status. 
+              <p className="text-lg font-semibold flex items-center gap-2"><Users className="h-6 w-6 text-accent" />Team Roster</p>
+              <div className="text-sm text-muted-foreground">
+                List of all team members and their current status.
                 (Showing {filteredPersonnelList.length} of {personnelList.length} members)
               </div>
             </div>
@@ -332,7 +327,7 @@ export default function PersonnelPage() {
                       <Badge variant={
                         member.status === "Available" ? "default" :
                         member.status === "Assigned" ? "secondary" :
-                        "outline" 
+                        "outline"
                       }>{member.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -364,8 +359,8 @@ export default function PersonnelPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <Card className="border-0">
           <CardHeader>
-            <p className="text-lg font-semibold flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment</p> 
-            <div className="text-sm text-muted-foreground"> 
+            <p className="text-lg font-semibold flex items-center gap-2"><Workflow className="h-5 w-5 text-accent" />Personnel Assignment</p>
+            <div className="text-sm text-muted-foreground">
               {selectedProject ? `Assign personnel to events for ${selectedProject.name}.` : "Select a project to assign personnel to its events."}
             </div>
           </CardHeader>
@@ -432,8 +427,8 @@ export default function PersonnelPage() {
 
         <Card className="border-0">
           <CardHeader>
-            <p className="text-lg font-semibold flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</p> 
-            <div className="text-sm text-muted-foreground">View team member schedules and event commitments across all projects. Sorted by date.</div> 
+            <p className="text-lg font-semibold flex items-center gap-2"><GanttChartSquare className="h-5 w-5 text-accent" />Team Schedule Visualization</p>
+            <div className="text-sm text-muted-foreground">View team member schedules and event commitments across all projects. Sorted by date.</div>
           </CardHeader>
           <CardContent>
              {/* Use personnelList from context */}
@@ -470,5 +465,3 @@ export default function PersonnelPage() {
     </div>
   );
 }
-
-    
