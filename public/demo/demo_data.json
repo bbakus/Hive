@@ -1,125 +1,279 @@
+
 {
   "projects": [
     {
-      "projectId": "proj_culinary_fest_2024",
-      "name": "Annual Culinary Arts Festival 2024",
-      "description": "Premier food and wine festival showcasing top chefs and culinary trends.",
-      "startDate": "2024-10-10",
-      "endDate": "2024-10-13"
+      "projectId": "proj_g9e_summit_2024",
+      "name": "G9e Annual Summit 2024",
+      "startDate": "2024-10-01",
+      "endDate": "2024-10-03",
+      "status": "Planning",
+      "organizationId": "org_g9e",
+      "description": "The annual flagship event for G9e, focusing on future tech and innovation. Includes keynotes, workshops, and networking sessions.",
+      "location": "Grand Hyatt Convention Center",
+      "keyPersonnel": [
+        {"personnelId": "user_liam_w", "name": "Liam Wilson", "projectRole": "Project Manager"},
+        {"personnelId": "user_maria_s", "name": "Maria Sanchez", "projectRole": "Lead Photographer"},
+        {"personnelId": "user_ava_m", "name": "Ava Miller", "projectRole": "Lead Editor"}
+      ],
+      "createdByUserId": "user_admin_global"
     },
     {
-      "projectId": "proj_gourmet_summit",
-      "name": "Gourmet Innovation Summit",
-      "description": "Industry summit focused on the future of food technology and sustainable practices.",
-      "startDate": "2025-03-15",
-      "endDate": "2025-03-17"
+      "projectId": "proj_client_alpha_q1_2025",
+      "name": "Client Alpha Q1 Product Launch",
+      "startDate": "2025-01-15",
+      "endDate": "2025-01-20",
+      "status": "In Progress",
+      "organizationId": "org_g9e",
+      "description": "Product launch photography and videography for Client Alpha's new gadget line. Includes studio shots and a launch event.",
+      "location": "Client Alpha HQ & Studio 7",
+      "keyPersonnel": [
+        {"personnelId": "user_liam_w", "name": "Liam Wilson", "projectRole": "Project Manager"},
+        {"personnelId": "user_david_k", "name": "David Kim", "projectRole": "Lead Videographer"}
+      ],
+      "createdByUserId": "user_admin_global"
+    },
+    {
+      "projectId": "proj_urban_explorer_series",
+      "name": "Urban Explorer Photo Series",
+      "startDate": "2024-09-01",
+      "endDate": "2024-12-15",
+      "status": "Completed",
+      "organizationId": "org_g9e",
+      "description": "A documentary photo series capturing the essence of urban life in 5 major cities.",
+      "location": "Multiple Cities",
+      "keyPersonnel": [
+         {"personnelId": "user_maria_s", "name": "Maria Sanchez", "projectRole": "Photographer"}
+      ],
+      "createdByUserId": "user_admin_global"
     }
   ],
   "events": [
     {
-      "eventId": "evt_culinary_fest_d1_chef_smith",
-      "projectId": "proj_culinary_fest_2024",
-      "name": "Chef Demo: Master Techniques with Chef Smith",
-      "date": "2024-10-10",
-      "startTime": "11:00",
-      "endTime": "12:00",
-      "location": "Main Stage",
-      "description": "Chef John Smith demonstrates molecular gastronomy techniques."
+      "eventId": "evt_summit_d1_opening",
+      "name": "Summit Day 1: Opening Ceremony & Welcome Address",
+      "projectId": "proj_g9e_summit_2024",
+      "date": "2024-10-01",
+      "time": "09:00 - 10:30",
+      "priority": "Critical",
+      "assignedPersonnelIds": ["user_maria_s", "user_david_k"],
+      "isQuickTurnaround": true,
+      "deadline": "2024-10-01T18:00:00Z",
+      "organizationId": "org_g9e",
+      "discipline": "Photography",
+      "isCovered": true,
+      "location": "Main Auditorium",
+      "status": "Upcoming",
+      "description": "Coverage of the opening ceremony, VIP arrivals, and welcome speech.",
+      "shots": [
+        {"id": "sr_summit_d1_open_001", "title": "VIP Arrivals Red Carpet", "description": "Wide and medium shots of VIPs arriving.", "priority": "High", "status": "Assigned", "assignedPersonnelId": "user_maria_s"},
+        {"id": "sr_summit_d1_open_002", "description": "CEO Welcome Speech Full Coverage", "priority": "Critical", "status": "Assigned", "assignedPersonnelId": "user_david_k"},
+        {"id": "sr_summit_d1_open_003", "description": "Audience Reaction Shots", "priority": "Medium", "status": "Unassigned"}
+      ]
     },
     {
-      "eventId": "evt_culinary_fest_d1_wine_pairing",
-      "projectId": "proj_culinary_fest_2024",
-      "name": "Wine Pairing Masterclass: Italian Wines",
-      "date": "2024-10-10",
-      "startTime": "14:00",
-      "endTime": "15:30",
-      "location": "Workshop Room A",
-      "description": "Explore classic Italian wine pairings."
+      "eventId": "evt_summit_d1_keynote",
+      "name": "Summit Day 1: Tech Keynote by Dr. Innovate",
+      "projectId": "proj_g9e_summit_2024",
+      "date": "2024-10-01",
+      "time": "11:00 - 12:30",
+      "priority": "High",
+      "assignedPersonnelIds": ["user_maria_s", "user_brian_c"],
+      "isCovered": true,
+      "description": "Full coverage of Dr. Innovate's keynote presentation.",
+      "personnelActivity": {
+        "user_maria_s": {"checkInTime": "2024-10-01T10:45:00Z"}
+      },
+      "shots": [
+        {"id": "sr_summit_d1_keynote_001", "description": "Dr. Innovate on stage - various angles", "priority": "High", "status": "Assigned", "assignedPersonnelId": "user_maria_s"},
+        {"id": "sr_summit_d1_keynote_002", "description": "Presentation slides on screen (clear shots)", "priority": "Medium", "status": "Assigned", "assignedPersonnelId": "user_brian_c"}
+      ]
     },
     {
-      "eventId": "evt_culinary_fest_d2_book_jones",
-      "projectId": "proj_culinary_fest_2024",
-      "name": "Book Signing: 'The Art of Baking' by Jane Jones",
-      "date": "2024-10-11",
-      "startTime": "10:00",
-      "endTime": "11:00",
-      "location": "Book Nook",
-      "description": "Meet author Jane Jones and get your copy signed."
+      "eventId": "evt_summit_d2_workshop_ai",
+      "name": "Summit Day 2: AI Workshop",
+      "projectId": "proj_g9e_summit_2024",
+      "date": "2024-10-02",
+      "time": "14:00 - 16:00",
+      "priority": "Medium",
+      "assignedPersonnelIds": ["user_brian_c"],
+      "isCovered": true,
+      "description": "Interactive AI workshop coverage."
     },
-     {
-      "eventId": "evt_gourmet_summit_d1_keynote",
-      "projectId": "proj_gourmet_summit",
-      "name": "Keynote: Future of Food Sustainability",
-      "date": "2025-03-15",
-      "startTime": "09:00",
-      "endTime": "10:00",
-      "location": "Grand Ballroom",
-      "description": "Opening keynote address on sustainable food practices."
+    {
+      "eventId": "evt_client_alpha_studio_shoot",
+      "name": "Client Alpha: Gadget Studio Shoot Day 1",
+      "projectId": "proj_client_alpha_q1_2025",
+      "date": "2025-01-15",
+      "time": "10:00 - 18:00",
+      "priority": "High",
+      "assignedPersonnelIds": ["user_maria_s", "user_chloe_l"],
+      "isCovered": true,
+      "isQuickTurnaround": true,
+      "deadline": "2025-01-17T17:00:00Z",
+      "description": "Studio photography for new product line."
+    },
+    {
+      "eventId": "evt_urban_nyc_downtown",
+      "name": "Urban Explorer: NYC Downtown",
+      "projectId": "proj_urban_explorer_series",
+      "date": "2024-09-05",
+      "time": "09:00 - 17:00",
+      "priority": "Medium",
+      "assignedPersonnelIds": ["user_maria_s"],
+      "isCovered": false,
+      "description": "Capturing street life and architecture in downtown New York."
     }
   ],
   "personnel": [
     {
-      "personnelId": "user001",
-      "name": "Alice Johnson",
-      "role": "Photographer",
-      "contact": "alice.johnson@example.com"
+      "personnelId": "user_liam_w",
+      "name": "Liam Wilson",
+      "role": "Project Manager",
+      "contact": "liam.wilson@hive.example.com",
+      "status": "Available",
+      "avatar": "https://placehold.co/40x40.png?text=LW",
+      "cameraSerials": []
     },
     {
-      "personnelId": "user002",
-      "name": "Bob Williams",
+      "personnelId": "user_maria_s",
+      "name": "Maria Sanchez",
       "role": "Photographer",
-      "contact": "bob.williams@example.com"
+      "contact": "maria.sanchez@hive.example.com",
+      "status": "Available",
+      "avatar": "https://placehold.co/40x40.png?text=MS",
+      "cameraSerials": ["SN_MARIA_001", "SN_MARIA_002"]
     },
-     {
-      "personnelId": "user003",
-      "name": "Charlie Brown",
-      "role": "Event Manager",
-      "contact": "charlie.brown@example.com"
+    {
+      "personnelId": "user_david_k",
+      "name": "David Kim",
+      "role": "Videographer",
+      "contact": "david.kim@hive.example.com",
+      "status": "Assigned",
+      "avatar": "https://placehold.co/40x40.png?text=DK",
+      "cameraSerials": ["SN_DAVID_V01"]
+    },
+    {
+      "personnelId": "user_ava_m",
+      "name": "Ava Miller",
+      "role": "Editor",
+      "contact": "ava.miller@hive.example.com",
+      "status": "Available",
+      "avatar": "https://placehold.co/40x40.png?text=AM",
+      "cameraSerials": []
+    },
+    {
+      "personnelId": "user_brian_c",
+      "name": "Brian Chen",
+      "role": "Photographer",
+      "contact": "brian.chen@hive.example.com",
+      "status": "Available",
+      "avatar": "https://placehold.co/40x40.png?text=BC",
+      "cameraSerials": ["SN_BRIAN_P01"]
+    },
+    {
+      "personnelId": "user_chloe_l",
+      "name": "Chloe Lim",
+      "role": "Assistant",
+      "contact": "chloe.lim@hive.example.com",
+      "status": "On Leave",
+      "avatar": "https://placehold.co/40x40.png?text=CL",
+      "cameraSerials": []
+    },
+    {
+      "personnelId": "user_client_liaison",
+      "name": "Client Liaison (PBCC)",
+      "role": "Client",
+      "contact": "liaison@pbcc.example.com",
+      "status": "Available",
+      "avatar": "https://placehold.co/40x40.png?text=CL",
+      "cameraSerials": []
     }
   ],
   "deliverables": [
     {
-      "deliverableId": "del_smith_demo_photos",
-      "eventId": "evt_culinary_fest_d1_chef_smith",
-      "name": "Photos from Chef Smith Demo",
-      "status": "Completed",
-      "dueDate": "2024-10-15",
-      "url": "/files/deliverables/smith_demo_photos.zip"
+      "deliverableId": "del_summit_d1_highlights",
+      "name": "Summit Day 1 Highlight Reel",
+      "eventId": "evt_summit_d1_opening",
+      "projectId": "proj_g9e_summit_2024",
+      "dueDate": "2024-10-02T17:00:00Z",
+      "status": "Pending",
+      "type": "Video"
     },
     {
-      "deliverableId": "del_wine_masterclass_report",
-      "eventId": "evt_culinary_fest_d1_wine_pairing",
-      "name": "Wine Pairing Masterclass Summary Report",
+      "deliverableId": "del_summit_d1_keynote_photos",
+      "name": "Summit Day 1 Keynote Photos (Top 50)",
+      "eventId": "evt_summit_d1_keynote",
+      "projectId": "proj_g9e_summit_2024",
+      "dueDate": "2024-10-01T23:59:00Z",
       "status": "In Progress",
-      "dueDate": "2024-10-18"
+      "type": "Images"
+    },
+    {
+      "deliverableId": "del_alpha_product_shots_final",
+      "name": "Client Alpha Gadget Final Product Shots",
+      "eventId": "evt_client_alpha_studio_shoot",
+      "projectId": "proj_client_alpha_q1_2025",
+      "dueDate": "2025-01-25T17:00:00Z",
+      "status": "Pending",
+      "type": "Images"
     }
   ],
-   "ingestionJobs": [
+  "clientGalleries": [
     {
-      "jobId": "job_init_culinary_smith_001",
+      "id": "gal_summit_d1_previews",
+      "galleryName": "G9e Summit Day 1 - Live Previews",
+      "clientEmail": "stakeholders@g9e.example.com",
+      "accessType": "password",
+      "password": "g9eSummit!24",
+      "allowHighResDownload": false,
+      "enableWatermarking": true,
+      "expiresOn": "2024-10-05T23:59:00Z",
+      "welcomeMessage": "Live photo previews from Day 1 of the G9e Annual Summit.",
+      "deliverableContextName": "G9e Annual Summit 2024"
+    },
+    {
+      "id": "gal_alpha_q1_teaser",
+      "galleryName": "Client Alpha Q1 - Teaser Shots",
+      "clientEmail": "marketing@clientalpha.example",
+      "accessType": "private",
+      "allowHighResDownload": true,
+      "enableWatermarking": false,
+      "expiresOn": null,
+      "welcomeMessage": "Teaser images for the upcoming Q1 product line.",
+      "deliverableContextName": "Client Alpha Q1 Product Launch"
+    }
+  ],
+  "ingestionJobs": [
+    {
+      "jobId": "job_summit_d1_maria_card1_20241001_0930",
       "status": "completed",
       "progress": 100,
-      "message": "Images from Chef Smith demo ingested successfully.",
-      "filesProcessed": 150,
-      "filesMatchedToEvents": 145,
-      "filesUnmatched": 5,
-      "totalFiles": 150,
-      "totalSizeMB": 2048,
+      "message": "Card 1 from Maria S. (Summit Day 1 Morning) ingested successfully.",
+      "filesProcessed": 250,
+      "filesMatchedToEvents": 240,
+      "filesUnmatched": 10,
+      "totalFiles": 250,
+      "totalSizeMB": 3840,
       "checksumResult": "passed",
       "errors": [],
-      "determinedPhotographerId": "user001",
-      "determinedEventId": "evt_culinary_fest_d1_chef_smith",
-      "reportUrl": "/reports/mock/job_smith_demo.json"
+      "determinedPhotographerId": "user_maria_s",
+      "determinedEventId": "evt_summit_d1_opening",
+      "reportUrl": "/reports/mock/sample_ingest_report.json",
+      "timestamp": "2024-10-01T10:45:00Z"
     },
-     {
-      "jobId": "job_init_culinary_jones_002",
+    {
+      "jobId": "job_summit_d1_david_card1_20241001_1000",
       "status": "processing_files",
-      "progress": 65,
-      "message": "Processing photos from Jane Jones book signing...",
-      "filesProcessed": 80,
-      "totalFiles": 120,
-      "determinedPhotographerId": "user002",
-      "determinedEventId": "evt_culinary_fest_d2_book_jones"
+      "progress": 70,
+      "message": "Processing video files from David K. (Summit Day 1 Opening).",
+      "filesProcessed": 5,
+      "totalFiles": 8,
+      "totalSizeMB": 12288,
+      "checksumResult": "pending",
+      "determinedPhotographerId": "user_david_k",
+      "determinedEventId": "evt_summit_d1_opening",
+      "timestamp": "2024-10-01T11:15:00Z"
     }
   ]
 }
+    

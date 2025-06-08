@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useEventContext } from "@/contexts/EventContext";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useSettingsContext } from "@/contexts/SettingsContext";
-import { initialPersonnelMock, type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
+import { type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
 import { useRouter } from "next/navigation"; // Added for reportUrl navigation
 
 type Editor = { id: string; name: string };
@@ -90,7 +90,8 @@ export default function PostProductionPage() {
 
   const getPersonnelName = (personnelId?: string): string => {
     if (!personnelId) return "N/A";
-    return initialPersonnelMock.find(p => p.id === personnelId)?.name || "Unknown";
+    // Note: initialPersonnelMock was removed. Need to fetch actual personnel data.
+    return "Unknown (Personnel Data Needed)";
   };
 
   useEffect(() => {

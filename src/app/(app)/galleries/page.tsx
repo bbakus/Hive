@@ -16,28 +16,9 @@ import { format, parseISO } from 'date-fns'; // Added
 import { type Project } from '@/contexts/ProjectContext';
 import { type Organization } from '@/contexts/OrganizationContext';
 
-// Placeholder for client galleries data, eventually from a context or API
 interface MockGallery {
   id: string;
-  name: string;
-  client: string;
-  date: string;
-  lastUpdated: string; // ISO date string
-  projectId: string;
-  organizationId: string;
 }
-
-const mockClientGalleries: MockGallery[] = [
-  { id: "gal001", name: "Summer Fest Highlights", client: "Client A", date: "2024-07-20", lastUpdated: "2024-07-22T10:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal002", name: "Tech Conference Keynotes", client: "Client B", date: "2024-09-15", lastUpdated: "2024-09-16T11:00:00Z", projectId: "proj_other_tech_conf", organizationId: "org_g9e" },
-  { id: "gal003", name: "G9e Summit Live Previews", client: "Internal Stakeholder", date: "2024-10-01", lastUpdated: "2024-10-02T12:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal004", name: "Product Shoot Q4", client: "Client C", date: "2024-10-15", lastUpdated: "2024-11-12T09:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal005", name: "Annual Charity Ball", client: "Client D", date: "2024-11-01", lastUpdated: "2024-11-05T14:00:00Z", projectId: "proj_charity_event_2024", organizationId: "org_another_org" },
-  { id: "gal006", name: "Holiday Special Shoot", client: "Client E", date: "2024-11-10", lastUpdated: "2024-11-11T16:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal007", name: "Autumn Collection Launch", client: "Fashion House X", date: "2024-10-05", lastUpdated: "2024-10-05T18:00:00Z", projectId: "proj_fashion_autumn", organizationId: "org_g9e" },
-  { id: "gal008", name: "G9e Summit - Day 1 Selects", client: "Marketing Team", date: "2024-10-01", lastUpdated: "2024-10-03T09:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-  { id: "gal009", name: "G9e Summit - VIP Portraits", client: "VIP Relations", date: "2024-10-02", lastUpdated: "2024-10-04T14:00:00Z", projectId: "proj_g9e_summit_2024", organizationId: "org_g9e" },
-];
 
 interface MockDayGallery {
   id: string; // e.g., "2024-10-01" (YYYY-MM-DD format for easy linking)
@@ -62,20 +43,8 @@ export default function GalleriesOverviewPage() {
   }, [isLoadingEvents, isLoadingSettings]);
 
   const displayedGalleries = useMemo(() => {
-    let filtered = mockClientGalleries.filter(gallery => projects.some(p => p.id === gallery.projectId) && organizations.some(o => o.id === gallery.organizationId)); // Filter by available projects/orgs
-
-    if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
-      filtered = filtered.filter(gallery => gallery.organizationId === selectedOrganizationId);
-    }
-
-    if (selectedProjectId) {
-      filtered = filtered.filter(gallery => gallery.projectId === selectedProjectId);
-    }
-
-    return [...filtered]
-      .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
-      .slice(0, 4);
-  }, [selectedProjectId, selectedOrganizationId]);
+ return []; // Placeholder: Gallery data will come from a proper API/context later
+  }, [selectedProjectId, selectedOrganizationId]); // Keep dependencies for future implementation
   
   const displayedDayGalleries = useMemo(() => {
     // Always use events data from context when in demo mode
@@ -174,9 +143,7 @@ export default function GalleriesOverviewPage() {
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {displayedGalleries.map(gallery => (
                 <Card key={gallery.id} className="hover:shadow-md transition-shadow border-0">
-                  <CardHeader>
-                    <CardTitle className="text-base">{gallery.name}</CardTitle>
-                    <CardDescription>Client: {gallery.client} | Date: {gallery.date}</CardDescription>
+ <CardHeader> {/* Placeholder for future gallery details */}
                   </CardHeader>
                   <CardContent>
                     <Image src="https://placehold.co/600x400.png" alt={`Preview of ${gallery.name}`} width={600} height={400} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
@@ -191,7 +158,7 @@ export default function GalleriesOverviewPage() {
                 </Card>
               ))}
             </div>
-          ) : (
+ ) : (
             <p className="text-muted-foreground text-center py-8">
               No client galleries found matching your current selection for "Recently Updated".
             </p>
