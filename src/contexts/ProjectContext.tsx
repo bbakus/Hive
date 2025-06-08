@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useSettingsContext } from './SettingsContext';
 import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
-import { format, subDays, addDays } from 'date-fns';
+import { type Personnel } from '@/contexts/PersonnelContext'; // Import the Personnel type
 
 export type KeyPersonnel = {
   personnelId: string;
@@ -41,6 +41,7 @@ type ProjectContextType = {
   deleteProject: (projectId: string) => void;
   selectedProject: Project | null;
   isLoadingProjects: boolean;
+  allPersonnel: Personnel[]; // Add allPersonnel to the context type
 };
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -53,19 +54,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [allProjects, setAllProjects] = useState<Project[]>([]); 
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([]); // Add state for personnel
 
   useEffect(() => {
     const fetchProjects = async () => {
       if (!isLoadingSettings) {
         setIsLoadingProjects(true);
         let loadedProjects: Project[] = [];
-        if (useDemoData) {
+        if (useDemoData) { // Check useDemoData here
           try {
-            const response = await fetch("/demo/demo_data.json");
+            const response = await fetch('/demo/demo_data.json'); // Corrected path
             if (response.ok) {
               const demoData = await response.json();
-              // Assuming the demo data JSON has a top-level 'projects' array
+              
               if (demoData && Array.isArray(demoData.projects)) {
+                 // Assuming the demo data JSON has a top-level 'projects' array
+
                 // Map the demo data structure to the Project type if necessary
                 loadedProjects = demoData.projects.map((p: any) => ({
                   id: p.projectId, // Map projectId from JSON to id in type
@@ -79,6 +83,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
                   organizationId: p.organizationId, // Assuming organizationId is in demo data
                   createdByUserId: p.createdByUserId,
                 }));
+
+                // Extract and set personnel data from demoData
+                if (demoData.personnel && Array.isArray(demoData.personnel)) {
+                    setAllPersonnel(demoData.personnel);
+                } else { setAllPersonnel([]); } // Ensure it's an empty array if personnel is missing or not an array
               } else {
                  console.error("Demo data file does not contain a 'projects' array or is empty.");
               }
@@ -91,6 +100,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         } else {
           // TODO: Implement fetching real project data from backend API
           console.warn("Demo data mode is off. Implement actual API call to fetch projects.");
+          setAllPersonnel([]); // Set to empty when not using demo data
           loadedProjects = []; // Start with empty array when not using demo data
         }
 
@@ -113,7 +123,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     };
 
     fetchProjects();
-  }, [useDemoData, isLoadingSettings, selectedOrganizationId]); // Depend on useDemoData and selectedOrganizationId
+  }, [useDemoData, isLoadingSettings, selectedOrganizationId, selectedProjectId]); // Added selectedProjectId to dependency array to re-evaluate if it changes
 
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
@@ -210,7 +220,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     deleteProject,
     selectedProject,
     isLoadingProjects,
-  }), [selectedProjectId, projectsForSelectedOrg, addProject, updateProject, deleteProject, selectedProject, isLoadingProjects]);
+    allPersonnel, // Include allPersonnel in the context value
+  }), [selectedProjectId, setSelectedProjectIdState, projectsForSelectedOrg, addProject, updateProject, deleteProject, selectedProject, isLoadingProjects, allPersonnel]);
 
   return (
     <ProjectContext.Provider value={value}>
@@ -226,5 +237,3 @@ export function useProjectContext() {
   }
   return context;
 }
-
-    

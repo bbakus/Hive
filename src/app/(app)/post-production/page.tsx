@@ -15,11 +15,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEventContext } from "@/contexts/EventContext";
+import { useEventContext, type Event } from "@/contexts/EventContext";
 import { useProjectContext } from "@/contexts/ProjectContext";
-import { useSettingsContext } from "@/contexts/SettingsContext";
-import { type Personnel, PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
-import { useRouter } from "next/navigation"; // Added for reportUrl navigation
+import { useSettingsContext } from "@/contexts/SettingsContext"; // Assuming Personnel type is defined here
+// Import Personnel from the correct context
+import { type Personnel } from "@/contexts/PersonnelContext";
+import { PHOTOGRAPHY_ROLES } from "@/app/(app)/personnel/page";
 
 type Editor = { id: string; name: string };
 export type TaskStatus = 'ingestion' | 'culling' | 'color' | 'review' | 'completed';
@@ -72,7 +73,7 @@ const taskStatusFilterOptions: { value: TaskStatus | "all"; label: string }[] = 
 
 export default function PostProductionPage() {
   const { eventsForSelectedProjectAndOrg, isLoadingEvents, getShotRequestsForEvent } = useEventContext();
-  const { selectedProject, isLoadingProjects } = useProjectContext();
+  const { selectedProject, isLoadingProjects, allPersonnel } = useProjectContext();
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
   const router = useRouter();
 
@@ -90,8 +91,7 @@ export default function PostProductionPage() {
 
   const getPersonnelName = (personnelId?: string): string => {
     if (!personnelId) return "N/A";
-    // Note: initialPersonnelMock was removed. Need to fetch actual personnel data.
-    return "Unknown (Personnel Data Needed)";
+    return allPersonnel.find(p => p.personnelId === personnelId)?.name || "Unknown Personnel";
   };
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export default function PostProductionPage() {
       .map((event, index) => {
         let photographerDisplay = "N/A";
         const photoPersonnelIds = event.assignedPersonnelIds?.filter(pid => {
-            const p = initialPersonnelMock.find(person => person.id === pid);
+            const p = allPersonnel.find(person => person.personnelId === pid);
             return p && PHOTOGRAPHY_ROLES.includes(p.role as typeof PHOTOGRAPHY_ROLES[number]) && p.role !== "Client";
         }) || [];
 
@@ -150,7 +150,7 @@ export default function PostProductionPage() {
       return [...derivedTasks, ...simulatedTasks];
     });
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps // Dependencies are managed for event/project data changes
   }, [eventsForSelectedProjectAndOrg, isLoadingEvents, isLoadingProjects, isLoadingSettings, selectedProject, getShotRequestsForEvent]);
 
 
@@ -433,7 +433,7 @@ export default function PostProductionPage() {
                                     size="icon"
                                     className="h-6 w-6 flex-shrink-0 ml-2"
                                     onClick={() => task.reportUrl?.startsWith('/reports/mock/') ? handleOpenReportModal(task.reportUrl) : router.push(task.reportUrl!)}
-                                   >
+                                  >
                                     <Settings className="h-4 w-4" />
                                     <span className="sr-only">View Report / Event Shots</span>
                                   </Button>

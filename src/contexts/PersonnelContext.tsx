@@ -8,7 +8,7 @@ import { default_api } from '@/lib/utils';
 
 // Define the Personnel type, similar to what's in personnel/page.tsx
 export type Personnel = {
-  id: string;
+  personnelId: string;
   name: string;
   role: string; // Assuming role is a string, adjust if needed
   status?: string; // Assuming status is optional string
@@ -22,8 +22,8 @@ type PersonnelContextType = {
   isLoadingPersonnel: boolean;
   // Optional: Add functions for adding, updating, deleting personnel
   // These would ideally interact with a backend API when not in demo mode
-  addPersonnel: (personnelData: Omit<Personnel, 'id'>) => string; // Returns new ID
-  updatePersonnel: (personnelId: string, personnelData: Partial<Omit<Personnel, 'id'>>) => void;
+  addPersonnel: (personnelData: Omit<Personnel, 'personnelId'>) => string; // Returns new ID
+  updatePersonnel: (personnelId: string, personnelData: Partial<Omit<Personnel, 'personnelId'>>) => void;
   deletePersonnel: (personnelId: string) => void;
   getPersonnelById: (personnelId: string) => Personnel | undefined;
 };
@@ -50,7 +50,7 @@ export function PersonnelProvider({ children }: { children: ReactNode }) {
             if (demoData && Array.isArray(demoData.personnel)) {
               loadedPersonnel = demoData.personnel.map((p: any) => ({
                  id: p.personnelId, // Map personnelId from JSON to id in type
-                 name: p.name,
+                 personnelId: p.personnelId, // Use personnelId from JSON
                  role: p.role, 
                  contact: p.contact,
                  status: p.status || "Available", 
@@ -90,11 +90,11 @@ export function PersonnelProvider({ children }: { children: ReactNode }) {
     loadPersonnelData();
   }, [useDemoData, isLoadingSettings]); // Depend on useDemoData and isLoadingSettings
 
-  const addPersonnel = useCallback((personnelData: Omit<Personnel, 'id'>): string => {
+  const addPersonnel = useCallback((personnelData: Omit<Personnel, 'personnelId'>): string => {
     const newId = `user_new_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newPersonnel: Personnel = {
       ...personnelData,
-      id: newId,
+      personnelId: newId, // Use personnelId
       cameraSerials: personnelData.cameraSerials || [],
     };
     setPersonnelList(prevList => [...prevList, newPersonnel]);
@@ -106,10 +106,10 @@ export function PersonnelProvider({ children }: { children: ReactNode }) {
     return newId;
   }, [useDemoData]); // Depend on useDemoData
 
-  const updatePersonnel = useCallback((personnelId: string, personnelData: Partial<Omit<Personnel, 'id'>>) => {
+  const updatePersonnel = useCallback((personnelId: string, personnelData: Partial<Omit<Personnel, 'personnelId'>>) => {
     setPersonnelList(prevList =>
       prevList.map(p =>
-        p.id === personnelId ? { ...p, ...personnelData, cameraSerials: personnelData.cameraSerials || p.cameraSerials } : p
+        p.personnelId === personnelId ? { ...p, ...personnelData, cameraSerials: personnelData.cameraSerials || p.cameraSerials } : p
       )
     );
      if (!useDemoData) {
@@ -119,15 +119,15 @@ export function PersonnelProvider({ children }: { children: ReactNode }) {
   }, [useDemoData]); // Depend on useDemoData
 
   const deletePersonnel = useCallback((personnelId: string) => {
-    setPersonnelList(prevList => prevList.filter(p => p.id !== personnelId));
+    setPersonnelList(prevList => prevList.filter(p => p.personnelId !== personnelId));
      if (!useDemoData) {
         console.warn("Demo data mode is off. Implement actual API call to delete personnel:", personnelId);
         // TODO: Implement real API call to delete personnel
      }
   }, [useDemoData]); // Depend on useDemoData
 
-  const getPersonnelById = useCallback((personnelId: string) => {
-    return personnelList.find(p => p.id === personnelId);
+  const getPersonnelById = useCallback((personnelId: string): Personnel | undefined => {
+    return personnelList.find(p => p.personnelId === personnelId);
   }, [personnelList]); // Depend on personnelList
 
   const value = useMemo(() => ({

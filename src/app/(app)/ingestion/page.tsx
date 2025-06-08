@@ -112,7 +112,7 @@ export default function IngestionUtilityPage() {
           try {
             const response = await default_api.read_file({ path: "public/demo/demo_data.json" });
             if (response.status === 'succeeded') {
-              const demoData = JSON.parse(response.result);
+              const demoData = JSON.parse(response.result || "{}");
               if (demoData && Array.isArray(demoData.ingestionJobs)) {
                 // Map demo data structure to IngestJobStatus type
                 fetchedJobs = demoData.ingestionJobs.map((job: any) => ({
