@@ -1,3 +1,4 @@
+
 from flask_sqlalchemy import SQLAlchemy
 
 
@@ -17,7 +18,7 @@ class Event(db.Model):
     def __repr__(self):
         return f"<Event {self.name}>"
 
-class Personnel(db.model):
+class Personnel(db.Model):
     __tablename__ = 'personnel'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -37,7 +38,7 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
 
 
-class Metada(db.Model):
+class Metadata(db.Model):
 
     __tablename__='metadatas'
 

@@ -2,11 +2,15 @@
 # Import the initialized Firestore client
 from firebase_admin_init import db as firestore_db # Renamed to avoid conflict with SQLAlchemy db
 from typing import Dict, List, Any
+from firebase_admin import firestore # Required for firestore.SERVER_TIMESTAMP
 
 # --- Example Firestore Operations ---
 
-def create_project(project_data: Dict[str, Any]) -> str:
+def create_project(project_data: Dict[str, Any]) -> str | None:
     """Adds a new project document to the 'projects' collection."""
+    if firestore_db is None:
+        print("Error: Firestore client (firestore_db) is not initialized. Cannot create project.")
+        return None
     try:
         # Add a new document with an auto-generated ID
         doc_ref = firestore_db.collection('projects').add(project_data)
@@ -19,6 +23,9 @@ def create_project(project_data: Dict[str, Any]) -> str:
 
 def get_project(project_id: str) -> Dict[str, Any] | None:
     """Retrieves a project document by its ID."""
+    if firestore_db is None:
+        print(f"Error: Firestore client (firestore_db) is not initialized. Cannot get project {project_id}.")
+        return None
     try:
         doc_ref = firestore_db.collection('projects').document(project_id)
         doc = doc_ref.get()
@@ -34,6 +41,9 @@ def get_project(project_id: str) -> Dict[str, Any] | None:
 
 def update_project(project_id: str, update_data: Dict[str, Any]) -> bool:
     """Updates an existing project document."""
+    if firestore_db is None:
+        print(f"Error: Firestore client (firestore_db) is not initialized. Cannot update project {project_id}.")
+        return False
     try:
         doc_ref = firestore_db.collection('projects').document(project_id)
         doc_ref.update(update_data)
@@ -45,6 +55,9 @@ def update_project(project_id: str, update_data: Dict[str, Any]) -> bool:
 
 def delete_project(project_id: str) -> bool:
     """Deletes a project document by its ID."""
+    if firestore_db is None:
+        print(f"Error: Firestore client (firestore_db) is not initialized. Cannot delete project {project_id}.")
+        return False
     try:
         firestore_db.collection('projects').document(project_id).delete()
         print(f"Successfully deleted project with ID: {project_id}")
@@ -55,6 +68,9 @@ def delete_project(project_id: str) -> bool:
 
 def list_all_projects() -> List[Dict[str, Any]]:
     """Retrieves all project documents from the 'projects' collection."""
+    if firestore_db is None:
+        print("Error: Firestore client (firestore_db) is not initialized. Cannot list projects.")
+        return []
     try:
         projects = []
         docs = firestore_db.collection('projects').stream() # stream() is good for potentially large collections
@@ -145,3 +161,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all() # Create tables before running the app for SQLAlchemy
     app.run(debug=True, port=5000) # Specify port for Flask dev server
+
