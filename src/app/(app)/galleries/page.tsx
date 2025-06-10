@@ -147,6 +147,7 @@ export default function GalleriesOverviewPage() {
                   </CardHeader>
                   <CardContent>
                     <Image src="https://placehold.co/600x400.png" alt={`Preview of ${gallery.name}`} width={600} height={400} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
+                    <Image src="https://placehold.co/600x400.png" alt={`Preview of ${gallery.name || 'Gallery'}`} width={600} height={400} className="w-full h-auto rounded-none" data-ai-hint="gallery preview event" />
                   </CardContent>
                   <CardContent className="pt-4">
                     <Link href={`/gallery/${gallery.id}`} passHref legacyBehavior>

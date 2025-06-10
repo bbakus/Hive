@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSettingsContext } from "@/contexts/SettingsContext";
 import { useProjectContext } from "@/contexts/ProjectContext";
 import { useEventContext, type Event, type ShotRequest } from "@/contexts/EventContext";
-import { initialPersonnelMock, PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
+import { PHOTOGRAPHY_ROLES, type Personnel } from "@/app/(app)/personnel/page";
 
 
 interface ParsedScheduleItem {

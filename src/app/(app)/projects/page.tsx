@@ -32,7 +32,9 @@ const projectStatuses = ["Planning", "In Progress", "Completed", "On Hold", "Can
 
 export default function ProjectsPage() {
   const { user, isLoadingUser } = useUserContext(); // Get user from context
-  const { projects: projectsFromContext, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
+  const { projects: projectsFromContextMaybeArray, updateProject, deleteProject, isLoadingProjects } = useProjectContext();
+  const projectsFromContext = Array.isArray(projectsFromContextMaybeArray) ? projectsFromContextMaybeArray : [];
+
   const { organizations, selectedOrganizationId, isLoadingOrganizations } = useOrganizationContext();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -81,8 +83,7 @@ export default function ProjectsPage() {
   }, [selectedOrganizationId, organizations, MOCK_CURRENT_USER_ROLE]);
 
   const displayProjects = useMemo(() => {
-    // Start with all projects from the context
-    let filtered = projectsFromContext; 
+    let filtered = [...projectsFromContext]; 
 
     if (MOCK_CURRENT_USER_ROLE === "Project Manager" || MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") {
       filtered = filtered.filter(project =>
@@ -90,17 +91,14 @@ export default function ProjectsPage() {
       );
     }
     
-    // Apply text filter if present
     if (filterText) {
       filtered = filtered.filter(project =>
         project.name.toLowerCase().includes(filterText.toLowerCase())
       );
     }
-    // Apply status filter if not 'all'
     if (statusFilter !== "all") {
       filtered = filtered.filter(project => project.status === statusFilter);
     }
-    // Return the filtered list
     return filtered;
   }, [projectsFromContext, filterText, statusFilter, MOCK_CURRENT_USER_ROLE, MOCK_CURRENT_USER_ID]);
 
@@ -109,12 +107,10 @@ export default function ProjectsPage() {
   }
 
   const handleEditProjectSubmit = (data: ProjectFormDialogData) => {
-    // Handle submission of the project edit form
     if (editingProject) {
-      // Filter out key personnel entries that are incomplete
       const finalKeyPersonnel = data.keyPersonnel?.filter(kp => kp.personnelId && data.selectedPersonnelMap?.[kp.personnelId] && kp.projectRole) || [];
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { selectedPersonnelMap, ...dataToUpdate } = data; // Exclude the temporary map
+      const { selectedPersonnelMap, ...dataToUpdate } = data; 
 
       updateProject(editingProject.id, {...dataToUpdate, keyPersonnel: finalKeyPersonnel });
       toast({
@@ -127,13 +123,11 @@ export default function ProjectsPage() {
   };
 
   const openEditProjectModal = (project: Project) => {
-    // Set the project to be edited and open the modal
     setEditingProject(project);
     setIsEditModalOpen(true);
   };
 
   const handleDeleteClick = (projectId: string) => {
-    // Set the project ID to be deleted and open the confirmation dialog
     setProjectToDeleteId(projectId);
     setIsDeleteDialogOpen(true);
   };
@@ -141,7 +135,6 @@ export default function ProjectsPage() {
   const confirmDelete = () => {
     if (projectToDeleteId) {
       const project = projectsFromContext.find(p => p.id === projectToDeleteId);
-      // Call context function to delete the project
       deleteProject(projectToDeleteId);
       toast({
         title: "Project Deleted",
@@ -154,10 +147,8 @@ export default function ProjectsPage() {
   };
 
   const showActionsForProject = (project: Project): boolean => {
-    // Determine if the current user role allows editing/deleting this project
     if (MOCK_CURRENT_USER_ROLE === "HIVE" || MOCK_CURRENT_USER_ROLE === "Admin") return true;
     if (MOCK_CURRENT_USER_ROLE === "Project Manager" && project.keyPersonnel?.some(kp => kp.personnelId === MOCK_CURRENT_USER_ID)) return true;
-    // Other roles (Client, Photographer, Editor, Guest) generally do not have edit/delete rights
     return false;
   };
 
@@ -180,7 +171,6 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      {/* Project Edit Form Dialog */}
       <ProjectFormDialog
         isOpen={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
@@ -190,7 +180,6 @@ export default function ProjectsPage() {
         isLoadingOrganizations={isLoadingOrganizations}
       />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -206,7 +195,6 @@ export default function ProjectsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Project List Card */}
       <Card className="border-0">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -221,7 +209,6 @@ export default function ProjectsPage() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              {/* Filter Input */}
               <div className="relative w-full sm:w-64">
                 <Input
                   type="text"
@@ -232,7 +219,6 @@ export default function ProjectsPage() {
                 />
                 <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               </div>
-              {/* Status Filter Select */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by status" />
@@ -247,7 +233,6 @@ export default function ProjectsPage() {
             </div>
           </div>
         </CardHeader>
-        {/* Project Table */}
         <CardContent>
           {displayProjects.length > 0 ? (
             <Table>
@@ -286,7 +271,7 @@ export default function ProjectsPage() {
                         project.status === "Completed" ? "default" :
                         project.status === "On Hold" ? "outline" :
                         project.status === "Cancelled" ? "destructive" :
-                        "destructive" /* Fallback */
+                        "destructive" 
                       }>{project.status}</Badge>
                     </TableCell>
                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={
@@ -300,7 +285,6 @@ export default function ProjectsPage() {
                     </TableCell>
                     {showActionsForProject(project) ? (
                         <TableCell className="text-right">
-                        {/* Edit Button */}
                         <Button variant="ghost" size="icon" className="hover:text-foreground/80" onClick={() => openEditProjectModal(project)}>
                             <Edit className="h-4 w-4" />
                             <span className="sr-only">Edit</span>
@@ -309,7 +293,6 @@ export default function ProjectsPage() {
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Delete</span>
                         </Button>
-                        {/* Empty cell for roles that cannot edit/delete */}
                         </TableCell>
                     ) : (MOCK_CURRENT_USER_ROLE === "Client" || MOCK_CURRENT_USER_ROLE === "Photographer" || MOCK_CURRENT_USER_ROLE === "Editor" || MOCK_CURRENT_USER_ROLE === "Guest") ? (
                        <TableCell className="text-right"></TableCell>

@@ -99,34 +99,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           try {
             const response = await fetch('/api/projects');
             if (response.ok) {
-              const apiProjects: Array<{ id: string, name: string, client: string }> = await response.json();
+              const apiProjects: Array<{ id: string, name: string, client: string, organizationId?: string }> = await response.json();
               
-              // Determine a default organization ID for projects fetched from the API
-              // as the current API doesn't provide it.
-              let defaultOrgId = "org_g9e"; // Fallback default
+              let defaultOrgForFallback = "org_g9e"; 
               if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
-                defaultOrgId = selectedOrganizationId;
+                defaultOrgForFallback = selectedOrganizationId;
               } else if (organizations.length > 0) {
-                defaultOrgId = organizations[0].id;
+                defaultOrgForFallback = organizations[0].id;
               }
 
               loadedProjects = apiProjects.map(apiProj => ({
                 id: apiProj.id,
                 name: apiProj.name,
-                // Client from API can be mapped to description or a new field if needed
                 description: `Client: ${apiProj.client}`, 
-                organizationId: defaultOrgId, // Placeholder, API should provide this
-                status: "Planning", // Default status
-                keyPersonnel: [], // Default
-                // Other fields will be undefined or have defaults
+                organizationId: apiProj.organizationId || defaultOrgForFallback, // Use API's orgId, or fallback
+                status: "Planning", 
+                keyPersonnel: [], 
               }));
             } else {
               console.error("Failed to fetch live project data:", response.statusText);
-              loadedProjects = []; // Fallback to empty if API call fails
+              loadedProjects = []; 
             }
           } catch (error) {
             console.error("Error fetching live project data:", error);
-            loadedProjects = []; // Fallback to empty on network error
+            loadedProjects = []; 
           }
         }
 
@@ -147,7 +143,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     };
 
     fetchProjects();
-  }, [useDemoData, isLoadingSettings, selectedOrganizationId, organizations, selectedProjectId]); // Added organizations to dependencies
+  }, [useDemoData, isLoadingSettings, selectedOrganizationId, organizations, selectedProjectId]);
 
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
@@ -191,7 +187,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     });
      if (!useDemoData) {
          console.warn("Live Add Project: Implement actual API call to add project to backend.");
-         // Example: fetch('/api/projects', { method: 'POST', body: JSON.stringify(newProjectWithOrg) });
      }
   }, [selectedOrganizationId, selectedProjectId, projectsForSelectedOrg, useDemoData]);
 
@@ -203,7 +198,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     );
      if (!useDemoData) {
          console.warn("Live Update Project: Implement actual API call to update project on backend.");
-         // Example: fetch(`/api/projects/${projectId}`, { method: 'PUT', body: JSON.stringify(projectData) });
      }
   }, [useDemoData]);
 
@@ -217,7 +211,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
      if (!useDemoData) {
          console.warn("Live Delete Project: Implement actual API call to delete project from backend.");
-         // Example: fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
      }
   }, [selectedProjectId, projectsForSelectedOrg, useDemoData]);
 
@@ -252,3 +245,4 @@ export function useProjectContext() {
   }
   return context;
 }
+

@@ -32,7 +32,8 @@ export async function GET(request: Request) {
   const responseProjects = mockProjectsForApi.map(p => ({
     id: p.id,
     name: p.name,
-    client: p.client
+    client: p.client,
+    organizationId: p.organizationId // Ensure organizationId is returned
   }));
 
   return NextResponse.json(responseProjects);
