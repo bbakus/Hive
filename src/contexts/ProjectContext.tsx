@@ -4,8 +4,8 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { useSettingsContext } from './SettingsContext';
-import { useOrganizationContext, ALL_ORGANIZATIONS_ID } from './OrganizationContext';
-import { type Personnel } from '@/contexts/PersonnelContext'; // Import the Personnel type
+import { useOrganizationContext, ALL_ORGANIZATIONS_ID, type Organization } from './OrganizationContext'; // Added Organization type
+import { type Personnel } from '@/contexts/PersonnelContext';
 
 export type KeyPersonnel = {
   personnelId: string;
@@ -41,7 +41,7 @@ type ProjectContextType = {
   deleteProject: (projectId: string) => void;
   selectedProject: Project | null;
   isLoadingProjects: boolean;
-  allPersonnel: Personnel[]; // Add allPersonnel to the context type
+  allPersonnel: Personnel[];
 };
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -49,45 +49,41 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { useDemoData, isLoading: isLoadingSettings } = useSettingsContext();
-  const { selectedOrganizationId } = useOrganizationContext(); 
+  const { selectedOrganizationId, organizations } = useOrganizationContext(); // Added organizations
 
-  const [allProjects, setAllProjects] = useState<Project[]>([]); 
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
-  const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([]); // Add state for personnel
+  const [allPersonnel, setAllPersonnel] = useState<Personnel[]>([]);
 
   useEffect(() => {
     const fetchProjects = async () => {
       if (!isLoadingSettings) {
         setIsLoadingProjects(true);
         let loadedProjects: Project[] = [];
-        if (useDemoData) { // Check useDemoData here
+        if (useDemoData) {
           try {
-            const response = await fetch('/demo/demo_data.json'); // Corrected path
+            const response = await fetch('/demo/demo_data.json');
             if (response.ok) {
               const demoData = await response.json();
               
               if (demoData && Array.isArray(demoData.projects)) {
-                 // Assuming the demo data JSON has a top-level 'projects' array
-
-                // Map the demo data structure to the Project type if necessary
                 loadedProjects = demoData.projects.map((p: any) => ({
-                  id: p.projectId, // Map projectId from JSON to id in type
+                  id: p.projectId,
                   name: p.name,
                   startDate: p.startDate,
                   endDate: p.endDate,
                   status: p.status,
                   description: p.description,
                   location: p.location,
-                  keyPersonnel: p.keyPersonnel || [], // Ensure keyPersonnel is an array
-                  organizationId: p.organizationId, // Assuming organizationId is in demo data
+                  keyPersonnel: p.keyPersonnel || [],
+                  organizationId: p.organizationId,
                   createdByUserId: p.createdByUserId,
                 }));
 
-                // Extract and set personnel data from demoData
                 if (demoData.personnel && Array.isArray(demoData.personnel)) {
                     setAllPersonnel(demoData.personnel);
-                } else { setAllPersonnel([]); } // Ensure it's an empty array if personnel is missing or not an array
+                } else { setAllPersonnel([]); }
               } else {
                  console.error("Demo data file does not contain a 'projects' array or is empty.");
               }
@@ -98,20 +94,48 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
             console.error("Error fetching or parsing demo data JSON:", error);
           }
         } else {
-          // TODO: Implement fetching real project data from backend API
-          console.warn("Demo data mode is off. Implement actual API call to fetch projects.");
-          setAllPersonnel([]); // Set to empty when not using demo data
-          loadedProjects = []; // Start with empty array when not using demo data
+          // Fetch real project data
+          setAllPersonnel([]); // Reset personnel when not using demo data
+          try {
+            const response = await fetch('/api/projects');
+            if (response.ok) {
+              const apiProjects: Array<{ id: string, name: string, client: string }> = await response.json();
+              
+              // Determine a default organization ID for projects fetched from the API
+              // as the current API doesn't provide it.
+              let defaultOrgId = "org_g9e"; // Fallback default
+              if (selectedOrganizationId && selectedOrganizationId !== ALL_ORGANIZATIONS_ID) {
+                defaultOrgId = selectedOrganizationId;
+              } else if (organizations.length > 0) {
+                defaultOrgId = organizations[0].id;
+              }
+
+              loadedProjects = apiProjects.map(apiProj => ({
+                id: apiProj.id,
+                name: apiProj.name,
+                // Client from API can be mapped to description or a new field if needed
+                description: `Client: ${apiProj.client}`, 
+                organizationId: defaultOrgId, // Placeholder, API should provide this
+                status: "Planning", // Default status
+                keyPersonnel: [], // Default
+                // Other fields will be undefined or have defaults
+              }));
+            } else {
+              console.error("Failed to fetch live project data:", response.statusText);
+              loadedProjects = []; // Fallback to empty if API call fails
+            }
+          } catch (error) {
+            console.error("Error fetching live project data:", error);
+            loadedProjects = []; // Fallback to empty on network error
+          }
         }
 
         setAllProjects(loadedProjects);
-        // Logic to select initial project based on loaded projects and selected organization
         const projectsInCurrentOrg = selectedOrganizationId === ALL_ORGANIZATIONS_ID 
           ? loadedProjects 
           : loadedProjects.filter(p => p.organizationId === selectedOrganizationId);
         
         if (projectsInCurrentOrg.length > 0) {
-          // If the currently selected project is not in the filtered list, select the first one.
           if (!selectedProjectId || !projectsInCurrentOrg.some(p => p.id === selectedProjectId)) {
              setSelectedProjectIdState(projectsInCurrentOrg[0].id);
           }
@@ -123,7 +147,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     };
 
     fetchProjects();
-  }, [useDemoData, isLoadingSettings, selectedOrganizationId, selectedProjectId]); // Added selectedProjectId to dependency array to re-evaluate if it changes
+  }, [useDemoData, isLoadingSettings, selectedOrganizationId, organizations, selectedProjectId]); // Added organizations to dependencies
 
   const projectsForSelectedOrg = useMemo(() => {
     if (selectedOrganizationId === ALL_ORGANIZATIONS_ID) {
@@ -132,8 +156,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     return allProjects.filter(p => p.organizationId === selectedOrganizationId);
   }, [allProjects, selectedOrganizationId]);
 
-
-  // This effect keeps the selected project in sync with the filtered list
   useEffect(() => {
     if (!isLoadingProjects && projectsForSelectedOrg.length > 0) {
       const currentSelectionIsValid = selectedProjectId && projectsForSelectedOrg.some(p => p.id === selectedProjectId);
@@ -145,9 +167,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [projectsForSelectedOrg, selectedProjectId, isLoadingProjects]);
 
-
   const addProject = useCallback((projectData: Omit<ProjectFormData, 'organizationId'>, organizationId: string, userId?: string) => {
-    // This add logic works for demo data as well, generating a new ID
     setAllProjects((prevProjects) => {
       const newProject: Project = {
         ...projectData,
@@ -158,7 +178,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       };
       const updatedProjects = [...prevProjects, newProject];
       
-      // Auto-select new project if it matches current org filter or if no org filter
       const shouldSelectNewProject = 
         (selectedOrganizationId === ALL_ORGANIZATIONS_ID || organizationId === selectedOrganizationId) &&
         (selectedProjectId === null || projectsForSelectedOrg.length === 0);
@@ -168,15 +187,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       } else if (selectedOrganizationId === ALL_ORGANIZATIONS_ID && selectedProjectId === null && updatedProjects.length === 1) {
          setSelectedProjectIdState(newProject.id);
       }
-
-
       return updatedProjects;
     });
-    // TODO: Add logic to save the new project if not in demo mode
      if (!useDemoData) {
-         console.warn("Demo data mode is off. Implement actual API call to add project.");
+         console.warn("Live Add Project: Implement actual API call to add project to backend.");
+         // Example: fetch('/api/projects', { method: 'POST', body: JSON.stringify(newProjectWithOrg) });
      }
-
   }, [selectedOrganizationId, selectedProjectId, projectsForSelectedOrg, useDemoData]);
 
   const updateProject = useCallback((projectId: string, projectData: Partial<ProjectFormData>) => {
@@ -185,9 +201,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         proj.id === projectId ? { ...proj, ...projectData, keyPersonnel: projectData.keyPersonnel || proj.keyPersonnel } : proj
       )
     );
-     // TODO: Add logic to save the updated project if not in demo mode
      if (!useDemoData) {
-         console.warn("Demo data mode is off. Implement actual API call to update project.");
+         console.warn("Live Update Project: Implement actual API call to update project on backend.");
+         // Example: fetch(`/api/projects/${projectId}`, { method: 'PUT', body: JSON.stringify(projectData) });
      }
   }, [useDemoData]);
 
@@ -199,15 +215,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const remainingOrgProjects = projectsForSelectedOrg.filter(p => p.id !== projectId);
         setSelectedProjectIdState(remainingOrgProjects.length > 0 ? remainingOrgProjects[0].id : null);
     }
-    // TODO: Add logic to delete the project if not in demo mode
      if (!useDemoData) {
-         console.warn("Demo data mode is off. Implement actual API call to delete project.");
+         console.warn("Live Delete Project: Implement actual API call to delete project from backend.");
+         // Example: fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
      }
   }, [selectedProjectId, projectsForSelectedOrg, useDemoData]);
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId) return null;
-    // Find in all projects, as projectsForSelectedOrg might change based on org filter
     return allProjects.find(p => p.id === selectedProjectId) || null;
   }, [selectedProjectId, allProjects]);
 
@@ -220,7 +235,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     deleteProject,
     selectedProject,
     isLoadingProjects,
-    allPersonnel, // Include allPersonnel in the context value
+    allPersonnel,
   }), [selectedProjectId, setSelectedProjectIdState, projectsForSelectedOrg, addProject, updateProject, deleteProject, selectedProject, isLoadingProjects, allPersonnel]);
 
   return (
