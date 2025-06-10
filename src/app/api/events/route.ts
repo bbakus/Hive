@@ -1,3 +1,4 @@
+
 // src/app/api/events/route.ts
 import { NextResponse } from 'next/server';
 
@@ -14,8 +15,16 @@ type BackendEvent = {
 };
 
 export async function GET(request: Request) {
-  const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:5000/events';
+  // const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:5000/events';
 
+  // --- TEMPORARY MODIFICATION FOR DIAGNOSIS ---
+  // Instead of fetching from Python backend, return an empty list.
+  // This helps determine if the Python backend interaction is causing the Internal Server Error.
+  console.log("INFO: /api/events GET request received. Returning empty mock event data for diagnosis.");
+  return NextResponse.json({ events: [] });
+  // --- END TEMPORARY MODIFICATION ---
+
+  /* Original code:
   try {
     const response = await fetch(pythonBackendUrl, {
       method: 'GET',
@@ -46,6 +55,7 @@ export async function GET(request: Request) {
         { status: 503 } // Service Unavailable
     );
   }
+  */
 }
 
 // You can also implement POST for creating events if needed
