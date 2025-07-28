@@ -1,9 +1,10 @@
 /* Event Planner Styles */
 
 .eventplanner-container {
-  max-width: 1200px;
+  max-width: 95vw; /* Use 95% of viewport width */
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem 2rem; /* Reduce padding to use more space */
 }
 
 .eventplanner-header {
@@ -869,10 +870,225 @@
 .status-badge.status-starting-soon,
 .status-badge.status-ongoing,
 .status-badge.status-done {
-  font-size: 0.5rem;
-  font-weight: 600;
-  padding: 0.125rem 0.375rem;
-  border-radius: 4px;
+  font-size: 0.75rem; /* Much larger text */
+  font-weight: 700; /* Bolder */
+  padding: 0.375rem 0.5rem; /* Much more padding */
+  border-radius: 6px; /* Larger radius */
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap; /* Prevent text wrapping */
+}
+
+/* Fresh Timetable Schedule Styles */
+.timetable-wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem; /* Reduce padding to use more space */
+  margin-top: 1.5rem;
+  width: 100%; /* Use full available width */
+}
+
+.timetable-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.timetable-header h3 {
+  color: #ffffff;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.timetable {
+  display: flex;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  height: 1900px; /* 19 hours * 100px each (6AM to Midnight) */
+  width: 100%; /* Use full available width */
+  min-width: 1400px; /* Minimum width for proper display */
+  margin: 0 auto;
+}
+
+.time-column {
+  width: 140px; /* Even wider time column for better readability */
+  background: rgba(255, 255, 255, 0.05);
+  border-right: 2px solid rgba(255, 255, 255, 0.2);
+  height: 1900px; /* EXACT match - 19 hours */
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.time-row {
+  height: 100px; /* MUCH BIGGER - 100px per hour */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 5px;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.time-label {
+  color: #ffffff;
+  font-size: 1rem; /* Bigger text */
+  font-weight: 600;
+}
+
+.events-grid {
+  flex: 1;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px; /* Bigger gap between columns for wider layout */
+  padding: 0 8px; /* Add some horizontal padding */
+  height: 1900px; /* EXACT match with time column - 19 hours */
+  min-height: 1900px; /* Ensure it doesn't shrink */
+  max-height: 1900px; /* Ensure it doesn't grow */
+}
+
+.time-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1900px; /* EXACT match - 19 hours */
+  z-index: 1;
+  pointer-events: none;
+}
+
+.time-grid-row {
+  height: 100px; /* EXACT match with time-row */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.time-grid-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.event-column {
+  position: relative;
+  z-index: 2;
+  height: 1900px; /* EXACT match with new height - 19 hours */
+  margin: 0;
+  padding: 0;
+}
+
+.event-card {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  background: rgba(74, 144, 226, 0.3);
+  border: 2px solid rgba(74, 144, 226, 0.6);
+  border-radius: 8px; /* Slightly bigger radius */
+  padding: 1rem; /* More padding for bigger cards */
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); /* Bigger shadow */
+  margin: 0;
+  box-sizing: border-box;
+  min-height: 50px; /* Minimum height for readability */
+}
+
+.event-card:hover {
+  background: rgba(74, 144, 226, 0.4);
+  border-color: rgba(74, 144, 226, 0.8);
+  transform: scale(1.01); /* Subtle scaling for bigger cards */
+  z-index: 10;
+}
+
+.event-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem; /* More spacing */
+  height: 100%;
+  position: relative; /* For absolute positioning of status/process indicators */
+}
+
+.event-name {
+  color: #ffffff;
+  font-size: 1rem; /* Bigger text */
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+  padding-right: 80px; /* Leave more space for larger status indicators */
+}
+
+.event-time {
+  color: #4a90e2;
+  font-size: 0.875rem; /* Bigger text */
+  font-weight: 500;
+}
+
+.event-status {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end; /* Align badges to the right */
+}
+
+.event-location {
+  color: #b0b0b0;
+  font-size: 0.875rem; /* Bigger text */
+}
+
+.process-badge {
+  background: rgba(255, 193, 7, 0.3);
+  border: 1px solid rgba(255, 193, 7, 0.6);
+  color: #ffc107;
+  font-size: 0.75rem; /* Much larger text */
+  font-weight: 700; /* Bolder */
+  padding: 0.375rem 0.5rem; /* Much more padding */
+  border-radius: 6px; /* Larger radius */
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap; /* Prevent text wrapping */
+}
+
+.no-events {
+  text-align: center;
+  padding: 3rem;
+  color: #b0b0b0;
+  font-size: 1rem;
+}
+
+/* Process Point Colors */
+.event-card.process-idle {
+  background: rgba(138, 43, 226, 0.3);
+  border-color: rgba(138, 43, 226, 0.6);
+}
+
+.event-card.process-ingest {
+  background: rgba(13, 110, 253, 0.3);
+  border-color: rgba(13, 110, 253, 0.6);
+}
+
+.event-card.process-cull {
+  background: rgba(255, 193, 7, 0.3);
+  border-color: rgba(255, 193, 7, 0.6);
+}
+
+.event-card.process-color {
+  background: rgba(220, 53, 69, 0.3);
+  border-color: rgba(220, 53, 69, 0.6);
+}
+
+.event-card.process-delivered {
+  background: rgba(25, 135, 84, 0.3);
+  border-color: rgba(25, 135, 84, 0.6);
+}
+
+.event-card.process-default {
+  background: rgba(74, 144, 226, 0.3);
+  border-color: rgba(74, 144, 226, 0.6);
 }

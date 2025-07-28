@@ -330,49 +330,45 @@ export const EventPlanner = ({liftUserId}) => {
     const renderScheduleTab = () => {
         const eventsForSelectedDate = getEventsForDate(selectedDate)
         
-        // Generate time slots from 6 AM to 10 PM
-        const timeSlots = []
-        for (let hour = 6; hour <= 22; hour++) {
-            timeSlots.push(`${hour.toString().padStart(2, '0')}:00`)
+        // Create hourly time slots from 6 AM to Midnight
+        const hours = []
+        for (let hour = 6; hour <= 24; hour++) {
+            hours.push(hour)
         }
         
-        // Helper function to get time slot for an event
-        const getTimeSlot = (time) => {
-            if (!time) return null
-            const hour = parseInt(time.split(':')[0])
-            return `${hour.toString().padStart(2, '0')}:00`
+        // Convert time string to exact pixel position from top
+        const timeToPixels = (timeStr) => {
+            if (!timeStr) return 0
+            const [hour, minute] = timeStr.split(':').map(Number)
+            // Calculate exact position: each hour = 100px, each minute = 100/60 = 1.67px
+            const hourOffset = (hour - 6) * 100  // Hours since 6 AM
+            const minuteOffset = (minute / 60) * 100  // Minutes within the hour
+            return Math.round(hourOffset + minuteOffset)
         }
         
-        // Helper function to get column position for overlapping events
-        const getEventColumn = (event, allEvents) => {
-            const eventStart = event.startTime ? parseInt(event.startTime.split(':')[0]) : 0
-            const eventEnd = event.endTime ? parseInt(event.endTime.split(':')[0]) : 24
-            
-            // Find overlapping events
-            const overlappingEvents = allEvents.filter(otherEvent => {
-                if (otherEvent.id === event.id) return false
-                const otherStart = otherEvent.startTime ? parseInt(otherEvent.startTime.split(':')[0]) : 0
-                const otherEnd = otherEvent.endTime ? parseInt(otherEvent.endTime.split(':')[0]) : 24
+        // Calculate position and height for events
+        const processEvents = () => {
+            return eventsForSelectedDate.map((event, index) => {
+                const startPixels = timeToPixels(event.startTime)
+                const endPixels = timeToPixels(event.endTime)
+                const heightPixels = endPixels - startPixels
                 
-                return (eventStart < otherEnd && eventEnd > otherStart)
+                return {
+                    ...event,
+                    topPosition: startPixels, // Exact pixel position from top
+                    height: Math.max(30, heightPixels), // Minimum 30px visual height
+                    column: index % 4 // Distribute across 4 columns
+                }
             })
-            
-            // Find the first available column (0-3)
-            for (let col = 0; col < 4; col++) {
-                const hasConflict = overlappingEvents.some(otherEvent => {
-                    // Check if any event in this column overlaps
-                    return false // Simplified for now
-                })
-                if (!hasConflict) return col
-            }
-            return 0
         }
+        
+        const processedEvents = processEvents()
         
         return (
             <div className='eventplanner-tab-content'>
                 <h2>Event Schedule</h2>
                 
-                {/* Date Selector for Schedule */}
+                {/* Date Selector */}
                 <div className='schedule-date-selector'>
                     <label htmlFor='schedule-date-selector'>Schedule for:</label>
                     <input
@@ -384,89 +380,81 @@ export const EventPlanner = ({liftUserId}) => {
                         max={getProjectDateRange().max}
                         disabled={!selectedProject}
                     />
-                    {!selectedProject && (
-                        <small className='date-selector-help'>
-                            Select a project to enable date selection
-                        </small>
-                    )}
                 </div>
                 
-                <div className='schedule-view'>
+                {/* Timetable */}
+                <div className='timetable-wrapper'>
+                    <div className='timetable-header'>
+                        <h3>Schedule for {formatDate(selectedDate)}</h3>
+                    </div>
+                    
                     <div className='timetable'>
-                        <div className='timetable-header'>
-                            <h3>Schedule for {formatDate(selectedDate)}</h3>
+                        {/* Time column */}
+                        <div className='time-column'>
+                            {hours.map(hour => (
+                                <div key={hour} className='time-row'>
+                                    <span className='time-label'>
+                                        {hour === 24 ? '00:00' : hour.toString().padStart(2, '0') + ':00'}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                         
-                        <div className='timetable-grid'>
-                            {/* Time column */}
-                            <div className='time-column'>
-                                {timeSlots.map((time, index) => (
-                                    <div key={time} className='time-slot'>
-                                        <span className='time-label'>{time}</span>
-                                    </div>
+                        {/* Events columns */}
+                        <div className='events-grid'>
+                            {/* Background time grid */}
+                            <div className='time-grid'>
+                                {hours.map(hour => (
+                                    <div key={hour} className='time-grid-row' />
                                 ))}
                             </div>
                             
                             {/* Event columns */}
                             {[0, 1, 2, 3].map(columnIndex => (
                                 <div key={columnIndex} className='event-column'>
-                                    {timeSlots.map((timeSlot, timeIndex) => {
-                                        const eventsInThisSlot = eventsForSelectedDate.filter(event => {
-                                            if (!event.startTime) return false
-                                            const eventHour = parseInt(event.startTime.split(':')[0])
-                                            const slotHour = parseInt(timeSlot.split(':')[0])
-                                            return eventHour === slotHour
-                                        })
-                                        
-                                        const eventInThisColumn = eventsInThisSlot[columnIndex]
-                                        
-                                        return (
-                                            <div key={timeSlot} className='timetable-slot'>
-                                                {eventInThisColumn ? (
-                                                    <div 
-                                                        className={`timetable-event ${getProcessPointColor(eventInThisColumn.processPoint)}`}
-                                                        onClick={() => handleEventClick(eventInThisColumn)}
-                                                        style={{ cursor: 'pointer' }}
-                                                    >
-                                                        <div className='event-header'>
-                                                            <h4>{eventInThisColumn.name}</h4>
-                                                            <div className='event-status-badge'>
-                                                                <span className={`status-badge status-${getEventStatus(eventInThisColumn).toLowerCase().replace(' ', '-')}`}>
-                                                                    {getEventStatus(eventInThisColumn)}
-                                                                </span>
-                                                                {eventInThisColumn.processPoint && (
-                                                                    <span className='process-point-badge'>
-                                                                        {eventInThisColumn.processPoint}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className='event-details'>
-                                                            <p className='event-time'>
-                                                                {eventInThisColumn.startTime} - {eventInThisColumn.endTime}
-                                                            </p>
-                                                            {eventInThisColumn.location && (
-                                                                <p className='event-location'>{eventInThisColumn.location}</p>
-                                                            )}
-                                                        </div>
+                                    {processedEvents
+                                        .filter(event => event.column === columnIndex)
+                                        .map(event => (
+                                            <div
+                                                key={event.id}
+                                                className={`event-card ${getProcessPointColor(event.processPoint)}`}
+                                                style={{
+                                                    top: `${event.topPosition}px`,
+                                                    height: `${event.height}px`
+                                                }}
+                                                onClick={() => handleEventClick(event)}
+                                            >
+                                                <div className='event-content'>
+                                                    <h4 className='event-name'>{event.name}</h4>
+                                                    <div className='event-time'>
+                                                        {event.startTime} - {event.endTime}
                                                     </div>
-                                                ) : null}
+                                                    <div className='event-status'>
+                                                        <span className={`status-badge status-${getEventStatus(event).toLowerCase().replace(' ', '-')}`}>
+                                                            {getEventStatus(event)}
+                                                        </span>
+                                                        {event.processPoint && (
+                                                            <span className='process-badge'>
+                                                                {event.processPoint}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {event.location && (
+                                                        <div className='event-location'>{event.location}</div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        )
-                                    })}
+                                        ))}
                                 </div>
                             ))}
                         </div>
-                        
-                        {eventsForSelectedDate.length === 0 && (
-                            <div className='no-schedule'>
-                                <p>No events scheduled for {formatDate(selectedDate)}</p>
-                                {!selectedProject && (
-                                    <p className='no-project-help'>Select a project to view events within its date range</p>
-                                )}
-                            </div>
-                        )}
                     </div>
+                    
+                    {eventsForSelectedDate.length === 0 && (
+                        <div className='no-events'>
+                            <p>No events scheduled for this date</p>
+                        </div>
+                    )}
                 </div>
             </div>
         )

@@ -189,7 +189,7 @@ class EventListResource(Resource):
                     'organizationId': str(event.organization_id),
                     'discipline': event.discipline or 'Photography',
                     'isCovered': event.is_covered if event.is_covered is not None else True,
-                    'processPoint': event.process_point,
+                    'processPoint': event.process_point or 'idle',
                     'personnelActivity': {},  # Default empty object
                     'projectId': str(event.project_id) if event.project_id else None,
                     'shots': [{
@@ -242,7 +242,7 @@ class EventListResource(Resource):
                 standard_shot_package=data.get('standardShotPackage', True),
                 is_quick_turnaround=data.get('isQuickTurnaround', False),
                 is_covered=data.get('isCovered', True),
-                process_point=data.get('processPoint'),
+                process_point=data.get('processPoint', 'idle'),
                 deadline=data.get('deadline')
             )
             
@@ -265,7 +265,7 @@ class EventListResource(Resource):
                 'isQuickTurnaround': event.is_quick_turnaround or False,
                 'isCovered': event.is_covered if event.is_covered is not None else True,
                 'deadline': event.deadline,
-                'processPoint': event.process_point,
+                'processPoint': event.process_point or 'idle',
                 'message': 'Event created successfully'
             }, 201
         except Exception as e:
@@ -299,7 +299,7 @@ class EventResource(Resource):
                 'isQuickTurnaround': event.is_quick_turnaround or False,
                 'isCovered': event.is_covered if event.is_covered is not None else True,
                 'deadline': event.deadline,
-                'processPoint': event.process_point
+                'processPoint': event.process_point or 'idle'
             }, 200
         except Exception as e:
             return {'error': str(e)}, 500
@@ -365,7 +365,7 @@ class EventResource(Resource):
                 'isQuickTurnaround': event.is_quick_turnaround or False,
                 'isCovered': event.is_covered if event.is_covered is not None else True,
                 'deadline': event.deadline,
-                'processPoint': event.process_point,
+                'processPoint': event.process_point or 'idle',
                 'message': 'Event updated successfully'
             }, 200
         except Exception as e:
