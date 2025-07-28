@@ -1,0 +1,529 @@
+/* Personnel Page Styles */
+.personnel-container {
+    padding: 2rem;
+}
+
+.personnel-title {
+    color: white;
+    margin-bottom: 2rem;
+}
+
+/* Personnel Cards */
+.personnel-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background-color: #222222;
+    border-radius: 8px;
+    border: 1px solid #2c3e50;
+    position: relative;
+    border-left: 4px solid goldenrod; /* Default border color */
+}
+
+/* Role-based border colors */
+.personnel-card.role-photographer {
+    border-left-color: #3498db; /* Blue */
+}
+
+.personnel-card.role-videographer {
+    border-left-color: #9b59b6; /* Purple */
+}
+
+.personnel-card.role-editor {
+    border-left-color: #e67e22; /* Orange */
+}
+
+.personnel-card.role-assistant {
+    border-left-color: #2ecc71; /* Green */
+}
+
+.personnel-card.role-coordinator {
+    border-left-color: goldenrod; /* Goldenrod */
+}
+
+.personnel-card.role-manager {
+    border-left-color: #e74c3c; /* Red */
+}
+
+.personnel-card.role-colorist {
+    border-left-color: #95a5a6; /* Grey */
+}
+
+/* Role-based text colors for project roles */
+.personnel-project-role.role-photographer {
+    color: #3498db !important; /* Blue */
+}
+
+.personnel-project-role.role-videographer {
+    color: #9b59b6 !important; /* Purple */
+}
+
+.personnel-project-role.role-editor {
+    color: #e67e22 !important; /* Orange */
+}
+
+.personnel-project-role.role-assistant {
+    color: #2ecc71 !important; /* Green */
+}
+
+.personnel-project-role.role-coordinator {
+    color: goldenrod !important; /* Goldenrod */
+}
+
+.personnel-project-role.role-manager {
+    color: #e74c3c !important; /* Red */
+}
+
+.personnel-project-role.role-intern {
+    color: #95a5a6 !important; /* Grey */
+}
+
+.personnel-card-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.personnel-card-info {
+    flex: 1;
+}
+
+.personnel-name {
+    color: #fff;
+    margin-bottom: 0.5rem;
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+.personnel-project-role {
+    margin: 0.25rem 0;
+    color: goldenrod;
+}
+
+.personnel-details {
+    color: #bdc3c7;
+    font-size: 0.9rem;
+}
+
+.personnel-detail-item {
+    margin: 0.25rem 0;
+}
+
+.personnel-id {
+    margin: 0.25rem 0;
+    font-size: 0.8rem;
+    color: #95a5a6;
+}
+
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    color: #bdc3c7;
+    padding: 2rem;
+    background-color: #2c3e50;
+    border-radius: 8px;
+}
+
+.empty-state-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-subtitle {
+    margin: 0;
+}
+
+/* Project Statistics */
+.project-statistics {
+    text-align: center;
+    color: #bdc3c7;
+    padding: 1rem;
+}
+
+/* Scrollable Areas */
+.scrollable-area {
+    max-height: 700px; /* Much taller */
+    overflow-y: auto;
+    flex: 1; /* Take up available space in flex container */
+    min-height: 500px; /* Higher minimum height */
+}
+
+/* Team Member Count */
+.team-member-count {
+    color: #95a5a6;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+/* Modal specific styles for personnel list */
+.personnel-modal-content {
+    max-width: 600px;
+}
+
+.personnel-modal-header {
+    margin-bottom: 1rem;
+    color: #bdc3c7;
+}
+
+.personnel-modal-title {
+    color: goldenrod;
+    margin-bottom: 1rem;
+}
+
+.personnel-modal-actions {
+    margin-top: 1.5rem;
+    border-top: 1px solid #34495e;
+    padding-top: 1rem;
+}
+
+/* Form styling for add personnel */
+.personnel-form-group {
+    margin-bottom: 1rem;
+}
+
+.personnel-form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #fff;
+    font-weight: bold;
+}
+
+.personnel-form-input,
+.personnel-form-select,
+.personnel-form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #34495e;
+    border-radius: 4px;
+    background-color: #2c3e50;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.personnel-form-input:focus,
+.personnel-form-select:focus,
+.personnel-form-textarea:focus {
+    outline: none;
+    border-color: goldenrod;
+    box-shadow: 0 0 0 2px rgba(218, 165, 32, 0.2);
+}
+
+.personnel-form-help {
+    color: #b0b0b0;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* Form actions */
+.personnel-form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #34495e;
+}
+
+.personnel-form-button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+}
+
+.personnel-form-button-primary {
+    background-color: goldenrod;
+    color: #2c3e50;
+    font-weight: bold;
+}
+
+.personnel-form-button-primary:hover {
+    background-color: darkgoldenrod;
+}
+
+.personnel-form-button-secondary {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.personnel-form-button-secondary:hover {
+    background-color: #7f8c8d;
+}
+
+/* Quick Action Buttons */
+.quick-action-btn {
+    background-color: goldenrod;
+    color: #2c3e50;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-right: 1rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.quick-action-btn:hover {
+    background-color: darkgoldenrod;
+    transform: translateY(-1px);
+}
+
+.quick-action-btn:disabled {
+    background-color: #7f8c8d;
+    color: #bdc3c7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* 4-column grid layout for personnel page */
+.personnel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr; /* 4 columns: Actions, Stats, Project Team, All Personnel */
+    gap: 2rem;
+    margin-top: 1rem;
+    align-items: start; /* Align items to top */
+}
+
+/* Make the personnel containers taller */
+.personnel-container-card,
+.all-personnel-card {
+    min-height: 800px; /* Much taller */
+    display: flex;
+    flex-direction: column;
+}
+
+.personnel-container-content {
+    flex: 1; /* Take up remaining space */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Stats container for project statistics */
+.stats-container {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: goldenrod;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #bdc3c7;
+    margin-top: 0.5rem;
+}
+
+/* Remove Button Styles */
+.personnel-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-direction: column;
+}
+
+.remove-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.remove-button.remove-from-project {
+    background-color: #f39c12;
+    color: white;
+}
+
+.remove-button.remove-from-project:hover {
+    background-color: #e67e22;
+    transform: translateY(-1px);
+}
+
+.remove-button.delete-personnel {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.remove-button.delete-personnel:hover {
+    background-color: #c0392b;
+    transform: translateY(-1px);
+}
+
+/* Personnel role styling */
+.personnel-role {
+    margin: 0.25rem 0;
+    color: goldenrod;
+}
+
+/* Role-based text colors for personnel roles (All Personnel section) */
+.personnel-role.role-photographer {
+    color: #3498db !important; /* Blue */
+}
+
+.personnel-role.role-videographer {
+    color: #9b59b6 !important; /* Purple */
+}
+
+.personnel-role.role-editor {
+    color: #e67e22 !important; /* Orange */
+}
+
+.personnel-role.role-assistant {
+    color: #2ecc71 !important; /* Green */
+}
+
+.personnel-role.role-coordinator {
+    color: goldenrod !important; /* Goldenrod */
+}
+
+.personnel-role.role-manager {
+    color: #e74c3c !important; /* Red */
+}
+
+.personnel-role.role-colorist {
+    color: #95a5a6 !important; /* Grey */
+}
+
+.personnel-project-assignment {
+    margin: 0.25rem 0;
+    color: #27ae60;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+/* Personnel card in project styling */
+.personnel-card.in-project {
+    border-left-color: #27ae60;
+    background-color: #1a2e1a;
+}
+
+/* Override in-project styling for All Personnel section to use role colors */
+.all-personnel-card .personnel-card.in-project {
+    background-color: #222222; /* Same as regular personnel cards */
+}
+
+/* Ensure role-based border colors take precedence in All Personnel section */
+.all-personnel-card .personnel-card.role-photographer {
+    border-left-color: #3498db !important; /* Blue */
+}
+
+.all-personnel-card .personnel-card.role-videographer {
+    border-left-color: #9b59b6 !important; /* Purple */
+}
+
+.all-personnel-card .personnel-card.role-editor {
+    border-left-color: #e67e22 !important; /* Orange */
+}
+
+.all-personnel-card .personnel-card.role-assistant {
+    border-left-color: #2ecc71 !important; /* Green */
+}
+
+.all-personnel-card .personnel-card.role-coordinator {
+    border-left-color: goldenrod !important; /* Goldenrod */
+}
+
+.all-personnel-card .personnel-card.role-manager {
+    border-left-color: #e74c3c !important; /* Red */
+}
+
+.all-personnel-card .personnel-card.role-colorist {
+    border-left-color: #95a5a6 !important; /* Grey */
+}
+
+/* Edit button styling */
+.action-button.edit-personnel {
+    background-color: #3498db;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.action-button.edit-personnel:hover {
+    background-color: #2980b9;
+    transform: translateY(-1px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .personnel-grid {
+        grid-template-columns: 1fr; /* Single column on mobile */
+        gap: 1rem;
+    }
+    
+    .personnel-container-card {
+        min-height: auto; /* Remove fixed height on mobile */
+    }
+    
+    .personnel-card-content {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .personnel-card-actions {
+        flex-direction: row;
+        justify-content: flex-start;
+    }
+    
+    .remove-button {
+        margin-left: 0;
+        align-self: flex-start;
+        min-width: 100px;
+    }
+    
+    .stats-container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .scrollable-area {
+        max-height: 500px; /* Taller on mobile */
+        min-height: 400px;
+    }
+}
+
+@media (max-width: 1400px) {
+    .personnel-grid {
+        grid-template-columns: 1fr 1fr; /* 2x2 grid on medium screens */
+        gap: 1.5rem;
+    }
+}
+
+@media (max-width: 1024px) {
+    .personnel-grid {
+        grid-template-columns: 1fr; /* Stack on tablets */
+        gap: 1.5rem;
+    }
+    
+    .personnel-container-card,
+    .all-personnel-card {
+        min-height: 600px; /* Taller on tablets */
+    }
+}

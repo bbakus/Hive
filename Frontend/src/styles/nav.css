@@ -1,0 +1,256 @@
+/* Navigation Styles */
+.home-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+}
+
+/* Top Bar */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  z-index: 1000;
+  
+}
+
+.topbar img{
+    width: 70px;
+    height: 70px;
+    margin-left: -20px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Logo in corner */
+.topbar-logo {
+  width: 40px;
+  height: 40px;
+  margin-right: 2rem;
+  flex-shrink: 0;
+}
+
+.topbar button {
+  background: transparent;
+  border: none;
+  color: #e0e0e0;
+  padding: 2.5rem 2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: relative;
+  border-bottom: 2px solid transparent;
+  margin-right: 20px;
+}
+
+.topbar button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.topbar button.active {
+  color: goldenrod;
+  border-bottom: 2px solid goldenrod;
+  background: rgba(218, 165, 32, 0.1);
+}
+
+.topbar button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, goldenrod, transparent);
+  box-shadow: 0 0 10px rgba(218, 165, 32, 0.5);
+}
+
+.topbar p {
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0.5rem;
+}
+
+.topbar select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  min-width: 150px;
+}
+
+.topbar select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.topbar select option {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 100px; /* Below top bar */
+  left: 0;
+  bottom: 0;
+  width: 90px; /* Collapsed width */
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  transition: width 0.3s ease;
+  z-index: 999;
+  overflow: hidden;
+}
+
+.sidebar:hover {
+  width: 300px; /* Expanded width */
+}
+
+.sidebar button img {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  filter: brightness(0.8);
+  transition: filter 0.3s ease;
+}
+
+/* Sidebar Buttons */
+.sidebar button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #e0e0e0;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.sidebar button:hover img {
+  filter: brightness(1.2);
+}
+
+.sidebar button:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Active state for sidebar buttons */
+.sidebar button.active {
+  color: goldenrod;
+  background: rgba(218, 165, 32, 0.1);
+  border-left: 3px solid goldenrod;
+}
+
+.sidebar button.active img {
+  filter: brightness(1.2);
+}
+
+.sidebar button.active:hover {
+  background: rgba(218, 165, 32, 0.15);
+  color: goldenrod;
+}
+
+/* Remove placeholder icons since we're using real images */
+
+/* Main Content Area */
+.content-area {
+  position: fixed;
+  top: 100px; /* Below top bar */
+  left: 90px; /* Right of sidebar */
+  right: 0;
+  bottom: 0;
+  padding: 2rem;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.02);
+  z-index: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 80px;
+  }
+  
+  .sidebar:hover {
+    width: 180px;
+  }
+  
+  .content-area {
+    left: 80px;
+  }
+  
+  .topbar {
+    padding: 0 1rem;
+  }
+  
+  .topbar select {
+    min-width: 120px;
+  }
+}
+
+/* Animation for sidebar expansion */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar:hover button {
+  animation: slideIn 0.2s ease forwards;
+}
