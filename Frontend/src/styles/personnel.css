@@ -17,6 +17,7 @@
     border: 1px solid #2c3e50;
     position: relative;
     border-left: 4px solid goldenrod; /* Default border color */
+    
 }
 
 /* Role-based border colors */
@@ -285,19 +286,38 @@
     gap: 0.5rem;
 }
 
-/* 4-column grid layout for personnel page */
-.personnel-grid {
+/* Main grid layout for personnel page */
+.personnel-main-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr; /* 4 columns: Actions, Stats, Project Team, All Personnel */
-    gap: 2rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
     margin-top: 1rem;
-    align-items: start; /* Align items to top */
+    align-items: start;
+}
+
+.personnel-left-column {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.personnel-right-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+/* Assignment Views in Left Column */
+.assignments-section-left {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
 /* Make the personnel containers taller */
 .personnel-container-card,
 .all-personnel-card {
-    min-height: 800px; /* Much taller */
+    min-height: 1010px; /* Much taller */
     display: flex;
     flex-direction: column;
 }
@@ -313,10 +333,14 @@
     display: flex;
     justify-content: space-around;
     margin-top: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .stat-item {
     text-align: center;
+    flex: 1;
+    min-width: 80px;
 }
 
 .stat-number {
@@ -471,10 +495,44 @@
     transform: translateY(-1px);
 }
 
+/* Assign to Event button styling */
+.action-button.assign-event {
+    background-color: #daa520;
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.action-button.assign-event:hover {
+    background-color: #b8941c;
+    transform: translateY(-1px);
+}
+
+.action-button.assign-event:disabled {
+    background-color: #666666;
+    color: #999999;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .personnel-grid {
+    .personnel-main-grid {
         grid-template-columns: 1fr; /* Single column on mobile */
+        gap: 1rem;
+    }
+    
+    .personnel-right-column {
+        grid-template-columns: 1fr; /* Stack right column on mobile */
+    }
+    
+    .assignments-section-left {
         gap: 1rem;
     }
     
@@ -509,21 +567,321 @@
     }
 }
 
-@media (max-width: 1400px) {
-    .personnel-grid {
-        grid-template-columns: 1fr 1fr; /* 2x2 grid on medium screens */
-        gap: 1.5rem;
-    }
-}
-
 @media (max-width: 1024px) {
-    .personnel-grid {
+    .personnel-main-grid {
         grid-template-columns: 1fr; /* Stack on tablets */
         gap: 1.5rem;
+    }
+    
+    .personnel-right-column {
+        grid-template-columns: 1fr; /* Stack right column on tablets */
+    }
+    
+    .assignments-section-left {
+        gap: 1rem;
     }
     
     .personnel-container-card,
     .all-personnel-card {
         min-height: 600px; /* Taller on tablets */
     }
+}
+
+/* Event Assignment Modal Styles */
+.events-list-container {
+    max-height: 400px;
+    overflow-y: auto;
+    margin: 1rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.events-list {
+    padding: 0.5rem;
+}
+
+.event-card-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.event-card-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #daa520;
+    transform: translateY(-1px);
+}
+
+.event-card-item:last-child {
+    margin-bottom: 0;
+}
+
+.event-card-content {
+    color: #ffffff;
+}
+
+.event-name {
+    color: #daa520;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.event-details {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.event-details:last-child {
+    margin-bottom: 0;
+}
+
+.personnel-selection-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 1rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.personnel-selection-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.personnel-selection-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.personnel-selection-item:last-child {
+    border-bottom: none;
+}
+
+.personnel-selection-item h4 {
+    color: #ffffff;
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+}
+
+.personnel-selection-item p {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* Assignment Views Section - now handled by assignments-section-left */
+
+.assignment-view-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.assignment-view-card:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border-color: rgba(218, 165, 32, 0.3);
+    transform: translateY(-2px);
+}
+
+.assignment-view-card h3 {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.assignment-description {
+    color: #b0b0b0;
+    font-size: 1rem;
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+.assignment-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.assignment-view-btn {
+    background: #daa520;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 250px;
+}
+
+.assignment-view-btn:hover {
+    background: #b8941c;
+    transform: translateY(-1px);
+}
+
+.assignment-view-btn:disabled {
+    background: #666666;
+    color: #999999;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Assignment Modal Styles */
+.assignments-modal {
+    width: 90vw;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.personnel-grid-assignments,
+.events-grid-assignments {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.personnel-assignment-card,
+.event-assignment-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.personnel-assignment-card:hover,
+.event-assignment-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #daa520;
+    transform: translateY(-2px);
+}
+
+.personnel-assignment-card h4,
+.event-assignment-card h4 {
+    color: #daa520;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.personnel-assignment-card p,
+.event-assignment-card p {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.personnel-assignment-card p:last-child,
+.event-assignment-card p:last-child {
+    margin-bottom: 0;
+}
+
+/* Assignment Details */
+.assignment-details {
+    margin: 1rem 0;
+}
+
+.assignment-details-header {
+    margin-bottom: 2rem;
+}
+
+.back-button {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #b0b0b0;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.back-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.assignment-details-header h3 {
+    color: #ffffff;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.assignment-subtitle {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.assignments-count {
+    color: #daa520;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.assignments-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.assignment-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.assignment-item:last-child {
+    margin-bottom: 0;
+}
+
+.assignment-event-name,
+.assignment-person-name {
+    color: #daa520;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.assignment-event-details,
+.assignment-person-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.5rem;
+}
+
+.assignment-event-details p,
+.assignment-person-details p {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.loading-state {
+    text-align: center;
+    color: #b0b0b0;
+    padding: 2rem;
+    font-style: italic;
 }

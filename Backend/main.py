@@ -37,6 +37,8 @@ def parse_date(date_string):
         return datetime(year, month, day).date()
     return date_string
 
+
+
 # ==================== USER RESOURCES ====================
 
 class UserListResource(Resource):
@@ -822,6 +824,7 @@ class ShotRequestListResource(Resource):
                     'deadline': shot_request.deadline,
                     'keySponsor': shot_request.key_sponsor,
                     'status': shot_request.status,
+                    'processPoint': shot_request.process_point or 'idle',
                     'eventId': shot_request.event_id
                 }
                 shot_requests_data.append(shot_request_data)
@@ -849,6 +852,7 @@ class ShotRequestListResource(Resource):
                 quick_turn=data.get('quickTurn', False),
                 deadline=data.get('deadline'),
                 key_sponsor=data.get('keySponsor'),
+                process_point=data.get('processPoint', 'idle'),
                 event_id=data.get('eventId')
             )
             
@@ -864,6 +868,7 @@ class ShotRequestListResource(Resource):
                 'quickTurn': shot_request.quick_turn,
                 'deadline': shot_request.deadline,
                 'keySponsor': shot_request.key_sponsor,
+                'processPoint': shot_request.process_point or 'idle',
                 'eventId': shot_request.event_id,
                 'message': 'Shot request created successfully'
             }, 201
@@ -891,6 +896,7 @@ class ShotRequestResource(Resource):
                 'quickTurn': shot_request.quick_turn,
                 'deadline': shot_request.deadline,
                 'keySponsor': shot_request.key_sponsor,
+                'processPoint': shot_request.process_point or 'idle',
                 'eventId': shot_request.event_id,
                 'status': shot_request.status
             }, 200
@@ -925,6 +931,8 @@ class ShotRequestResource(Resource):
                 shot_request.key_sponsor = data['keySponsor']
             if 'eventId' in data:
                 shot_request.event_id = data['eventId']
+            if 'processPoint' in data:
+                shot_request.process_point = data['processPoint']
             
             session.commit()
             
@@ -937,6 +945,7 @@ class ShotRequestResource(Resource):
                 'quickTurn': shot_request.quick_turn,
                 'deadline': shot_request.deadline,
                 'keySponsor': shot_request.key_sponsor,
+                'processPoint': shot_request.process_point or 'idle',
                 'eventId': shot_request.event_id,
                 'message': 'Shot request updated successfully'
             }, 200
@@ -1535,6 +1544,8 @@ class AuthVerifyCodeResource(Resource):
             return {'error': str(e)}, 500
         finally:
             session.close()
+
+
 
 # ==================== API ROUTES ====================
 

@@ -22,6 +22,31 @@ export const EventPlanner = ({liftUserId}) => {
     const [showEventModal, setShowEventModal] = useState(false)
     const [editingEvent, setEditingEvent] = useState(null)
     const [currentTime, setCurrentTime] = useState(new Date())
+    const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false)
+    const [filterProcessPoint, setFilterProcessPoint] = useState('')
+    const [newEventForm, setNewEventForm] = useState({
+        name: '',
+        date: selectedDate,
+        startTime: '',
+        endTime: '',
+        location: '',
+        description: '',
+        discipline: 'Photography',
+        isQuickTurnaround: false,
+        standardShotPackage: true,
+        deadline: '',
+        hasShotRequest: false
+    })
+    const [shotRequestForm, setShotRequestForm] = useState({
+        shotDescription: '',
+        startTime: '',
+        endTime: '',
+        stakeholder: '',
+        quickTurn: false,
+        deadline: '',
+        keySponsor: ''
+    })
+    const [showShotRequestModal, setShowShotRequestModal] = useState(false)
     
     // Get current user from localStorage 
     useEffect(() => {
@@ -86,6 +111,80 @@ export const EventPlanner = ({liftUserId}) => {
     const getEventsForDate = (date) => {
         return events.filter(event => {
             return event.date === date
+        })
+    }
+
+    // Get all events for the selected project
+    const getProjectEvents = () => {
+        if (!selectedProject) return []
+        return events.filter(event => 
+            String(event.projectId) === String(selectedProject.id)
+        )
+    }
+
+    // Apply filters to project events
+    const getFilteredProjectEvents = () => {
+        let filteredEvents = getProjectEvents()
+        
+        // Apply quick turnaround filter
+        if (filterQuickTurnaround) {
+            filteredEvents = filteredEvents.filter(event => event.isQuickTurnaround)
+        }
+        
+        // Apply process point filter
+        if (filterProcessPoint && filterProcessPoint !== '') {
+            filteredEvents = filteredEvents.filter(event => 
+                event.processPoint?.toLowerCase() === filterProcessPoint.toLowerCase()
+            )
+        }
+        
+        // Sort by date and time
+        return filteredEvents.sort((a, b) => {
+            const dateComparison = new Date(a.date) - new Date(b.date)
+            if (dateComparison !== 0) return dateComparison
+            
+            // If same date, sort by start time
+            if (a.startTime && b.startTime) {
+                return a.startTime.localeCompare(b.startTime)
+            }
+            return 0
+        })
+    }
+
+    // Get events starting within the next hour
+    const getUpcomingEventsWithinHour = () => {
+        const projectEvents = getProjectEvents()
+        const now = currentTime
+        const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000) // Add 1 hour
+        
+        return projectEvents.filter(event => {
+            if (!event.startTime || !event.date) return false
+            
+            // Create date object for event start time
+            const [year, month, day] = event.date.split('-').map(Number)
+            const [startHour, startMinute] = event.startTime.split(':').map(Number)
+            const eventStartTime = new Date(year, month - 1, day, startHour, startMinute, 0, 0)
+            
+            // Check if event starts between now and 1 hour from now
+            return eventStartTime > now && eventStartTime <= oneHourFromNow
+        })
+    }
+
+    // Get events that have already ended (completed)
+    const getCompletedEvents = () => {
+        const projectEvents = getProjectEvents()
+        const now = currentTime
+        
+        return projectEvents.filter(event => {
+            if (!event.endTime || !event.date) return false
+            
+            // Create date object for event end time
+            const [year, month, day] = event.date.split('-').map(Number)
+            const [endHour, endMinute] = event.endTime.split(':').map(Number)
+            const eventEndTime = new Date(year, month - 1, day, endHour, endMinute, 0, 0)
+            
+            // Check if event has already ended
+            return eventEndTime <= now
         })
     }
 
@@ -228,9 +327,138 @@ export const EventPlanner = ({liftUserId}) => {
         }
     }
 
+    // Handle new event form submission
+    const handleNewEventSubmit = async (e) => {
+        e.preventDefault()
+        
+        // Validate required fields
+        if (!newEventForm.name?.trim()) {
+            alert('Event name is required.')
+            return
+        }
+        
+        if (!newEventForm.date) {
+            alert('Event date is required.')
+            return
+        }
+        
+        if (!selectedProject) {
+            alert('Please select a project before creating an event.')
+            return
+        }
+        
+        // Validate shot request if selected
+        if (newEventForm.hasShotRequest && !shotRequestForm.shotDescription?.trim()) {
+            alert('Shot description is required when adding a shot request.')
+            return
+        }
+        
+        try {
+            const eventData = {
+                name: newEventForm.name.trim(),
+                date: newEventForm.date,
+                startTime: newEventForm.startTime,
+                endTime: newEventForm.endTime,
+                location: newEventForm.location.trim(),
+                description: newEventForm.description.trim(),
+                discipline: newEventForm.discipline,
+                isQuickTurnaround: newEventForm.isQuickTurnaround,
+                standardShotPackage: newEventForm.standardShotPackage,
+                deadline: newEventForm.deadline,
+                projectId: selectedProject.id,
+                status: 'Scheduled'
+            }
+            
+            const response = await fetch('http://localhost:5001/events', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(eventData)
+            })
+            
+            if (response.ok) {
+                const createdEvent = await response.json()
+                
+                // Create shot request if selected
+                if (newEventForm.hasShotRequest) {
+                    try {
+                        const shotRequestData = {
+                            shotDescription: shotRequestForm.shotDescription.trim(),
+                            startTime: shotRequestForm.startTime,
+                            endTime: shotRequestForm.endTime,
+                            stakeholder: shotRequestForm.stakeholder.trim(),
+                            quickTurn: shotRequestForm.quickTurn,
+                            deadline: shotRequestForm.deadline,
+                            keySponsor: shotRequestForm.keySponsor.trim(),
+                            eventId: createdEvent.id
+                        }
+                        
+                        const shotRequestResponse = await fetch('http://localhost:5001/shot-requests', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(shotRequestData)
+                        })
+                        
+                        if (!shotRequestResponse.ok) {
+                            const shotRequestError = await shotRequestResponse.json()
+                            alert(`Event created but shot request failed: ${shotRequestError.error}`)
+                        }
+                    } catch (shotRequestError) {
+                        console.error('Error creating shot request:', shotRequestError)
+                        alert('Event created but shot request failed')
+                    }
+                }
+                
+                // Refresh events
+                const eventsResponse = await fetch('http://localhost:5001/events')
+                if (eventsResponse.ok) {
+                    const eventsData = await eventsResponse.json()
+                    setEvents(eventsData.events || eventsData)
+                }
+                
+                // Reset forms
+                setNewEventForm({
+                    name: '',
+                    date: selectedDate,
+                    startTime: '',
+                    endTime: '',
+                    location: '',
+                    description: '',
+                    discipline: 'Photography',
+                    isQuickTurnaround: false,
+                    standardShotPackage: true,
+                    deadline: '',
+                    hasShotRequest: false
+                })
+                
+                setShotRequestForm({
+                    shotDescription: '',
+                    startTime: '',
+                    endTime: '',
+                    stakeholder: '',
+                    quickTurn: false,
+                    deadline: '',
+                    keySponsor: ''
+                })
+                
+                alert('Event created successfully!')
+            } else {
+                const error = await response.json()
+                alert(`Error creating event: ${error.error}`)
+            }
+        } catch (error) {
+            console.error('Error creating event:', error)
+            alert('Failed to create event')
+        }
+    }
+
     const renderOverviewTab = () => {
         const projectDateRange = getProjectDateRange()
         const eventsForSelectedDate = getEventsForDate(selectedDate)
+        const filteredProjectEvents = getFilteredProjectEvents()
         
         return (
             <div className='eventplanner-tab-content'>
@@ -272,56 +500,167 @@ export const EventPlanner = ({liftUserId}) => {
                 {/* Statistics for selected date */}
                 <div className='overview-stats'>
                     <div className='stat-card'>
+                        <h3>All Events</h3>
+                        <div className='stat-number'>{selectedProject ? getProjectEvents().length : 0}</div>
+                    </div>
+                    <div className='stat-card'>
                         <h3>Events Today</h3>
                         <div className='stat-number'>{eventsForSelectedDate.length}</div>
                     </div>
                     <div className='stat-card'>
-                        <h3>Scheduled</h3>
-                        <div className='stat-number'>{eventsForSelectedDate.filter(e => e.status === 'Scheduled').length}</div>
+                        <h3>Upcoming</h3>
+                        <div className='stat-number'>{selectedProject ? getUpcomingEventsWithinHour().length : 0}</div>
                     </div>
                     <div className='stat-card'>
                         <h3>Completed</h3>
-                        <div className='stat-number'>{eventsForSelectedDate.filter(e => e.status === 'Completed').length}</div>
-                    </div>
-                    <div className='stat-card'>
-                        <h3>Upcoming</h3>
-                        <div className='stat-number'>{eventsForSelectedDate.filter(e => e.status === 'Upcoming').length}</div>
+                        <div className='stat-number'>{selectedProject ? getCompletedEvents().length : 0}</div>
                     </div>
                 </div>
                 
-                {/* Events for selected date */}
-                <div className='recent-events'>
-                    <h3>Events for {formatDate(selectedDate)}</h3>
-                    {eventsForSelectedDate.length > 0 ? (
-                        <div className='events-grid'>
-                            {eventsForSelectedDate.map((event, index) => (
-                                <div key={event.id || index} className='event-card'>
-                                    <div className='event-card-header'>
-                                        <h4>{event.name}</h4>
-                                        <span className={`status-badge status-${getEventStatus(event).toLowerCase().replace(' ', '-')}`}>
-                                            {getEventStatus(event)}
-                                        </span>
+                <div className='overview-content'>
+                    {/* Left Panel - Events for selected date */}
+                    <div className='daily-events-panel'>
+                        <h3>Events for {formatDate(selectedDate)}</h3>
+                        {eventsForSelectedDate.length > 0 ? (
+                            <div className='events-grid'>
+                                {eventsForSelectedDate.map((event, index) => (
+                                    <div key={event.id || index} className={`event-card ${getProcessPointColor(event.processPoint)}`} onClick={() => handleEventClick(event)}>
+                                        <div className='event-card-header'>
+                                            <h4>{event.name}</h4>
+                                            <div className='event-indicators'>
+                                                {event.isQuickTurnaround && (
+                                                    <span className='quick-turnaround-indicator' title='Quick Turnaround'>
+                                                    </span>
+                                                )}
+                                                <span className={`status-badge status-${getEventStatus(event).toLowerCase().replace(' ', '-')}`}>
+                                                    {getEventStatus(event)}
+                                                </span>
+                                                {event.processPoint && (
+                                                    <span className='process-badge'>
+                                                        {event.processPoint}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className='event-card-content'>
+                                            <p><strong>Date:</strong> {formatDate(event.date)}</p>
+                                            {event.startTime && event.endTime && (
+                                                <p><strong>Time:</strong> {event.startTime} - {event.endTime}</p>
+                                            )}
+                                            {event.location && (
+                                                <p><strong>Location:</strong> {event.location}</p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className='event-card-content'>
-                                        <p><strong>Date:</strong> {formatDate(event.date)}</p>
-                                        {event.startTime && event.endTime && (
-                                            <p><strong>Time:</strong> {event.startTime} - {event.endTime}</p>
-                                        )}
-                                        {event.location && (
-                                            <p><strong>Location:</strong> {event.location}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className='no-events'>
-                            <p>No events scheduled for {formatDate(selectedDate)}</p>
-                            {!selectedProject && (
-                                <p className='no-project-help'>Select a project to view events within its date range</p>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className='no-events'>
+                                <p>No events scheduled for {formatDate(selectedDate)}</p>
+                                {!selectedProject && (
+                                    <p className='no-project-help'>Select a project to view events within its date range</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right Panel - All Project Events with Filters */}
+                    <div className='project-events-panel'>
+                        <div className='project-events-header'>
+                            <h3>All Project Events</h3>
+                            {selectedProject && (
+                                <p className='project-events-count'>
+                                    {filteredProjectEvents.length} of {getProjectEvents().length} events
+                                </p>
                             )}
                         </div>
-                    )}
+                        
+                        {/* Filters */}
+                        <div className='project-events-filters'>
+                            <div className='filter-row'>
+                                <label className='filter-checkbox'>
+                                    <input
+                                        type='checkbox'
+                                        checked={filterQuickTurnaround}
+                                        onChange={(e) => setFilterQuickTurnaround(e.target.checked)}
+                                    />
+                                    <span className='filter-checkbox-label'>Quick Turnaround Only</span>
+                                </label>
+                            </div>
+                            <div className='filter-row'>
+                                <label className='filter-dropdown-label'>Process Point:</label>
+                                <select
+                                    className='filter-dropdown'
+                                    value={filterProcessPoint}
+                                    onChange={(e) => setFilterProcessPoint(e.target.value)}
+                                >
+                                    <option value=''>All Process Points</option>
+                                    <option value='idle'>Idle</option>
+                                    <option value='ingest'>Ingest</option>
+                                    <option value='cull'>Cull</option>
+                                    <option value='color'>Color</option>
+                                    <option value='delivered'>Delivered</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Events List */}
+                        <div className='project-events-list'>
+                            {selectedProject ? (
+                                filteredProjectEvents.length > 0 ? (
+                                    filteredProjectEvents.map((event, index) => (
+                                        <div key={event.id || index} className={`project-event-item ${getProcessPointColor(event.processPoint)}`} onClick={() => handleEventClick(event)}>
+                                            <div className='project-event-content'>
+                                                <div className='project-event-header'>
+                                                    <h5 className='project-event-name'>{event.name}</h5>
+                                                    <div className='project-event-indicators'>
+                                                        {event.isQuickTurnaround && (
+                                                            <span className='quick-turnaround-indicator' title='Quick Turnaround'>
+                                                            </span>
+                                                        )}
+                                                        <span className={`status-badge status-${getEventStatus(event).toLowerCase().replace(' ', '-')}`}>
+                                                            {getEventStatus(event)}
+                                                        </span>
+                                                        {event.processPoint && (
+                                                            <span className='process-badge'>
+                                                                {event.processPoint}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className='project-event-details'>
+                                                    <p><strong>Date:</strong> {formatDate(event.date)}</p>
+                                                    {event.startTime && event.endTime && (
+                                                        <p><strong>Time:</strong> {event.startTime} - {event.endTime}</p>
+                                                    )}
+                                                    {event.location && (
+                                                        <p><strong>Location:</strong> {event.location}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className='no-filtered-events'>
+                                        <p>No events match the current filters.</p>
+                                        <button 
+                                            className='clear-filters-btn'
+                                            onClick={() => {
+                                                setFilterQuickTurnaround(false)
+                                                setFilterProcessPoint('')
+                                            }}
+                                        >
+                                            Clear Filters
+                                        </button>
+                                    </div>
+                                )
+                            ) : (
+                                <div className='no-project-selected'>
+                                    <p>Select a project to view all events</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         )
@@ -430,9 +769,10 @@ export const EventPlanner = ({liftUserId}) => {
                                                         {event.startTime} - {event.endTime}
                                                     </div>
                                                     <div className='event-status'>
-                                                        <span className={`status-badge status-${getEventStatus(event).toLowerCase().replace(' ', '-')}`}>
-                                                            {getEventStatus(event)}
-                                                        </span>
+                                                        {event.isQuickTurnaround && (
+                                                            <span className='quick-turnaround-indicator' title='Quick Turnaround'>
+                                                            </span>
+                                                        )}
                                                         {event.processPoint && (
                                                             <span className='process-badge'>
                                                                 {event.processPoint}
@@ -462,99 +802,309 @@ export const EventPlanner = ({liftUserId}) => {
 
     const renderDetailsTab = () => (
         <div className='eventplanner-tab-content'>
-            <h2>Event Details</h2>
+            <h2>Add New Event</h2>
             
-            <div className='event-selector'>
-                <label htmlFor='event-select'>Select Event:</label>
-                <select 
-                    id='event-select'
-                    value={selectedEvent?.id || ''}
-                    onChange={(e) => {
-                        const event = events.find(ev => ev.id == e.target.value)
-                        setSelectedEvent(event)
-                    }}
-                >
-                    <option value=''>Choose an event...</option>
-                    {events.map(event => (
-                        <option key={event.id} value={event.id}>
-                            {event.name} - {new Date(event.date).toLocaleDateString()}
-                        </option>
-                    ))}
-                </select>
-            </div>
-            
-            {selectedEvent ? (
-                <div className='event-details'>
-                    <div className='detail-section'>
-                        <h3>Basic Information</h3>
-                        <div className='detail-grid'>
-                            <div className='detail-item'>
-                                <label>Event Name:</label>
-                                <span>{selectedEvent.name}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Date:</label>
-                                <span>{new Date(selectedEvent.date).toLocaleDateString()}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Time:</label>
-                                <span>
-                                    {selectedEvent.startTime && selectedEvent.endTime 
-                                        ? `${selectedEvent.startTime} - ${selectedEvent.endTime}`
-                                        : 'Not specified'
-                                    }
-                                </span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Location:</label>
-                                <span>{selectedEvent.location || 'Not specified'}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Status:</label>
-                                <span className={`status-badge status-${selectedEvent.status?.toLowerCase()}`}>
-                                    {selectedEvent.status}
-                                </span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Discipline:</label>
-                                <span>{selectedEvent.discipline || 'Not specified'}</span>
-                            </div>
-                        </div>
+            {selectedProject ? (
+                <div className='new-event-form-container'>
+                    <div className='form-header'>
+                        <h3>Creating event for: <span className='project-name'>{selectedProject.name}</span></h3>
+                        <p className='form-description'>Fill out the form below to add a new event to your project.</p>
                     </div>
                     
-                    <div className='detail-section'>
-                        <h3>Additional Information</h3>
-                        <div className='detail-grid'>
-                            <div className='detail-item'>
-                                <label>Description:</label>
-                                <span>{selectedEvent.description || 'No description provided'}</span>
+                    <form onSubmit={handleNewEventSubmit} className='new-event-form'>
+                        <div className='form-grid'>
+                            {/* Left Column */}
+                            <div className='form-column'>
+                                <div className='form-group'>
+                                    <label className='form-label'>Event Name *</label>
+                                    <input
+                                        type='text'
+                                        className='form-input'
+                                        value={newEventForm.name}
+                                        onChange={(e) => setNewEventForm({...newEventForm, name: e.target.value})}
+                                        placeholder='Enter event name'
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Date *</label>
+                                    <input
+                                        type='date'
+                                        className='form-input'
+                                        value={newEventForm.date}
+                                        onChange={(e) => setNewEventForm({...newEventForm, date: e.target.value})}
+                                        min={getProjectDateRange().min}
+                                        max={getProjectDateRange().max}
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className='form-row'>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Start Time</label>
+                                        <input
+                                            type='time'
+                                            className='form-input'
+                                            value={newEventForm.startTime}
+                                            onChange={(e) => setNewEventForm({...newEventForm, startTime: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>End Time</label>
+                                        <input
+                                            type='time'
+                                            className='form-input'
+                                            value={newEventForm.endTime}
+                                            onChange={(e) => setNewEventForm({...newEventForm, endTime: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Location</label>
+                                    <input
+                                        type='text'
+                                        className='form-input'
+                                        value={newEventForm.location}
+                                        onChange={(e) => setNewEventForm({...newEventForm, location: e.target.value})}
+                                        placeholder='Enter event location'
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Discipline</label>
+                                    <select
+                                        className='form-select'
+                                        value={newEventForm.discipline}
+                                        onChange={(e) => setNewEventForm({...newEventForm, discipline: e.target.value})}
+                                    >
+                                        <option value='Photography'>Photography</option>
+                                        <option value='Videography'>Videography</option>
+                                        <option value='Both'>Both</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div className='detail-item'>
-                                <label>Deadline:</label>
-                                <span>{selectedEvent.deadline || 'Not specified'}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Process Point:</label>
-                                <span>{selectedEvent.processPoint || 'Not specified'}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Quick Turnaround:</label>
-                                <span>{selectedEvent.isQuickTurnaround ? 'Yes' : 'No'}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Covered:</label>
-                                <span>{selectedEvent.isCovered ? 'Yes' : 'No'}</span>
-                            </div>
-                            <div className='detail-item'>
-                                <label>Standard Shot Package:</label>
-                                <span>{selectedEvent.standardShotPackage ? 'Yes' : 'No'}</span>
+                            
+                            {/* Right Column */}
+                            <div className='form-column'>
+                                <div className='form-group'>
+                                    <label className='form-label'>Description</label>
+                                    <textarea
+                                        className='form-textarea'
+                                        value={newEventForm.description}
+                                        onChange={(e) => setNewEventForm({...newEventForm, description: e.target.value})}
+                                        placeholder='Enter event description'
+                                        rows='4'
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Deadline</label>
+                                    <input
+                                        type='text'
+                                        className='form-input'
+                                        value={newEventForm.deadline}
+                                        onChange={(e) => setNewEventForm({...newEventForm, deadline: e.target.value})}
+                                        placeholder='Enter deadline (e.g., "End of week", "2 days after event")'
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Options</label>
+                                    <div className='checkbox-group'>
+                                        <label className='checkbox-label'>
+                                            <input
+                                                type='checkbox'
+                                                checked={newEventForm.isQuickTurnaround}
+                                                onChange={(e) => setNewEventForm({...newEventForm, isQuickTurnaround: e.target.checked})}
+                                            />
+                                            <span className='checkbox-text'>Quick Turnaround</span>
+                                        </label>
+                                        <label className='checkbox-label'>
+                                            <input
+                                                type='checkbox'
+                                                checked={newEventForm.standardShotPackage}
+                                                onChange={(e) => setNewEventForm({...newEventForm, standardShotPackage: e.target.checked})}
+                                            />
+                                            <span className='checkbox-text'>Standard Shot Package</span>
+                                        </label>
+                                        <label className='checkbox-label'>
+                                            <input
+                                                type='checkbox'
+                                                checked={newEventForm.hasShotRequest}
+                                                onChange={(e) => setNewEventForm({...newEventForm, hasShotRequest: e.target.checked})}
+                                            />
+                                            <span className='checkbox-text'>Add Shot Request</span>
+                                        </label>
+                                    </div>
+                                    {newEventForm.hasShotRequest && (
+                                        <button
+                                            type='button'
+                                            className='shot-request-details-btn'
+                                            onClick={() => setShowShotRequestModal(true)}
+                                        >
+                                            Add Shot Request Details
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                        
+                        <div className='form-actions'>
+                            <button type='submit' className='form-button form-button-primary'>
+                                Create Event
+                            </button>
+                            <button 
+                                type='button' 
+                                className='form-button form-button-secondary'
+                                onClick={() => {
+                                    setNewEventForm({
+                                        name: '',
+                                        date: selectedDate,
+                                        startTime: '',
+                                        endTime: '',
+                                        location: '',
+                                        description: '',
+                                        discipline: 'Photography',
+                                        isQuickTurnaround: false,
+                                        standardShotPackage: true,
+                                        deadline: '',
+                                        hasShotRequest: false
+                                    })
+                                    setShotRequestForm({
+                                        shotDescription: '',
+                                        startTime: '',
+                                        endTime: '',
+                                        stakeholder: '',
+                                        quickTurn: false,
+                                        deadline: '',
+                                        keySponsor: ''
+                                    })
+                                    setShowShotRequestModal(false)
+                                }}
+                            >
+                                Clear Form
+                            </button>
+                        </div>
+                    </form>
                 </div>
             ) : (
-                <div className='no-event-selected'>
-                    <p>Select an event from the dropdown above to view its details.</p>
+                <div className='no-project-selected'>
+                    <h3>No Project Selected</h3>
+                    <p>Please select a project from the navigation before creating events.</p>
+                </div>
+            )}
+            
+            {/* Shot Request Modal */}
+            {showShotRequestModal && (
+                <div className='modal-overlay'>
+                    <div className='modal-content shot-request-modal'>
+                        <h2>Shot Request Details</h2>
+                        <form onSubmit={(e) => {
+                            e.preventDefault()
+                            setShowShotRequestModal(false)
+                        }} className='shot-request-form'>
+                            <div className='shot-request-grid'>
+                                <div className='form-group'>
+                                    <label className='form-label'>Shot Description *</label>
+                                    <textarea
+                                        className='form-textarea'
+                                        value={shotRequestForm.shotDescription}
+                                        onChange={(e) => setShotRequestForm({...shotRequestForm, shotDescription: e.target.value})}
+                                        placeholder='Describe the specific shots needed'
+                                        rows='3'
+                                        required
+                                    />
+                                </div>
+                                
+                                <div className='form-row'>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Start Time</label>
+                                        <input
+                                            type='time'
+                                            className='form-input'
+                                            value={shotRequestForm.startTime}
+                                            onChange={(e) => setShotRequestForm({...shotRequestForm, startTime: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>End Time</label>
+                                        <input
+                                            type='time'
+                                            className='form-input'
+                                            value={shotRequestForm.endTime}
+                                            onChange={(e) => setShotRequestForm({...shotRequestForm, endTime: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Stakeholder</label>
+                                    <input
+                                        type='text'
+                                        className='form-input'
+                                        value={shotRequestForm.stakeholder}
+                                        onChange={(e) => setShotRequestForm({...shotRequestForm, stakeholder: e.target.value})}
+                                        placeholder='Person requesting the shots'
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Key Sponsor</label>
+                                    <input
+                                        type='text'
+                                        className='form-input'
+                                        value={shotRequestForm.keySponsor}
+                                        onChange={(e) => setShotRequestForm({...shotRequestForm, keySponsor: e.target.value})}
+                                        placeholder='Key sponsor or client'
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='form-label'>Deadline</label>
+                                    <input
+                                        type='text'
+                                        className='form-input'
+                                        value={shotRequestForm.deadline}
+                                        onChange={(e) => setShotRequestForm({...shotRequestForm, deadline: e.target.value})}
+                                        placeholder='Enter shot deadline (e.g., "Next day", "Within 48 hours")'
+                                    />
+                                </div>
+                                
+                                <div className='form-group'>
+                                    <label className='checkbox-label'>
+                                        <input
+                                            type='checkbox'
+                                            checked={shotRequestForm.quickTurn}
+                                            onChange={(e) => {
+                                                const isChecked = e.target.checked
+                                                setShotRequestForm({...shotRequestForm, quickTurn: isChecked})
+                                                // Auto-enable event quick turnaround if shot request requires quick turn
+                                                if (isChecked) {
+                                                    setNewEventForm({...newEventForm, isQuickTurnaround: true})
+                                                }
+                                            }}
+                                        />
+                                        <span className='checkbox-text'>Quick Turn Required</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div className='modal-actions'>
+                                <button type='submit' className='form-button form-button-primary'>
+                                    Save Shot Request
+                                </button>
+                                <button 
+                                    type='button' 
+                                    className='form-button form-button-secondary'
+                                    onClick={() => setShowShotRequestModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>
@@ -584,7 +1134,7 @@ export const EventPlanner = ({liftUserId}) => {
                         className={`tab-btn ${activeTab === 'details' ? 'active' : ''}`}
                         onClick={() => handleTabChange('details')}
                     >
-                        Details
+                        Add Event
                     </button>
                 </div>
                 

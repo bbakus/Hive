@@ -7,7 +7,8 @@ import { Home } from './components/Home.js'
 import { Settings } from './components/Settings.js'
 import { Personnel } from './components/Personnel.js'
 import { EventPlanner } from './components/EventPlanner.js';
-
+import { ShotPlanner } from './components/ShotPlanner.js';
+import { Projects } from './components/Projects.js';
 
 function App() {
 
@@ -27,6 +28,8 @@ function App() {
         <Route element={<Settings liftUserId={liftUserId}/>} path='/:userId/settings'/>
         <Route element={<Personnel liftUserId={liftUserId}/>} path='/:userId/personnel'/>
         <Route element={<EventPlanner liftUserId={liftUserId}/>} path='/:userId/event-setup'/>
+        <Route element={<ShotPlanner liftUserId={liftUserId}/>} path='/:userId/shot-planner'/>
+        <Route element={<Projects liftUserId={liftUserId}/>} path='/:userId/projects'/>
       </Routes>
      </BrowserRouter>
     </div>

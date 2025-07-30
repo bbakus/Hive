@@ -4,6 +4,109 @@ import { useState, useEffect } from "react"
 import '../styles/home.css'
 import '../styles/personnel.css'
 
+// Personnel Assignment Details Component
+const PersonnelAssignmentDetails = ({ person, onBack, fetchAssignments }) => {
+    const [assignments, setAssignments] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const loadAssignments = async () => {
+            setLoading(true)
+            const assignedEvents = await fetchAssignments(person.id)
+            setAssignments(assignedEvents)
+            setLoading(false)
+        }
+        loadAssignments()
+    }, [person.id, fetchAssignments])
+
+    if (loading) {
+        return <div className='loading-state'>Loading assignments...</div>
+    }
+
+    return (
+        <div className='assignment-details'>
+            <div className='assignment-details-header'>
+                <button className='back-button' onClick={onBack}>← Back to Personnel List</button>
+                <h3>{person.name} - Event Assignments</h3>
+                <p className='assignment-subtitle'>{person.role} • {person.email}</p>
+            </div>
+            
+            {assignments.length > 0 ? (
+                <div className='assignments-list'>
+                    <p className='assignments-count'>Assigned to {assignments.length} event{assignments.length !== 1 ? 's' : ''}</p>
+                    {assignments.map(event => (
+                        <div key={event.id} className='assignment-item'>
+                            <h4 className='assignment-event-name'>{event.name}</h4>
+                            <div className='assignment-event-details'>
+                                <p><strong>Date:</strong> {event.date}</p>
+                                <p><strong>Time:</strong> {event.startTime || event.start_time} - {event.endTime || event.end_time}</p>
+                                <p><strong>Location:</strong> {event.location || 'Not specified'}</p>
+                                <p><strong>Process Point:</strong> {event.processPoint || 'Idle'}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className='empty-state'>
+                    <p className='empty-state-title'>No Event Assignments</p>
+                    <p className='empty-state-subtitle'>This person is not currently assigned to any events.</p>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// Event Assignment Details Component
+const EventAssignmentDetails = ({ event, onBack, fetchAssignments }) => {
+    const [assignedPersonnel, setAssignedPersonnel] = useState([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const loadAssignments = async () => {
+            setLoading(true)
+            const personnel = await fetchAssignments(event.id)
+            setAssignedPersonnel(personnel)
+            setLoading(false)
+        }
+        loadAssignments()
+    }, [event.id, fetchAssignments])
+
+    if (loading) {
+        return <div className='loading-state'>Loading assignments...</div>
+    }
+
+    return (
+        <div className='assignment-details'>
+            <div className='assignment-details-header'>
+                <button className='back-button' onClick={onBack}>← Back to Events List</button>
+                <h3>{event.name} - Personnel Assignments</h3>
+                <p className='assignment-subtitle'>{event.date} • {event.startTime || event.start_time} - {event.endTime || event.end_time}</p>
+            </div>
+            
+            {assignedPersonnel.length > 0 ? (
+                <div className='assignments-list'>
+                    <p className='assignments-count'>{assignedPersonnel.length} team member{assignedPersonnel.length !== 1 ? 's' : ''} assigned</p>
+                    {assignedPersonnel.map(person => (
+                        <div key={person.id} className='assignment-item'>
+                            <h4 className='assignment-person-name'>{person.name}</h4>
+                            <div className='assignment-person-details'>
+                                <p><strong>Role:</strong> {person.role}</p>
+                                <p><strong>Phone:</strong> {person.phone}</p>
+                                <p><strong>Email:</strong> {person.email}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className='empty-state'>
+                    <p className='empty-state-title'>No Personnel Assigned</p>
+                    <p className='empty-state-subtitle'>No team members are currently assigned to this event.</p>
+                </div>
+            )}
+        </div>
+    )
+}
+
 export const Personnel = ({liftUserId}) => {
 
     const { userId } = useParams()
@@ -13,8 +116,16 @@ export const Personnel = ({liftUserId}) => {
     const [showAddPersonnelDialog, setShowAddPersonnelDialog] = useState(false)
     const [showPersonnelListDialog, setShowPersonnelListDialog] = useState(false)
     const [showEditPersonnelDialog, setShowEditPersonnelDialog] = useState(false)
+    const [showAssignEventDialog, setShowAssignEventDialog] = useState(false)
     const [currentUser, setCurrentUser] = useState(null)
     const [editingPersonnel, setEditingPersonnel] = useState(null)
+    const [assigningPersonnel, setAssigningPersonnel] = useState(null)
+    const [events, setEvents] = useState([])
+    const [eventSearchTerm, setEventSearchTerm] = useState('')
+    const [showPersonnelAssignmentsDialog, setShowPersonnelAssignmentsDialog] = useState(false)
+    const [showEventAssignmentsDialog, setShowEventAssignmentsDialog] = useState(false)
+    const [selectedPersonnelForAssignments, setSelectedPersonnelForAssignments] = useState(null)
+    const [selectedEventForAssignments, setSelectedEventForAssignments] = useState(null)
     
     // Add Personnel form state
     const [personnelForm, setPersonnelForm] = useState({
@@ -99,6 +210,26 @@ export const Personnel = ({liftUserId}) => {
         })
         .catch(err => console.error('Error fetching projects:', err))
     },[])
+
+    // Fetch events for the selected project
+    useEffect(() => {
+        if (selectedProject) {
+            console.log('Fetching events for project:', selectedProject.id)
+            fetch('http://localhost:5001/events')
+            .then(res => res.json())
+            .then(data => {
+                const eventData = data.events || data
+                const projectEvents = eventData.filter(event => 
+                    String(event.projectId) === String(selectedProject.id)
+                )
+                console.log('Events fetched for project:', projectEvents)
+                setEvents(projectEvents)
+            })
+            .catch(err => console.error('Error fetching events:', err))
+        } else {
+            setEvents([])
+        }
+    }, [selectedProject])
 
     // Handle add personnel form submission
     const handleAddPersonnelSubmit = async (e) => {
@@ -530,6 +661,99 @@ export const Personnel = ({liftUserId}) => {
         setShowEditPersonnelDialog(true)
     }
 
+    // Open assign to event dialog
+    const openAssignEventDialog = (person) => {
+        setAssigningPersonnel(person)
+        setEventSearchTerm('')
+        setShowAssignEventDialog(true)
+    }
+
+    // Handle assign personnel to event
+    const handleAssignToEvent = async (eventId) => {
+        if (!assigningPersonnel) return
+        
+        try {
+            const response = await fetch(`http://localhost:5001/events/${eventId}/personnel/${assigningPersonnel.id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            
+            if (response.ok) {
+                alert(`${assigningPersonnel.name} has been assigned to the event successfully!`)
+                setShowAssignEventDialog(false)
+                setAssigningPersonnel(null)
+                setEventSearchTerm('')
+            } else {
+                const error = await response.json()
+                alert(`Error assigning personnel to event: ${error.error}`)
+            }
+        } catch (error) {
+            console.error('Error assigning personnel to event:', error)
+            alert('Failed to assign personnel to event')
+        }
+    }
+
+    // Filter events based on search term
+    const getFilteredEvents = () => {
+        if (!eventSearchTerm.trim()) return events
+        
+        return events.filter(event =>
+            event.name?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
+            event.location?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
+            event.date?.includes(eventSearchTerm)
+        )
+    }
+
+    // Fetch personnel assignments for a specific person
+    const fetchPersonnelAssignments = async (personnelId) => {
+        try {
+            // We'll need to check each event to see if this person is assigned
+            const assignments = []
+            for (const event of events) {
+                const response = await fetch(`http://localhost:5001/events/${event.id}/personnel`)
+                if (response.ok) {
+                    const eventPersonnel = await response.json()
+                    const isAssigned = eventPersonnel.some(person => String(person.id) === String(personnelId))
+                    if (isAssigned) {
+                        assignments.push(event)
+                    }
+                }
+            }
+            return assignments
+        } catch (error) {
+            console.error('Error fetching personnel assignments:', error)
+            return []
+        }
+    }
+
+    // Fetch event assignments (personnel assigned to a specific event)
+    const fetchEventAssignments = async (eventId) => {
+        try {
+            const response = await fetch(`http://localhost:5001/events/${eventId}/personnel`)
+            if (response.ok) {
+                return await response.json()
+            }
+            return []
+        } catch (error) {
+            console.error('Error fetching event assignments:', error)
+            return []
+        }
+    }
+
+    // Open personnel assignments dialog
+    const openPersonnelAssignmentsDialog = async (person) => {
+        setSelectedPersonnelForAssignments(person)
+        setShowPersonnelAssignmentsDialog(true)
+    }
+
+    // Open event assignments dialog
+    const openEventAssignmentsDialog = async (event) => {
+        setSelectedEventForAssignments(event)
+        setShowEventAssignmentsDialog(true)
+    }
+
     const projectPersonnel = getProjectPersonnel()
 
     // Get CSS class for role-based styling
@@ -544,43 +768,52 @@ export const Personnel = ({liftUserId}) => {
         <Nav/>
         <div className='content-area'>
             
-            <div className='personnel-grid'>
-                {/* Column 1: Personnel Actions */}
-                <div className='dashboard-card'>
-                    <h3>Personnel Actions</h3>
-                    <p className='personnel-modal-header'>Manage your team members</p>
-                    <div className='quick-actions'>
-                        <button 
-                            className='quick-action-btn'
-                            onClick={() => setShowAddPersonnelDialog(true)}
-                        >
-                            Add Personnel
-                        </button>
-                        <button 
-                            className='quick-action-btn'
-                            onClick={() => {
-                                console.log('Opening personnel list dialog for project:', selectedProject?.name)
-                                console.log('Full selected project data:', selectedProject)
-                                console.log('Project keyPersonnel:', selectedProject?.keyPersonnel)
-                                setShowPersonnelListDialog(true)
-                            }}
-                            disabled={!selectedProject}
-                        >
-                            View Project Team
-                        </button>
+            <div className='personnel-main-grid'>
+                {/* Left Column Container */}
+                <div className='personnel-left-column'>
+                    {/* Personnel Actions */}
+                    <div className='dashboard-card'>
+                        <h3>Personnel Actions</h3>
+                        <p className='personnel-modal-header'>Manage your team members</p>
+                        <div className='quick-actions'>
+                            <button 
+                                className='quick-action-btn'
+                                onClick={() => setShowAddPersonnelDialog(true)}
+                            >
+                                Add Personnel
+                            </button>
+                            <button 
+                                className='quick-action-btn'
+                                onClick={() => {
+                                    console.log('Opening personnel list dialog for project:', selectedProject?.name)
+                                    console.log('Full selected project data:', selectedProject)
+                                    console.log('Project keyPersonnel:', selectedProject?.keyPersonnel)
+                                    setShowPersonnelListDialog(true)
+                                }}
+                                disabled={!selectedProject}
+                            >
+                                View Project Team
+                            </button>
+                            <button 
+                                className='quick-action-btn'
+                                onClick={() => setShowAssignEventDialog(true)}
+                                disabled={!selectedProject}
+                            >
+                                Assign to Event
+                            </button>
+                        </div>
                     </div>
-                </div>
-                
-                {/* Column 2: Project Statistics */}
-                <div className='dashboard-card'>
-                    <h3>Project Statistics</h3>
-                    {selectedProject ? (
-                        <div className='stats-container'>
-                            <div className='stat-item'>
-                                <div className='stat-number'>{projectPersonnel.length}</div>
-                                <div className='stat-label'>Team Members</div>
-                            </div>
-                            <div className='stat-item'>
+                    
+                    {/* Project Statistics */}
+                    <div className='dashboard-card'>
+                        <h3>Project Statistics</h3>
+                        {selectedProject ? (
+                            <div className='stats-container'>
+                                <div className='stat-item'>
+                                    <div className='stat-number'>{projectPersonnel.length}</div>
+                                    <div className='stat-label'>Team Members</div>
+                                </div>
+                                                            <div className='stat-item'>
                                 <div className='stat-number'>{projectPersonnel.filter(p => 
                                     p.role?.toLowerCase().includes('photographer') || 
                                     p.projectRole?.toLowerCase().includes('photographer')
@@ -588,125 +821,177 @@ export const Personnel = ({liftUserId}) => {
                                 <div className='stat-label'>Photographers</div>
                             </div>
                             <div className='stat-item'>
+                                <div className='stat-number'>{projectPersonnel.filter(p => 
+                                    p.role?.toLowerCase().includes('videographer') || 
+                                    p.projectRole?.toLowerCase().includes('videographer')
+                                ).length}</div>
+                                <div className='stat-label'>Videographers</div>
+                            </div>
+                            <div className='stat-item'>
                                 <div className='stat-number'>{personnel.length}</div>
                                 <div className='stat-label'>Total Available</div>
                             </div>
+                            </div>
+                        ) : (
+                            <div className='project-statistics'>
+                                <p>Select a project to view statistics</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Assignment Views Section */}
+                    <div className='assignments-section-left'>
+                        {/* Personnel Assignments View */}
+                        <div className='assignment-view-card'>
+                            <h3>Personnel Assignments</h3>
+                            <p className='assignment-description'>View which events each team member is assigned to</p>
+                            <div className='assignment-actions'>
+                                <button 
+                                    className='assignment-view-btn'
+                                    onClick={() => setShowPersonnelAssignmentsDialog(true)}
+                                    disabled={!selectedProject}
+                                >
+                                    View Personnel → Event Assignments
+                                </button>
+                            </div>
                         </div>
-                    ) : (
-                        <div className='project-statistics'>
-                            <p>Select a project to view statistics</p>
+
+                        {/* Event Assignments View */}
+                        <div className='assignment-view-card'>
+                            <h3>Event Assignments</h3>
+                            <p className='assignment-description'>View which team members are assigned to each event</p>
+                            <div className='assignment-actions'>
+                                <button 
+                                    className='assignment-view-btn'
+                                    onClick={() => setShowEventAssignmentsDialog(true)}
+                                    disabled={!selectedProject}
+                                >
+                                    View Event → Personnel Assignments
+                                </button>
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
-                
-                {/* Column 3: Project Team Members */}
-                <div className='dashboard-card personnel-container-card'>
-                    <h3>Project Team Members</h3>
-                    {selectedProject ? (
-                        <div className='personnel-container-content'>
-                            <h4 className='personnel-modal-title'>{selectedProject.name}</h4>
-                            <div className='scrollable-area'>
-                                {projectPersonnel.length > 0 ? (
-                                    projectPersonnel.map((person, index) => (
-                                        <div key={person.personnelId || index} className={`personnel-card ${getRoleClass(person.projectRole || person.role)}`}>
-                                            <div className='personnel-card-content'>
-                                                <div className='personnel-card-info'>
-                                                    <h5 className='personnel-name'>{person.name}</h5>
-                                                    <p className={`personnel-project-role ${getRoleClass(person.projectRole)}`}><strong>Project Role:</strong> {person.projectRole}</p>
-                                                    <div className='personnel-details'>
-                                                        <p className='personnel-detail-item'><strong>Email:</strong> {person.email || 'Not available'}</p>
-                                                        <p className='personnel-detail-item'><strong>Phone:</strong> {person.phone || 'Not available'}</p>
-                                                        <p className='personnel-id'><strong>Personnel ID:</strong> {person.personnelId}</p>
+
+                {/* Right Column Container */}
+                <div className='personnel-right-column'>
+                    {/* Project Team Members */}
+                    <div className='dashboard-card personnel-container-card'>
+                        <h3>Project Team Members</h3>
+                        {selectedProject ? (
+                            <div className='personnel-container-content'>
+                                <h4 className='personnel-modal-title'>{selectedProject.name}</h4>
+                                <div className='scrollable-area'>
+                                    {projectPersonnel.length > 0 ? (
+                                        projectPersonnel.map((person, index) => (
+                                            <div key={person.personnelId || index} className={`personnel-card ${getRoleClass(person.projectRole || person.role)}`}>
+                                                <div className='personnel-card-content'>
+                                                    <div className='personnel-card-info'>
+                                                        <h5 className='personnel-name'>{person.name}</h5>
+                                                        <p className={`personnel-project-role ${getRoleClass(person.projectRole)}`}><strong>Project Role:</strong> {person.projectRole}</p>
+                                                        <div className='personnel-details'>
+                                                            <p className='personnel-detail-item'><strong>Email:</strong> {person.email || 'Not available'}</p>
+                                                            <p className='personnel-detail-item'><strong>Phone:</strong> {person.phone || 'Not available'}</p>
+                                                            <p className='personnel-id'><strong>Personnel ID:</strong> {person.personnelId}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className='personnel-card-actions'>
+                                                        <button 
+                                                            className='remove-button remove-from-project'
+                                                            onClick={() => {
+                                                                if (window.confirm(`Are you sure you want to remove ${person.name} from this project?`)) {
+                                                                    removePersonnelFromProject(person.personnelId)
+                                                                }
+                                                            }}
+                                                            title="Remove from project only"
+                                                        >
+                                                            Remove
+                                                        </button>
                                                     </div>
                                                 </div>
-                                                <div className='personnel-card-actions'>
-                                                    <button 
-                                                        className='remove-button remove-from-project'
-                                                        onClick={() => {
-                                                            if (window.confirm(`Are you sure you want to remove ${person.name} from this project?`)) {
-                                                                removePersonnelFromProject(person.personnelId)
-                                                            }
-                                                        }}
-                                                        title="Remove from project only"
-                                                    >
-                                                        Remove
-                                                    </button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className='empty-state'>
+                                            <p className='empty-state-title'>No personnel assigned to this project yet.</p>
+                                            <p className='empty-state-subtitle'>Use "Add Personnel" to add team members to this project.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className='empty-state'>
+                                <p className='empty-state-title'>No project selected</p>
+                                <p className='empty-state-subtitle'>Select a project from the navigation to view its team members.</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* All Personnel */}
+                    <div className='dashboard-card all-personnel-card'>
+                        <h3>All Personnel</h3>
+                        <div className='personnel-container-content'>
+                            <p className='personnel-modal-header'>Complete team directory</p>
+                            <div className='scrollable-area'>
+                                {personnel.length > 0 ? (
+                                    personnel.map((person, index) => {
+                                        const isInProject = selectedProject?.keyPersonnel?.some(p => p.personnelId === person.id) || false
+                                        return (
+                                            <div key={person.id || index} className={`personnel-card ${getRoleClass(person.role)} ${isInProject ? 'in-project' : ''}`}>
+                                                <div className='personnel-card-content'>
+                                                    <div className='personnel-card-info'>
+                                                        <h5 className='personnel-name'>{person.name}</h5>
+                                                        <p className={`personnel-role ${getRoleClass(person.role)}`}><strong>Role:</strong> {person.role}</p>
+                                                        {isInProject && selectedProject && (
+                                                            <p className='personnel-project-assignment'>
+                                                                <strong>Assigned to:</strong> {selectedProject.name}
+                                                            </p>
+                                                        )}
+                                                        <div className='personnel-details'>
+                                                            <p className='personnel-detail-item'><strong>Email:</strong> {person.email || 'Not available'}</p>
+                                                            <p className='personnel-detail-item'><strong>Phone:</strong> {person.phone || 'Not available'}</p>
+                                                            <p className='personnel-id'><strong>Personnel ID:</strong> {person.id}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className='personnel-card-actions'>
+                                                        <button 
+                                                            className='action-button edit-personnel'
+                                                            onClick={() => openEditPersonnelDialog(person)}
+                                                            title="Edit personnel details"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button 
+                                                            className='action-button assign-event'
+                                                            onClick={() => openAssignEventDialog(person)}
+                                                            title="Assign to event"
+                                                            disabled={!selectedProject}
+                                                        >
+                                                            Assign to Event
+                                                        </button>
+                                                        <button 
+                                                            className='remove-button delete-personnel'
+                                                            onClick={() => {
+                                                                if (window.confirm(`Are you sure you want to completely delete ${person.name} from the system? This action cannot be undone.`)) {
+                                                                    deletePersonnel(person.id)
+                                                                }
+                                                            }}
+                                                            title="Delete personnel completely"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        )
+                                    })
                                 ) : (
                                     <div className='empty-state'>
-                                        <p className='empty-state-title'>No personnel assigned to this project yet.</p>
-                                        <p className='empty-state-subtitle'>Use "Add Personnel" to add team members to this project.</p>
+                                        <p className='empty-state-title'>No personnel found</p>
+                                        <p className='empty-state-subtitle'>Use "Add Personnel" to create your first team member.</p>
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    ) : (
-                        <div className='empty-state'>
-                            <p className='empty-state-title'>No project selected</p>
-                            <p className='empty-state-subtitle'>Select a project from the navigation to view its team members.</p>
-                        </div>
-                    )}
-                </div>
-                
-                {/* Column 4: All Personnel */}
-                <div className='dashboard-card all-personnel-card'>
-                    <h3>All Personnel</h3>
-                    <div className='personnel-container-content'>
-                        <p className='personnel-modal-header'>Complete team directory</p>
-                        <div className='scrollable-area'>
-                            {personnel.length > 0 ? (
-                                personnel.map((person, index) => {
-                                    const isInProject = selectedProject?.keyPersonnel?.some(p => p.personnelId === person.id) || false
-                                    return (
-                                        <div key={person.id || index} className={`personnel-card ${getRoleClass(person.role)} ${isInProject ? 'in-project' : ''}`}>
-                                            <div className='personnel-card-content'>
-                                                <div className='personnel-card-info'>
-                                                    <h5 className='personnel-name'>{person.name}</h5>
-                                                    <p className={`personnel-role ${getRoleClass(person.role)}`}><strong>Role:</strong> {person.role}</p>
-                                                    {isInProject && selectedProject && (
-                                                        <p className='personnel-project-assignment'>
-                                                            <strong>Assigned to:</strong> {selectedProject.name}
-                                                        </p>
-                                                    )}
-                                                    <div className='personnel-details'>
-                                                        <p className='personnel-detail-item'><strong>Email:</strong> {person.email || 'Not available'}</p>
-                                                        <p className='personnel-detail-item'><strong>Phone:</strong> {person.phone || 'Not available'}</p>
-                                                        <p className='personnel-id'><strong>Personnel ID:</strong> {person.id}</p>
-                                                    </div>
-                                                </div>
-                                                <div className='personnel-card-actions'>
-                                                    <button 
-                                                        className='action-button edit-personnel'
-                                                        onClick={() => openEditPersonnelDialog(person)}
-                                                        title="Edit personnel details"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button 
-                                                        className='remove-button delete-personnel'
-                                                        onClick={() => {
-                                                            if (window.confirm(`Are you sure you want to completely delete ${person.name} from the system? This action cannot be undone.`)) {
-                                                                deletePersonnel(person.id)
-                                                            }
-                                                        }}
-                                                        title="Delete personnel completely"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })
-                            ) : (
-                                <div className='empty-state'>
-                                    <p className='empty-state-title'>No personnel found</p>
-                                    <p className='empty-state-subtitle'>Use "Add Personnel" to create your first team member.</p>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -977,6 +1262,203 @@ export const Personnel = ({liftUserId}) => {
                                 }}>Cancel</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign to Event Dialog */}
+            {showAssignEventDialog && (
+                <div className='modal-overlay'>
+                    <div className='modal-content'>
+                        <h2>Assign Personnel to Event</h2>
+                        {assigningPersonnel ? (
+                            <div>
+                                <h3 className='personnel-modal-title'>
+                                    Assigning: {assigningPersonnel.name}
+                                </h3>
+                                <p className='personnel-modal-header'>
+                                    Select an event from {selectedProject?.name || 'the current project'}
+                                </p>
+                                
+                                {/* Event Search */}
+                                <div className='personnel-form-group'>
+                                    <label className='personnel-form-label'>Search Events</label>
+                                    <input
+                                        className='personnel-form-input'
+                                        type='text'
+                                        value={eventSearchTerm}
+                                        onChange={(e) => setEventSearchTerm(e.target.value)}
+                                        placeholder='Search by event name, location, or date...'
+                                    />
+                                </div>
+                                
+                                {/* Events List */}
+                                <div className='events-list-container'>
+                                    {getFilteredEvents().length > 0 ? (
+                                        <div className='events-list'>
+                                            {getFilteredEvents().map(event => (
+                                                <div 
+                                                    key={event.id} 
+                                                    className='event-card-item'
+                                                    onClick={() => handleAssignToEvent(event.id)}
+                                                >
+                                                    <div className='event-card-content'>
+                                                        <h4 className='event-name'>{event.name}</h4>
+                                                        <p className='event-details'>
+                                                            <strong>Date:</strong> {event.date}
+                                                        </p>
+                                                        <p className='event-details'>
+                                                            <strong>Time:</strong> {event.startTime || event.start_time} - {event.endTime || event.end_time}
+                                                        </p>
+                                                        <p className='event-details'>
+                                                            <strong>Location:</strong> {event.location || 'Not specified'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className='empty-state'>
+                                            <p className='empty-state-title'>
+                                                {eventSearchTerm ? 'No events match your search' : 'No events found for this project'}
+                                            </p>
+                                            <p className='empty-state-subtitle'>
+                                                {eventSearchTerm ? 'Try adjusting your search terms' : 'Create events in the Event Planner to assign personnel'}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <p className='personnel-modal-header'>
+                                    Select a personnel member from the list to assign to an event
+                                </p>
+                                <div className='personnel-selection-list'>
+                                    {personnel.map(person => (
+                                        <div 
+                                            key={person.id} 
+                                            className='personnel-selection-item'
+                                            onClick={() => openAssignEventDialog(person)}
+                                        >
+                                            <h4>{person.name}</h4>
+                                            <p>{person.role}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        <div className='personnel-modal-actions'>
+                            <button 
+                                className='personnel-form-button personnel-form-button-secondary' 
+                                type='button' 
+                                onClick={() => {
+                                    setShowAssignEventDialog(false)
+                                    setAssigningPersonnel(null)
+                                    setEventSearchTerm('')
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Personnel Assignments Dialog */}
+            {showPersonnelAssignmentsDialog && (
+                <div className='modal-overlay'>
+                    <div className='modal-content assignments-modal'>
+                        <h2>Personnel → Event Assignments</h2>
+                        <p className='personnel-modal-header'>
+                            Click on any team member to see which events they're assigned to
+                        </p>
+                        
+                        {!selectedPersonnelForAssignments ? (
+                            <div className='personnel-selection-container'>
+                                <div className='personnel-grid-assignments'>
+                                    {personnel.map(person => (
+                                        <div 
+                                            key={person.id} 
+                                            className='personnel-assignment-card'
+                                            onClick={() => openPersonnelAssignmentsDialog(person)}
+                                        >
+                                            <h4 className='personnel-name'>{person.name}</h4>
+                                            <p className='personnel-role'>{person.role}</p>
+                                            <p className='personnel-email'>{person.email}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <PersonnelAssignmentDetails 
+                                person={selectedPersonnelForAssignments}
+                                onBack={() => setSelectedPersonnelForAssignments(null)}
+                                fetchAssignments={fetchPersonnelAssignments}
+                            />
+                        )}
+                        
+                        <div className='personnel-modal-actions'>
+                            <button 
+                                className='personnel-form-button personnel-form-button-secondary' 
+                                onClick={() => {
+                                    setShowPersonnelAssignmentsDialog(false)
+                                    setSelectedPersonnelForAssignments(null)
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Event Assignments Dialog */}
+            {showEventAssignmentsDialog && (
+                <div className='modal-overlay'>
+                    <div className='modal-content assignments-modal'>
+                        <h2>Event → Personnel Assignments</h2>
+                        <p className='personnel-modal-header'>
+                            Click on any event to see which team members are assigned to it
+                        </p>
+                        
+                        {!selectedEventForAssignments ? (
+                            <div className='events-selection-container'>
+                                <div className='events-grid-assignments'>
+                                    {events.map(event => (
+                                        <div 
+                                            key={event.id} 
+                                            className='event-assignment-card'
+                                            onClick={() => openEventAssignmentsDialog(event)}
+                                        >
+                                            <h4 className='event-name'>{event.name}</h4>
+                                            <p className='event-date'>{event.date}</p>
+                                            <p className='event-time'>{event.startTime || event.start_time} - {event.endTime || event.end_time}</p>
+                                            <p className='event-location'>{event.location || 'No location specified'}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <EventAssignmentDetails 
+                                event={selectedEventForAssignments}
+                                onBack={() => setSelectedEventForAssignments(null)}
+                                fetchAssignments={fetchEventAssignments}
+                            />
+                        )}
+                        
+                        <div className='personnel-modal-actions'>
+                            <button 
+                                className='personnel-form-button personnel-form-button-secondary' 
+                                onClick={() => {
+                                    setShowEventAssignmentsDialog(false)
+                                    setSelectedEventForAssignments(null)
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

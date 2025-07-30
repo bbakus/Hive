@@ -5,6 +5,11 @@
   box-sizing: border-box;
 }
 
+@font-face {
+  font-family: 'Inversionz';
+  src: url('/public/fonts/Inversionz.otf');
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #1a1a1a;
@@ -54,6 +59,7 @@ body {
 }
 
 .login-container h1 {
+  font-family: 'Inversionz';
   color: goldenrod;
   font-size: 5rem;
   font-weight: 700;

@@ -135,6 +135,7 @@ class Shot_Request(Base, SerializerMixin):
     deadline = Column(String)
     key_sponsor = Column(String)
     status = Column(String)
+    process_point = Column(String, default='idle')
     event_id = Column(Integer, ForeignKey('events.id'), nullable=True)
 
     event = relationship('Event', back_populates='shot_requests')
