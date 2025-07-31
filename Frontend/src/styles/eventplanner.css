@@ -794,6 +794,98 @@
   margin: 0;
 }
 
+.event-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.edit-event-btn {
+  background: rgba(33, 150, 243, 0.2);
+  border: 1px solid rgba(33, 150, 243, 0.6);
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-event-btn:hover {
+  background: rgba(33, 150, 243, 0.3);
+  border-color: rgba(33, 150, 243, 0.8);
+}
+
+.edit-event-form {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.edit-event-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.edit-event-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.edit-event-form .form-label {
+  display: block;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.edit-event-form .form-input,
+.edit-event-form .form-select,
+.edit-event-form .form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease;
+}
+
+.edit-event-form .form-input:focus,
+.edit-event-form .form-select:focus,
+.edit-event-form .form-textarea:focus {
+  outline: none;
+  border-color: rgba(33, 150, 243, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.edit-event-form .form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.edit-event-form .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ffffff;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.edit-event-form .checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.edit-event-form .checkbox-text {
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+
 .modal-close-btn {
   background: none;
   border: none;
@@ -1076,9 +1168,6 @@
 }
 
 .process-badge {
-  background: rgba(255, 193, 7, 0.3);
-  border: 1px solid rgba(255, 193, 7, 0.6);
-  color: #ffc107;
   font-size: 0.75rem; /* Much larger text */
   font-weight: 700; /* Bolder */
   padding: 0.375rem 0.5rem; /* Much more padding */
@@ -1086,6 +1175,43 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap; /* Prevent text wrapping */
+}
+
+/* Process badge colors matching process point colors */
+.process-badge.process-idle {
+  background: rgba(110, 216, 202, 0.3);
+  border: 1px solid rgba(110, 216, 202, 0.6);
+  color: #ffffff;
+}
+
+.process-badge.process-ingest {
+  background: rgba(13, 110, 253, 0.3);
+  border: 1px solid rgba(13, 110, 253, 0.6);
+  color: #ffffff;
+}
+
+.process-badge.process-cull {
+  background: rgba(255, 193, 7, 0.3);
+  border: 1px solid rgba(255, 193, 7, 0.6);
+  color: #ffffff;
+}
+
+.process-badge.process-color {
+  background: rgba(220, 53, 69, 0.3);
+  border: 1px solid rgba(220, 53, 69, 0.6);
+  color: #ffffff;
+}
+
+.process-badge.process-delivered {
+  background: rgba(25, 135, 84, 0.3);
+  border: 1px solid rgba(25, 135, 84, 0.6);
+  color: #ffffff;
+}
+
+.process-badge.process-default {
+  background: rgba(74, 144, 226, 0.3);
+  border: 1px solid rgba(74, 144, 226, 0.6);
+  color: #ffffff;
 }
 
 .no-events {
@@ -1157,6 +1283,23 @@
   margin-bottom: 1rem;
 }
 
+.daily-events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.daily-events-title-section {
+  flex: 1;
+}
+
+.daily-events-filter-section {
+  display: flex;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
 /* Project Events Panel */
 .project-events-header {
   display: flex;
@@ -1184,10 +1327,15 @@
   display: flex;
   align-items: center;
   margin-bottom: 1rem;
+  gap: 1rem;
 }
 
 .filter-row:last-child {
   margin-bottom: 0;
+}
+
+.filter-row .filter-dropdown-label {
+  margin-left: 1rem;
 }
 
 .filter-checkbox {

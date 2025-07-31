@@ -268,16 +268,27 @@ export const ShotPlanner = ({liftUserId}) => {
             })
         }
         
-        // Sort by start time descending (latest first), then by deadline
+        // Sort by associated event date (ascending - earliest first), then by start time
         return filteredShotRequests.sort((a, b) => {
-            // First sort by start time if available (descending - latest first)
+            const eventA = events.find(event => String(event.id) === String(a.eventId))
+            const eventB = events.find(event => String(event.id) === String(b.eventId))
+            
+            // First sort by event date (ascending - earliest first)
+            if (eventA?.date && eventB?.date) {
+                const dateComparison = eventA.date.localeCompare(eventB.date)
+                if (dateComparison !== 0) return dateComparison
+            }
+            if (eventA?.date && !eventB?.date) return -1
+            if (!eventA?.date && eventB?.date) return 1
+            
+            // Then sort by start time if both have start times (ascending)
             if (a.startTime && b.startTime) {
-                return b.startTime.localeCompare(a.startTime) // Reversed for descending
+                return a.startTime.localeCompare(b.startTime)
             }
             if (a.startTime && !b.startTime) return -1
             if (!a.startTime && b.startTime) return 1
             
-            // Then sort by deadline if both have deadlines (ascending for urgency)
+            // Finally sort by deadline if both have deadlines (ascending for urgency)
             if (a.deadline && b.deadline) {
                 return a.deadline.localeCompare(b.deadline)
             }

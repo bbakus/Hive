@@ -123,6 +123,11 @@ export const Projects = () => {
             projectEventIds.includes(String(shotRequest.eventId))
         )
 
+        // Calculate shot requests delivered (process point = 'delivered')
+        const shotRequestsDelivered = projectShotRequests.filter(shotRequest =>
+            shotRequest.processPoint?.toLowerCase() === 'delivered'
+        ).length
+
         // Calculate event status distribution based on time (matching EventPlanner logic)
         const eventStatusCounts = {}
         
@@ -228,6 +233,7 @@ export const Projects = () => {
         return {
             totalEvents: projectEvents.length,
             totalShotRequests: projectShotRequests.length,
+            shotRequestsDelivered: shotRequestsDelivered,  // Shot requests with process point "delivered"
             imagesDelivered: completedEvents,  // Events with process point "delivered"
             eventStatusCounts,
             eventProcessPointCounts,
@@ -544,15 +550,15 @@ export const Projects = () => {
                             <h3>Project Metrics</h3>
                             <div className='metrics-list'>
                                 <div className='metric-item'>
-                                    <div className='metric-number'>{statistics?.totalEvents || 0}</div>
-                                    <div className='metric-label'>Total Events</div>
+                                    <div className='metric-number delivered'>{statistics?.shotRequestsDelivered || 0}</div>
+                                    <div className='metric-label'>Shot Requests Delivered</div>
                                 </div>
                                 <div className='metric-item'>
                                     <div className='metric-number'>{statistics?.totalShotRequests || 0}</div>
                                     <div className='metric-label'>Shot Requests</div>
                                 </div>
                                 <div className='metric-item'>
-                                    <div className='metric-number'>{statistics?.imagesDelivered || 0}</div>
+                                    <div className='metric-number delivered'>{statistics?.imagesDelivered || 0}</div>
                                     <div className='metric-label'>Events Delivered</div>
                                 </div>
                                 <div className='metric-item'>
@@ -747,7 +753,7 @@ export const Projects = () => {
 const getProcessPointColor = (processPoint) => {
     const point = processPoint?.toLowerCase()
     switch (point) {
-        case 'idle': return '#757575'
+        case 'idle': return '#6ED8CA'  // Teal to match EventPlanner
         case 'ingest': return '#2196F3'
         case 'cull': return '#FF9800'
         case 'color': return '#DC3545'  // Red to match EventPlanner
@@ -760,11 +766,11 @@ const getProcessPointColor = (processPoint) => {
 const getEventStatusColor = (status) => {
     const eventStatus = status?.toLowerCase()
     switch (eventStatus) {
-        case 'scheduled': return '#2196F3'      // Blue
-        case 'upcoming': return '#9C27B0'       // Purple
-        case 'starting soon': return '#FF5722'   // Deep Orange
-        case 'ongoing': return '#FF9800'         // Orange
-        case 'done': return '#4CAF50'            // Green
+        case 'scheduled': return '#4A90E2'      // Blue (matching EventPlanner)
+        case 'upcoming': return '#FF8C00'       // Orange (matching EventPlanner)
+        case 'starting soon': return '#FFC107'   // Yellow (matching EventPlanner)
+        case 'ongoing': return '#198754'         // Green (matching EventPlanner)
+        case 'done': return '#6C757D'            // Grey (matching EventPlanner)
         default: return '#757575'
     }
 }

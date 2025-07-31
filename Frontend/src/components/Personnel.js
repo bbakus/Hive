@@ -122,6 +122,7 @@ export const Personnel = ({liftUserId}) => {
     const [assigningPersonnel, setAssigningPersonnel] = useState(null)
     const [events, setEvents] = useState([])
     const [eventSearchTerm, setEventSearchTerm] = useState('')
+    const [selectedEventDate, setSelectedEventDate] = useState('') // For filtering by specific day
     const [showPersonnelAssignmentsDialog, setShowPersonnelAssignmentsDialog] = useState(false)
     const [showEventAssignmentsDialog, setShowEventAssignmentsDialog] = useState(false)
     const [selectedPersonnelForAssignments, setSelectedPersonnelForAssignments] = useState(null)
@@ -665,6 +666,7 @@ export const Personnel = ({liftUserId}) => {
     const openAssignEventDialog = (person) => {
         setAssigningPersonnel(person)
         setEventSearchTerm('')
+        setSelectedEventDate('') // Reset date filter
         setShowAssignEventDialog(true)
     }
 
@@ -672,21 +674,33 @@ export const Personnel = ({liftUserId}) => {
     const handleAssignToEvent = async (eventId) => {
         if (!assigningPersonnel) return
         
+        console.log('Assigning personnel object:', assigningPersonnel)
+        console.log('Assigning personnel ID:', assigningPersonnel.id, 'to event:', eventId)
+        
         try {
-            const response = await fetch(`http://localhost:5001/events/${eventId}/personnel/${assigningPersonnel.id}`, {
+            // Use personnelId if available, otherwise fall back to id
+            const personnelId = assigningPersonnel.personnelId || assigningPersonnel.id
+            console.log('Using personnel ID:', personnelId)
+            
+            const response = await fetch(`http://localhost:5001/events/${eventId}/personnel/${personnelId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 }
             })
             
+            console.log('Response status:', response.status)
+            
             if (response.ok) {
+                const result = await response.json()
+                console.log('Assignment successful:', result)
                 alert(`${assigningPersonnel.name} has been assigned to the event successfully!`)
-                setShowAssignEventDialog(false)
-                setAssigningPersonnel(null)
+                // Keep modal open for multiple assignments
                 setEventSearchTerm('')
+                setSelectedEventDate('')
             } else {
                 const error = await response.json()
+                console.error('Assignment failed:', error)
                 alert(`Error assigning personnel to event: ${error.error}`)
             }
         } catch (error) {
@@ -695,15 +709,31 @@ export const Personnel = ({liftUserId}) => {
         }
     }
 
-    // Filter events based on search term
+    // Get unique dates from events for dropdown
+    const getUniqueEventDates = () => {
+        const dates = [...new Set(events.map(event => event.date))].sort()
+        return dates
+    }
+    
+    // Filter events based on search term and selected date
     const getFilteredEvents = () => {
-        if (!eventSearchTerm.trim()) return events
+        let filteredEvents = events
         
-        return events.filter(event =>
-            event.name?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
-            event.location?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
-            event.date?.includes(eventSearchTerm)
-        )
+        // Filter by selected date if specified
+        if (selectedEventDate) {
+            filteredEvents = filteredEvents.filter(event => event.date === selectedEventDate)
+        }
+        
+        // Apply search filter if search term exists
+        if (eventSearchTerm.trim()) {
+            filteredEvents = filteredEvents.filter(event =>
+                event.name?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
+                event.location?.toLowerCase().includes(eventSearchTerm.toLowerCase()) ||
+                event.date?.includes(eventSearchTerm)
+            )
+        }
+        
+        return filteredEvents
     }
 
     // Fetch personnel assignments for a specific person
@@ -897,6 +927,14 @@ export const Personnel = ({liftUserId}) => {
                                                     </div>
                                                     <div className='personnel-card-actions'>
                                                         <button 
+                                                            className='action-button assign-event'
+                                                            onClick={() => openAssignEventDialog(person)}
+                                                            title="Assign to event"
+                                                            disabled={!selectedProject}
+                                                        >
+                                                            Assign to Event
+                                                        </button>
+                                                        <button 
                                                             className='remove-button remove-from-project'
                                                             onClick={() => {
                                                                 if (window.confirm(`Are you sure you want to remove ${person.name} from this project?`)) {
@@ -960,14 +998,6 @@ export const Personnel = ({liftUserId}) => {
                                                             title="Edit personnel details"
                                                         >
                                                             Edit
-                                                        </button>
-                                                        <button 
-                                                            className='action-button assign-event'
-                                                            onClick={() => openAssignEventDialog(person)}
-                                                            title="Assign to event"
-                                                            disabled={!selectedProject}
-                                                        >
-                                                            Assign to Event
                                                         </button>
                                                         <button 
                                                             className='remove-button delete-personnel'
@@ -1280,16 +1310,33 @@ export const Personnel = ({liftUserId}) => {
                                     Select an event from {selectedProject?.name || 'the current project'}
                                 </p>
                                 
-                                {/* Event Search */}
-                                <div className='personnel-form-group'>
-                                    <label className='personnel-form-label'>Search Events</label>
-                                    <input
-                                        className='personnel-form-input'
-                                        type='text'
-                                        value={eventSearchTerm}
-                                        onChange={(e) => setEventSearchTerm(e.target.value)}
-                                        placeholder='Search by event name, location, or date...'
-                                    />
+                                {/* Event Search and Date Filter */}
+                                <div className='personnel-form-row'>
+                                    <div className='personnel-form-group'>
+                                        <label className='personnel-form-label'>Search Events</label>
+                                        <input
+                                            className='personnel-form-input'
+                                            type='text'
+                                            value={eventSearchTerm}
+                                            onChange={(e) => setEventSearchTerm(e.target.value)}
+                                            placeholder='Search by event name, location, or date...'
+                                        />
+                                    </div>
+                                    <div className='personnel-form-group'>
+                                        <label className='personnel-form-label'>Filter by Day</label>
+                                        <select
+                                            className='personnel-form-select'
+                                            value={selectedEventDate}
+                                            onChange={(e) => setSelectedEventDate(e.target.value)}
+                                        >
+                                            <option value=''>All Days</option>
+                                            {getUniqueEventDates().map(date => (
+                                                <option key={date} value={date}>
+                                                    {new Date(date).toLocaleDateString()}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 
                                 {/* Events List */}
@@ -1357,6 +1404,7 @@ export const Personnel = ({liftUserId}) => {
                                     setShowAssignEventDialog(false)
                                     setAssigningPersonnel(null)
                                     setEventSearchTerm('')
+                                    setSelectedEventDate('')
                                 }}
                             >
                                 Close

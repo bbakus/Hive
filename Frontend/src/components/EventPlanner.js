@@ -21,9 +21,25 @@ export const EventPlanner = ({liftUserId}) => {
     })
     const [showEventModal, setShowEventModal] = useState(false)
     const [editingEvent, setEditingEvent] = useState(null)
+    const [isEditingEvent, setIsEditingEvent] = useState(false)
+    const [editEventForm, setEditEventForm] = useState({
+        name: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        location: '',
+        description: '',
+        discipline: '',
+        deadline: '',
+        isQuickTurnaround: false,
+        isCovered: false,
+        standardShotPackage: false
+    })
     const [currentTime, setCurrentTime] = useState(new Date())
     const [filterQuickTurnaround, setFilterQuickTurnaround] = useState(false)
     const [filterProcessPoint, setFilterProcessPoint] = useState('')
+    const [filterTodayQuickTurnaround, setFilterTodayQuickTurnaround] = useState(false)
+    const [filterAllEventsDate, setFilterAllEventsDate] = useState('')
     const [newEventForm, setNewEventForm] = useState({
         name: '',
         date: selectedDate,
@@ -114,6 +130,17 @@ export const EventPlanner = ({liftUserId}) => {
         })
     }
 
+    // Get filtered events for today with quick turnaround filter
+    const getFilteredEventsForToday = (date) => {
+        let filteredEvents = getEventsForDate(date)
+        
+        if (filterTodayQuickTurnaround) {
+            filteredEvents = filteredEvents.filter(event => event.isQuickTurnaround)
+        }
+        
+        return filteredEvents
+    }
+
     // Get all events for the selected project
     const getProjectEvents = () => {
         if (!selectedProject) return []
@@ -125,6 +152,11 @@ export const EventPlanner = ({liftUserId}) => {
     // Apply filters to project events
     const getFilteredProjectEvents = () => {
         let filteredEvents = getProjectEvents()
+        
+        // Apply date filter
+        if (filterAllEventsDate && filterAllEventsDate !== '') {
+            filteredEvents = filteredEvents.filter(event => event.date === filterAllEventsDate)
+        }
         
         // Apply quick turnaround filter
         if (filterQuickTurnaround) {
@@ -327,6 +359,83 @@ export const EventPlanner = ({liftUserId}) => {
         }
     }
 
+    const handleEventUpdate = async (e) => {
+        e.preventDefault()
+        
+        if (!editingEvent) return
+        
+        try {
+            const response = await fetch(`http://localhost:5001/events/${editingEvent.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(editEventForm)
+            })
+            
+            if (response.ok) {
+                // Update the event in the local state
+                const updatedEvents = events.map(event => 
+                    event.id === editingEvent.id 
+                        ? { ...event, ...editEventForm }
+                        : event
+                )
+                setEvents(updatedEvents)
+                
+                // Update the editing event
+                setEditingEvent({ ...editingEvent, ...editEventForm })
+                
+                // Exit edit mode
+                setIsEditingEvent(false)
+                
+                alert('Event updated successfully!')
+            } else {
+                const error = await response.json()
+                console.error('Error updating event:', error)
+                alert('Failed to update event')
+            }
+        } catch (error) {
+            console.error('Error updating event:', error)
+            alert('Failed to update event')
+        }
+    }
+
+    const startEditingEvent = () => {
+        if (!editingEvent) return
+        
+        setEditEventForm({
+            name: editingEvent.name || '',
+            date: editingEvent.date || '',
+            startTime: editingEvent.startTime || '',
+            endTime: editingEvent.endTime || '',
+            location: editingEvent.location || '',
+            description: editingEvent.description || '',
+            discipline: editingEvent.discipline || '',
+            deadline: editingEvent.deadline || '',
+            isQuickTurnaround: editingEvent.isQuickTurnaround || false,
+            isCovered: editingEvent.isCovered || false,
+            standardShotPackage: editingEvent.standardShotPackage || false
+        })
+        setIsEditingEvent(true)
+    }
+
+    const cancelEditingEvent = () => {
+        setIsEditingEvent(false)
+        setEditEventForm({
+            name: '',
+            date: '',
+            startTime: '',
+            endTime: '',
+            location: '',
+            description: '',
+            discipline: '',
+            deadline: '',
+            isQuickTurnaround: false,
+            isCovered: false,
+            standardShotPackage: false
+        })
+    }
+
     // Handle new event form submission
     const handleNewEventSubmit = async (e) => {
         e.preventDefault()
@@ -520,10 +629,30 @@ export const EventPlanner = ({liftUserId}) => {
                 <div className='overview-content'>
                     {/* Left Panel - Events for selected date */}
                     <div className='daily-events-panel'>
-                        <h3>Events for {formatDate(selectedDate)}</h3>
-                        {eventsForSelectedDate.length > 0 ? (
+                        <div className='daily-events-header'>
+                            <div className='daily-events-title-section'>
+                                <h3>Events for {formatDate(selectedDate)}</h3>
+                                {selectedProject && (
+                                    <p className='daily-events-count'>
+                                        {getFilteredEventsForToday(selectedDate).length} of {eventsForSelectedDate.length} events
+                                    </p>
+                                )}
+                            </div>
+                            <div className='daily-events-filter-section'>
+                                <label className='filter-checkbox'>
+                                    <input
+                                        type='checkbox'
+                                        checked={filterTodayQuickTurnaround}
+                                        onChange={(e) => setFilterTodayQuickTurnaround(e.target.checked)}
+                                    />
+                                    <span className='filter-checkbox-label'>Quick Turnaround Only</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        {getFilteredEventsForToday(selectedDate).length > 0 ? (
                             <div className='events-grid'>
-                                {eventsForSelectedDate.map((event, index) => (
+                                {getFilteredEventsForToday(selectedDate).map((event, index) => (
                                     <div key={event.id || index} className={`event-card ${getProcessPointColor(event.processPoint)}`} onClick={() => handleEventClick(event)}>
                                         <div className='event-card-header'>
                                             <h4>{event.name}</h4>
@@ -536,7 +665,7 @@ export const EventPlanner = ({liftUserId}) => {
                                                     {getEventStatus(event)}
                                                 </span>
                                                 {event.processPoint && (
-                                                    <span className='process-badge'>
+                                                    <span className={`process-badge process-${event.processPoint.toLowerCase()}`}>
                                                         {event.processPoint}
                                                     </span>
                                                 )}
@@ -556,9 +685,22 @@ export const EventPlanner = ({liftUserId}) => {
                             </div>
                         ) : (
                             <div className='no-events'>
-                                <p>No events scheduled for {formatDate(selectedDate)}</p>
+                                <p>
+                                    {filterTodayQuickTurnaround 
+                                        ? `No quick turnaround events scheduled for ${formatDate(selectedDate)}`
+                                        : `No events scheduled for ${formatDate(selectedDate)}`
+                                    }
+                                </p>
                                 {!selectedProject && (
                                     <p className='no-project-help'>Select a project to view events within its date range</p>
+                                )}
+                                {filterTodayQuickTurnaround && getEventsForDate(selectedDate).length > 0 && (
+                                    <button 
+                                        className='clear-filters-btn'
+                                        onClick={() => setFilterTodayQuickTurnaround(false)}
+                                    >
+                                        Clear Filter
+                                    </button>
                                 )}
                             </div>
                         )}
@@ -601,6 +743,19 @@ export const EventPlanner = ({liftUserId}) => {
                                     <option value='color'>Color</option>
                                     <option value='delivered'>Delivered</option>
                                 </select>
+                                <label className='filter-dropdown-label'>Date:</label>
+                                <select
+                                    className='filter-dropdown'
+                                    value={filterAllEventsDate}
+                                    onChange={(e) => setFilterAllEventsDate(e.target.value)}
+                                >
+                                    <option value=''>All Dates</option>
+                                    {getProjectEvents().map(event => event.date).filter((date, index, self) => self.indexOf(date) === index).sort().map(date => (
+                                        <option key={date} value={date}>
+                                            {formatDate(date)}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
 
@@ -622,7 +777,7 @@ export const EventPlanner = ({liftUserId}) => {
                                                             {getEventStatus(event)}
                                                         </span>
                                                         {event.processPoint && (
-                                                            <span className='process-badge'>
+                                                            <span className={`process-badge process-${event.processPoint.toLowerCase()}`}>
                                                                 {event.processPoint}
                                                             </span>
                                                         )}
@@ -648,6 +803,7 @@ export const EventPlanner = ({liftUserId}) => {
                                             onClick={() => {
                                                 setFilterQuickTurnaround(false)
                                                 setFilterProcessPoint('')
+                                                setFilterAllEventsDate('')
                                             }}
                                         >
                                             Clear Filters
@@ -774,7 +930,7 @@ export const EventPlanner = ({liftUserId}) => {
                                                             </span>
                                                         )}
                                                         {event.processPoint && (
-                                                            <span className='process-badge'>
+                                                            <span className={`process-badge process-${event.processPoint.toLowerCase()}`}>
                                                                 {event.processPoint}
                                                             </span>
                                                         )}
@@ -1152,103 +1308,243 @@ export const EventPlanner = ({liftUserId}) => {
                 <div className='modal-content event-modal'>
                     <div className='event-modal-header'>
                         <h2>Event Details</h2>
-                        <button 
-                            className='modal-close-btn'
-                            onClick={() => {
-                                setShowEventModal(false)
-                                setEditingEvent(null)
-                            }}
-                        >
-                            ×
-                        </button>
+                        <div className='event-modal-actions'>
+                            {!isEditingEvent && (
+                                <button 
+                                    className='edit-event-btn'
+                                    onClick={startEditingEvent}
+                                >
+                                    Edit Event
+                                </button>
+                            )}
+                            <button 
+                                className='modal-close-btn'
+                                onClick={() => {
+                                    setShowEventModal(false)
+                                    setEditingEvent(null)
+                                    setIsEditingEvent(false)
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
                     </div>
                     
-                    <div className='event-details-content'>
-                        <div className='event-detail-section'>
-                            <h3>Basic Information</h3>
-                            <div className='detail-grid'>
-                                <div className='detail-item'>
-                                    <label>Event Name</label>
-                                    <span>{editingEvent.name}</span>
+                    {!isEditingEvent ? (
+                        <div className='event-details-content'>
+                            <div className='event-detail-section'>
+                                <h3>Basic Information</h3>
+                                <div className='detail-grid'>
+                                    <div className='detail-item'>
+                                        <label>Event Name</label>
+                                        <span>{editingEvent.name}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Date</label>
+                                        <span>{formatDate(editingEvent.date)}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Time</label>
+                                        <span>
+                                            {editingEvent.startTime && editingEvent.endTime 
+                                                ? `${editingEvent.startTime} - ${editingEvent.endTime}`
+                                                : 'All Day'
+                                            }
+                                        </span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Location</label>
+                                        <span>{editingEvent.location || 'Not specified'}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Status</label>
+                                        <span className={`status-badge status-${getEventStatus(editingEvent).toLowerCase().replace(' ', '-')}`}>
+                                            {getEventStatus(editingEvent)}
+                                        </span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Discipline</label>
+                                        <span>{editingEvent.discipline || 'Not specified'}</span>
+                                    </div>
                                 </div>
-                                <div className='detail-item'>
-                                    <label>Date</label>
-                                    <span>{formatDate(editingEvent.date)}</span>
+                            </div>
+                            
+                            <div className='event-detail-section'>
+                                <h3>Process Information</h3>
+                                <div className='process-point-editor'>
+                                    <label htmlFor='process-point-select'>Process Point:</label>
+                                    <select
+                                        id='process-point-select'
+                                        value={editingEvent.processPoint || ''}
+                                        onChange={(e) => {
+                                            const newProcessPoint = e.target.value
+                                            handleProcessPointUpdate(editingEvent.id, newProcessPoint)
+                                        }}
+                                    >
+                                        <option value=''>Select Process Point</option>
+                                        <option value='Idle'>Idle</option>
+                                        <option value='Ingest'>Ingest</option>
+                                        <option value='Cull'>Cull</option>
+                                        <option value='Color'>Color</option>
+                                        <option value='Delivered'>Delivered</option>
+                                    </select>
                                 </div>
-                                <div className='detail-item'>
-                                    <label>Time</label>
-                                    <span>
-                                        {editingEvent.startTime && editingEvent.endTime 
-                                            ? `${editingEvent.startTime} - ${editingEvent.endTime}`
-                                            : 'All Day'
-                                        }
-                                    </span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Location</label>
-                                    <span>{editingEvent.location || 'Not specified'}</span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Status</label>
-                                    <span className={`status-badge status-${getEventStatus(editingEvent).toLowerCase().replace(' ', '-')}`}>
-                                        {getEventStatus(editingEvent)}
-                                    </span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Discipline</label>
-                                    <span>{editingEvent.discipline || 'Not specified'}</span>
+                            </div>
+                            
+                            <div className='event-detail-section'>
+                                <h3>Additional Information</h3>
+                                <div className='detail-grid'>
+                                    <div className='detail-item'>
+                                        <label>Description</label>
+                                        <span>{editingEvent.description || 'No description'}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Deadline</label>
+                                        <span>{editingEvent.deadline || 'Not specified'}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Quick Turnaround</label>
+                                        <span>{editingEvent.isQuickTurnaround ? 'Yes' : 'No'}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Covered</label>
+                                        <span>{editingEvent.isCovered ? 'Yes' : 'No'}</span>
+                                    </div>
+                                    <div className='detail-item'>
+                                        <label>Standard Shot Package</label>
+                                        <span>{editingEvent.standardShotPackage ? 'Yes' : 'No'}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div className='event-detail-section'>
-                            <h3>Process Information</h3>
-                            <div className='process-point-editor'>
-                                <label htmlFor='process-point-select'>Process Point:</label>
-                                <select
-                                    id='process-point-select'
-                                    value={editingEvent.processPoint || ''}
-                                    onChange={(e) => {
-                                        const newProcessPoint = e.target.value
-                                        handleProcessPointUpdate(editingEvent.id, newProcessPoint)
-                                    }}
-                                >
-                                    <option value=''>Select Process Point</option>
-                                    <option value='Idle'>Idle</option>
-                                    <option value='Ingest'>Ingest</option>
-                                    <option value='Cull'>Cull</option>
-                                    <option value='Color'>Color</option>
-                                    <option value='Delivered'>Delivered</option>
-                                </select>
+                    ) : (
+                        <form onSubmit={handleEventUpdate} className='edit-event-form'>
+                            <div className='event-detail-section'>
+                                <h3>Basic Information</h3>
+                                <div className='form-grid'>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Event Name *</label>
+                                        <input
+                                            type='text'
+                                            className='form-input'
+                                            value={editEventForm.name}
+                                            onChange={(e) => setEditEventForm({...editEventForm, name: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Date *</label>
+                                        <input
+                                            type='date'
+                                            className='form-input'
+                                            value={editEventForm.date}
+                                            onChange={(e) => setEditEventForm({...editEventForm, date: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Start Time</label>
+                                        <input
+                                            type='time'
+                                            className='form-input'
+                                            value={editEventForm.startTime}
+                                            onChange={(e) => setEditEventForm({...editEventForm, startTime: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>End Time</label>
+                                        <input
+                                            type='time'
+                                            className='form-input'
+                                            value={editEventForm.endTime}
+                                            onChange={(e) => setEditEventForm({...editEventForm, endTime: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Location</label>
+                                        <input
+                                            type='text'
+                                            className='form-input'
+                                            value={editEventForm.location}
+                                            onChange={(e) => setEditEventForm({...editEventForm, location: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Discipline</label>
+                                        <select
+                                            className='form-select'
+                                            value={editEventForm.discipline}
+                                            onChange={(e) => setEditEventForm({...editEventForm, discipline: e.target.value})}
+                                        >
+                                            <option value=''>Select Discipline</option>
+                                            <option value='Photography'>Photography</option>
+                                            <option value='Videography'>Videography</option>
+                                            <option value='Both'>Both</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <div className='event-detail-section'>
-                            <h3>Additional Information</h3>
-                            <div className='detail-grid'>
-                                <div className='detail-item'>
-                                    <label>Description</label>
-                                    <span>{editingEvent.description || 'No description'}</span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Deadline</label>
-                                    <span>{editingEvent.deadline || 'Not specified'}</span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Quick Turnaround</label>
-                                    <span>{editingEvent.isQuickTurnaround ? 'Yes' : 'No'}</span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Covered</label>
-                                    <span>{editingEvent.isCovered ? 'Yes' : 'No'}</span>
-                                </div>
-                                <div className='detail-item'>
-                                    <label>Standard Shot Package</label>
-                                    <span>{editingEvent.standardShotPackage ? 'Yes' : 'No'}</span>
+                            
+                            <div className='event-detail-section'>
+                                <h3>Additional Information</h3>
+                                <div className='form-grid'>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Description</label>
+                                        <textarea
+                                            className='form-textarea'
+                                            value={editEventForm.description}
+                                            onChange={(e) => setEditEventForm({...editEventForm, description: e.target.value})}
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='form-label'>Deadline</label>
+                                        <input
+                                            type='date'
+                                            className='form-input'
+                                            value={editEventForm.deadline}
+                                            onChange={(e) => setEditEventForm({...editEventForm, deadline: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='checkbox-label'>
+                                            <input
+                                                type='checkbox'
+                                                checked={editEventForm.isQuickTurnaround}
+                                                onChange={(e) => setEditEventForm({...editEventForm, isQuickTurnaround: e.target.checked})}
+                                            />
+                                            <span className='checkbox-text'>Quick Turnaround</span>
+                                        </label>
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='checkbox-label'>
+                                            <input
+                                                type='checkbox'
+                                                checked={editEventForm.isCovered}
+                                                onChange={(e) => setEditEventForm({...editEventForm, isCovered: e.target.checked})}
+                                            />
+                                            <span className='checkbox-text'>Covered</span>
+                                        </label>
+                                    </div>
+                                    <div className='form-group'>
+                                        <label className='checkbox-label'>
+                                            <input
+                                                type='checkbox'
+                                                checked={editEventForm.standardShotPackage}
+                                                onChange={(e) => setEditEventForm({...editEventForm, standardShotPackage: e.target.checked})}
+                                            />
+                                            <span className='checkbox-text'>Standard Shot Package</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                            
+                            <div className='form-actions'>
+                                <button type='submit' className='form-button form-button-primary'>Update Event</button>
+                                <button type='button' className='form-button form-button-secondary' onClick={cancelEditingEvent}>Cancel</button>
+                            </div>
+                        </form>
+                    )}
                 </div>
             </div>
         )}

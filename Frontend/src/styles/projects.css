@@ -267,8 +267,12 @@
 .metric-number {
     font-size: 2.5rem;
     font-weight: 700;
-    color: #4CAF50;
+    color: #ffffff;
     margin-bottom: 0.5rem;
+}
+
+.metric-number.delivered {
+    color: #4CAF50;
 }
 
 .metric-label {
