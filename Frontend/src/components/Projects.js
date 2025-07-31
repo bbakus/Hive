@@ -2,7 +2,27 @@ import { Nav } from "./Nav";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useParams } from "react-router-dom";
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
 import '../styles/projects.css'
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export const Projects = () => {
     const [selectedProject, setSelectedProject] = useState(null)
@@ -221,6 +241,124 @@ export const Projects = () => {
     }
 
     const statistics = getProjectStatistics()
+
+    // Chart configurations
+    const getEventStatusChartData = () => {
+        if (!statistics?.eventStatusCounts) return null
+        
+        const allStatuses = ['Scheduled', 'Upcoming', 'Starting Soon', 'Ongoing', 'Done']
+        const data = allStatuses.map(status => statistics.eventStatusCounts[status] || 0)
+        
+        return {
+            labels: allStatuses,
+            datasets: [
+                {
+                    label: 'Events',
+                    data: data,
+                    backgroundColor: allStatuses.map(status => getEventStatusColor(status)),
+                    borderColor: allStatuses.map(status => getEventStatusColor(status)),
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }
+            ]
+        }
+    }
+
+    const getProcessPointsChartData = () => {
+        if (!statistics?.eventProcessPointCounts) return null
+        
+        const allProcessPoints = ['idle', 'ingest', 'cull', 'color', 'delivered']
+        const data = allProcessPoints.map(point => statistics.eventProcessPointCounts[point] || 0)
+        
+        return {
+            labels: allProcessPoints.map(point => point.charAt(0).toUpperCase() + point.slice(1)),
+            datasets: [
+                {
+                    label: 'Events',
+                    data: data,
+                    backgroundColor: allProcessPoints.map(point => getProcessPointColor(point)),
+                    borderColor: allProcessPoints.map(point => getProcessPointColor(point)),
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }
+            ]
+        }
+    }
+
+    const getStaffAssignmentChartData = () => {
+        if (!statistics?.assignedStaffMembers || statistics.assignedStaffMembers.length === 0) return null
+        
+        // Limit to top 10 staff members for better chart readability
+        const topStaff = statistics.assignedStaffMembers.slice(0, 10)
+        
+        return {
+            labels: topStaff.map(member => member.name),
+            datasets: [
+                {
+                    label: 'Events Assigned',
+                    data: topStaff.map(member => member.eventCount),
+                    backgroundColor: '#2196F3',
+                    borderColor: '#1976D2',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }
+            ]
+        }
+    }
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: '#2a2a2a',
+                titleColor: '#ffffff',
+                bodyColor: '#ffffff',
+                borderColor: '#444',
+                borderWidth: 1,
+                cornerRadius: 6,
+                callbacks: {
+                    label: function(context) {
+                        return `${context.parsed.y} events`
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)',
+                },
+                ticks: {
+                    color: '#ffffff',
+                    font: {
+                        size: 11
+                    },
+                    maxTicksLimit: 8, // Limit Y-axis ticks for better readability
+                    callback: function(value) {
+                        return Math.round(value)
+                    }
+                }
+            },
+            x: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)',
+                },
+                ticks: {
+                    color: '#ffffff',
+                    font: {
+                        size: 10
+                    },
+                    maxRotation: 45, // Rotate labels for better fit
+                    minRotation: 0
+                }
+            }
+        }
+    }
 
     // Handle edit project form submission
     const handleEditProjectSubmit = async (e) => {
@@ -469,67 +607,42 @@ export const Projects = () => {
                             </div>
                         </div>
 
-                        {/* Event Status Distribution */}
-                        <div className='stat-card event-status-card'>
+                        {/* Event Status Chart */}
+                        <div className='stat-card chart-card'>
                             <h3>Event Status Distribution</h3>
-                            <div className='event-status-list'>
-                                {(() => {
-                                    const allStatuses = ['Scheduled', 'Upcoming', 'Starting Soon', 'Ongoing', 'Done']
-                                    const statusCounts = statistics?.eventStatusCounts || {}
-                                    
-                                    return allStatuses.map(status => {
-                                        const count = statusCounts[status] || 0
-                                        return (
-                                            <div key={status} className='event-status-item'>
-                                                <div className='event-status-info'>
-                                                    <span className='event-status-name'>{status}</span>
-                                                    <span className='event-status-count'>{count} event{count !== 1 ? 's' : ''}</span>
-                                                </div>
-                                                <div className='event-status-bar'>
-                                                    <div 
-                                                        className='event-status-fill'
-                                                        style={{
-                                                            width: `${(count / (statistics?.totalEvents || 1)) * 100}%`,
-                                                            backgroundColor: getEventStatusColor(status)
-                                                        }}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })
-                                })()}
+                            <div className='chart-container'>
+                                {getEventStatusChartData() ? (
+                                    <Bar data={getEventStatusChartData()} options={chartOptions} />
+                                ) : (
+                                    <div className='chart-placeholder'>No data available</div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Process Point Distribution */}
-                        <div className='stat-card process-points-card'>
+                        {/* Process Points Chart */}
+                        <div className='stat-card chart-card'>
                             <h3>Event Process Points</h3>
-                            <div className='process-points-list'>
-                                {(() => {
-                                    const allProcessPoints = ['idle', 'ingest', 'cull', 'color', 'delivered']
-                                    const processPointCounts = statistics?.eventProcessPointCounts || {}
-                                    
-                                    return allProcessPoints.map(processPoint => {
-                                        const count = processPointCounts[processPoint] || 0
-                                        return (
-                                            <div key={processPoint} className='process-point-item'>
-                                                <div className='process-point-info'>
-                                                    <span className='process-point-name'>{processPoint}</span>
-                                                    <span className='process-point-count'>{count} event{count !== 1 ? 's' : ''}</span>
-                                                </div>
-                                                <div className='process-point-bar'>
-                                                    <div 
-                                                        className='process-point-fill'
-                                                        style={{
-                                                            width: `${(count / (statistics?.totalEvents || 1)) * 100}%`,
-                                                            backgroundColor: getProcessPointColor(processPoint)
-                                                        }}
-                                                    ></div>
-                                                </div>
-                                            </div>
-                                        )
-                                    })
-                                })()}
+                            <div className='chart-container'>
+                                {getProcessPointsChartData() ? (
+                                    <Bar data={getProcessPointsChartData()} options={chartOptions} />
+                                ) : (
+                                    <div className='chart-placeholder'>No data available</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Staff Assignment Chart */}
+                        <div className='stat-card chart-card'>
+                            <h3>Staff Event Assignments</h3>
+                            {statistics?.assignedStaffMembers && statistics.assignedStaffMembers.length > 10 && (
+                                <p className='chart-note'>Showing top 10 staff members</p>
+                            )}
+                            <div className='chart-container'>
+                                {getStaffAssignmentChartData() ? (
+                                    <Bar data={getStaffAssignmentChartData()} options={chartOptions} />
+                                ) : (
+                                    <div className='chart-placeholder'>No staff assignments found</div>
+                                )}
                             </div>
                         </div>
                     </div>

@@ -401,6 +401,37 @@
     color: #cccccc;
 }
 
+/* Chart Styles */
+.chart-card {
+    min-height: 300px;
+}
+
+.chart-container {
+    height: 250px;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.chart-placeholder {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cccccc;
+    font-size: 0.875rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chart-note {
+    color: #FF9800;
+    font-size: 0.75rem;
+    margin: 0.5rem 0 0 0;
+    text-align: center;
+    font-style: italic;
+}
+
 /* Edit Project Modal Styles */
 .modal-overlay {
     position: fixed;
