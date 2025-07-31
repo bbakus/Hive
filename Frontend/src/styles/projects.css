@@ -34,12 +34,41 @@
     flex: 1;
 }
 
+.project-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
 .project-title {
     font-family: 'Inversionz-unboxed' !important;
     font-size: 3rem;
     font-weight: 700;
     color: goldenrod;
-    margin: 0 0 1rem 0;
+    margin: 0;
+}
+
+.edit-project-btn {
+    background: #2196F3;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.edit-project-btn:hover {
+    background: #1976D2;
+    transform: translateY(-1px);
+}
+
+.edit-project-btn:active {
+    transform: translateY(0);
 }
 
 .project-meta {
@@ -301,7 +330,7 @@
 }
 
 /* Most Assigned Member */
-.most-assigned-member {
+.assigned-staff-section {
     margin-top: 1rem;
     padding: 1rem;
     background: rgba(255, 255, 255, 0.05);
@@ -309,34 +338,179 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.most-assigned-header {
+.assigned-staff-header {
     margin-bottom: 0.75rem;
     color: #ffffff;
     font-size: 0.875rem;
     text-align: center;
-}
-
-.most-assigned-details {
-    text-align: center;
-}
-
-.member-name {
-    font-size: 1.125rem;
     font-weight: 600;
+}
+
+.assigned-staff-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.assigned-staff-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.staff-member-info {
+    flex: 1;
+}
+
+.staff-member-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 0.25rem;
+}
+
+.staff-member-role {
+    font-size: 0.75rem;
+    color: #cccccc;
+}
+
+.staff-member-count {
+    font-size: 0.875rem;
+    color: #FF9800;
+    font-weight: 500;
+    text-align: right;
+}
+
+.assigned-staff-empty {
+    text-align: center;
+    padding: 1rem;
+}
+
+.empty-message {
+    font-size: 0.875rem;
     color: #4CAF50;
     margin-bottom: 0.25rem;
 }
 
-.member-role {
-    color: #b0b0b0;
+.empty-subtitle {
+    font-size: 0.75rem;
+    color: #cccccc;
+}
+
+/* Edit Project Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #2a2a2a;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid #444;
+}
+
+.modal-content h2 {
+    color: #ffffff;
+    margin: 0 0 1.5rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+.form-label {
+    display: block;
+    color: #ffffff;
     font-size: 0.875rem;
+    font-weight: 500;
     margin-bottom: 0.5rem;
 }
 
-.member-event-count {
-    color: #FF9800;
+.form-input,
+.form-textarea,
+.form-select {
+    width: 100%;
+    padding: 0.75rem;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 6px;
+    color: #ffffff;
     font-size: 0.875rem;
-    font-weight: 500;
+    transition: border-color 0.2s ease;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+    outline: none;
+    border-color: #2196F3;
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.form-button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.form-button-primary {
+    background: #2196F3;
+    color: #ffffff;
+}
+
+.form-button-primary:hover {
+    background: #1976D2;
+}
+
+.form-button-secondary {
+    background: #555;
+    color: #ffffff;
+}
+
+.form-button-secondary:hover {
+    background: #666;
 }
 
 /* Event Status */

@@ -12,6 +12,16 @@ export const Projects = () => {
     const [personnel, setPersonnel] = useState([])
     const [loading, setLoading] = useState(true)
     const [currentTime, setCurrentTime] = useState(new Date())
+    const [showEditProjectModal, setShowEditProjectModal] = useState(false)
+    const [editProjectForm, setEditProjectForm] = useState({
+        name: '',
+        client: '',
+        description: '',
+        location: '',
+        startDate: '',
+        endDate: '',
+        status: ''
+    })
 
     // Get selected project from localStorage and listen for changes
     useEffect(() => {
@@ -161,56 +171,44 @@ export const Projects = () => {
             ? Math.round((assignedPersonnel / totalPersonnel) * 100)
             : 0
 
-        // Calculate most assigned member (only for events that are not done)
+        // Calculate all assigned staff members with their counts
         const personnelEventCounts = {}
+        
+        // Count assignments for each personnel member
         projectEvents.forEach(event => {
-            // Skip events that are done
-            if (!event.startTime || !event.endTime) {
-                // Include events without times (they're not done)
-                const assignedPersonnelIds = event.assignedPersonnelIds || []
-                assignedPersonnelIds.forEach(personnelId => {
-                    const id = String(personnelId)
-                    personnelEventCounts[id] = (personnelEventCounts[id] || 0) + 1
-                })
-                return
-            }
+            const assignedPersonnelIds = event.assignedPersonnelIds || []
+            console.log(`Event "${event.name}" has assignments:`, assignedPersonnelIds)
             
-            // Check if event is done based on time
-            const [year, month, day] = event.date.split('-').map(Number)
-            const [startHour, startMinute] = event.startTime.split(':').map(Number)
-            const [endHour, endMinute] = event.endTime.split(':').map(Number)
-            
-            const startTime = new Date(year, month - 1, day, startHour, startMinute, 0, 0)
-            const endTime = new Date(year, month - 1, day, endHour, endMinute, 0, 0)
-            
-            const now = currentTime
-            const timeUntilEnd = endTime.getTime() - now.getTime()
-            const minutesUntilEnd = timeUntilEnd / (1000 * 60)
-            
-            // Only count events that are not done
-            if (minutesUntilEnd > 0) {
-                const assignedPersonnelIds = event.assignedPersonnelIds || []
-                assignedPersonnelIds.forEach(personnelId => {
-                    const id = String(personnelId)
-                    personnelEventCounts[id] = (personnelEventCounts[id] || 0) + 1
-                })
-            }
+            assignedPersonnelIds.forEach(personnelId => {
+                const id = String(personnelId)
+                personnelEventCounts[id] = (personnelEventCounts[id] || 0) + 1
+            })
         })
-
-        let mostAssignedMember = null
-        let maxEventCount = 0
+        
+        console.log('Final personnel event counts:', personnelEventCounts)
+        
+        // Get all assigned staff members with their details
+        const assignedStaffMembers = []
         
         Object.entries(personnelEventCounts).forEach(([personnelId, eventCount]) => {
-            if (eventCount > maxEventCount) {
-                maxEventCount = eventCount
-                const staffMember = personnel.find(p => String(p.id) === personnelId)
-                mostAssignedMember = staffMember ? { ...staffMember, eventCount } : null
+            const staffMember = personnel.find(p => String(p.id) === String(personnelId))
+            if (staffMember) {
+                assignedStaffMembers.push({
+                    ...staffMember,
+                    eventCount
+                })
             }
         })
+        
+        // Sort by event count (highest first)
+        assignedStaffMembers.sort((a, b) => b.eventCount - a.eventCount)
+        
+        console.log('All assigned staff members:', assignedStaffMembers)
 
         return {
             totalEvents: projectEvents.length,
             totalShotRequests: projectShotRequests.length,
+            imagesDelivered: completedEvents,  // Events with process point "delivered"
             eventStatusCounts,
             eventProcessPointCounts,
             completionPercentage,
@@ -218,11 +216,52 @@ export const Projects = () => {
             assignedPersonnel,
             totalPersonnel,
             completedEvents,
-            mostAssignedMember
+            assignedStaffMembers
         }
     }
 
     const statistics = getProjectStatistics()
+
+    // Handle edit project form submission
+    const handleEditProjectSubmit = async (e) => {
+        e.preventDefault()
+        
+        if (!selectedProject) return
+        
+        try {
+            const response = await fetch(`http://localhost:5001/projects/${selectedProject.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(editProjectForm)
+            })
+            
+            if (response.ok) {
+                // Update the selected project with new data
+                const updatedProject = { ...selectedProject, ...editProjectForm }
+                setSelectedProject(updatedProject)
+                
+                // Update localStorage
+                localStorage.setItem('selectedProject', JSON.stringify(updatedProject))
+                
+                // Dispatch event to notify other components
+                window.dispatchEvent(new CustomEvent('selectedProjectChanged', { 
+                    detail: updatedProject 
+                }))
+                
+                setShowEditProjectModal(false)
+                alert('Project updated successfully!')
+            } else {
+                const error = await response.json()
+                console.error('Error updating project:', error)
+                alert('Failed to update project')
+            }
+        } catch (error) {
+            console.error('Error updating project:', error)
+            alert('Failed to update project')
+        }
+    }
 
     // Handle project status change
     const handleProjectStatusChange = async (newStatus) => {
@@ -298,7 +337,26 @@ export const Projects = () => {
                     <div className='project-header-card'>
                         <div className='project-header-content'>
                             <div className='project-basic-info'>
-                                <h1 className='project-title'>{selectedProject.name}</h1>
+                                <div className='project-title-row'>
+                                    <h1 className='project-title'>{selectedProject.name}</h1>
+                                    <button 
+                                        className='edit-project-btn'
+                                        onClick={() => {
+                                            setEditProjectForm({
+                                                name: selectedProject.name || '',
+                                                client: selectedProject.client || '',
+                                                description: selectedProject.description || '',
+                                                location: selectedProject.location || '',
+                                                startDate: selectedProject.startDate || '',
+                                                endDate: selectedProject.endDate || '',
+                                                status: selectedProject.status || 'Planning'
+                                            })
+                                            setShowEditProjectModal(true)
+                                        }}
+                                    >
+                                        Edit Project
+                                    </button>
+                                </div>
                                 <div className='project-meta'>
                                     <span className='project-client'>{selectedProject.client}</span>
                                     <div className='project-status-container'>
@@ -356,8 +414,12 @@ export const Projects = () => {
                                     <div className='metric-label'>Shot Requests</div>
                                 </div>
                                 <div className='metric-item'>
+                                    <div className='metric-number'>{statistics?.imagesDelivered || 0}</div>
+                                    <div className='metric-label'>Events Delivered</div>
+                                </div>
+                                <div className='metric-item'>
                                     <div className='metric-number'>{statistics?.completedEvents || 0}</div>
-                                    <div className='metric-label'>Completed Events</div>
+                                    <div className='metric-label'>Finished Events</div>
                                 </div>
                             </div>
                         </div>
@@ -379,20 +441,31 @@ export const Projects = () => {
                                     </div>
                                 </div>
                                 
-                                {statistics?.mostAssignedMember && (
-                                    <div className='most-assigned-member'>
-                                        <div className='most-assigned-header'>
-                                            <strong>Most Assigned Member</strong>
-                                        </div>
-                                        <div className='most-assigned-details'>
-                                            <div className='member-name'>{statistics.mostAssignedMember.name}</div>
-                                            <div className='member-role'>{statistics.mostAssignedMember.role}</div>
-                                            <div className='member-event-count'>
-                                                {statistics.mostAssignedMember.eventCount} event{statistics.mostAssignedMember.eventCount !== 1 ? 's' : ''} assigned
-                                            </div>
-                                        </div>
+                                <div className='assigned-staff-section'>
+                                    <div className='assigned-staff-header'>
+                                        <strong>Assigned Staff Members</strong>
                                     </div>
-                                )}
+                                    {statistics?.assignedStaffMembers && statistics.assignedStaffMembers.length > 0 ? (
+                                        <div className='assigned-staff-list'>
+                                            {statistics.assignedStaffMembers.map((member, index) => (
+                                                <div key={member.id} className='assigned-staff-item'>
+                                                    <div className='staff-member-info'>
+                                                        <div className='staff-member-name'>{member.name}</div>
+                                                        <div className='staff-member-role'>{member.role}</div>
+                                                    </div>
+                                                    <div className='staff-member-count'>
+                                                        {member.eventCount} event{member.eventCount !== 1 ? 's' : ''} assigned
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className='assigned-staff-empty'>
+                                            <div className='empty-message'>No assignments found</div>
+                                            <div className='empty-subtitle'>No personnel assigned to events</div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -462,6 +535,97 @@ export const Projects = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Edit Project Modal */}
+            {showEditProjectModal && (
+                <div className='modal-overlay'>
+                    <div className='modal-content'>
+                        <h2>Edit Project</h2>
+                        <form onSubmit={handleEditProjectSubmit}>
+                            <div className='form-group'>
+                                <label className='form-label'>Project Name *</label>
+                                <input
+                                    className='form-input'
+                                    type='text'
+                                    value={editProjectForm.name}
+                                    onChange={(e) => setEditProjectForm({...editProjectForm, name: e.target.value})}
+                                    required
+                                    placeholder='Enter project name'
+                                />
+                            </div>
+                            <div className='form-group'>
+                                <label className='form-label'>Client *</label>
+                                <input
+                                    className='form-input'
+                                    type='text'
+                                    value={editProjectForm.client}
+                                    onChange={(e) => setEditProjectForm({...editProjectForm, client: e.target.value})}
+                                    required
+                                    placeholder='Enter client name'
+                                />
+                            </div>
+                            <div className='form-group'>
+                                <label className='form-label'>Description</label>
+                                <textarea
+                                    className='form-textarea'
+                                    value={editProjectForm.description}
+                                    onChange={(e) => setEditProjectForm({...editProjectForm, description: e.target.value})}
+                                    placeholder='Enter project description'
+                                    rows={3}
+                                />
+                            </div>
+                            <div className='form-group'>
+                                <label className='form-label'>Location</label>
+                                <input
+                                    className='form-input'
+                                    type='text'
+                                    value={editProjectForm.location}
+                                    onChange={(e) => setEditProjectForm({...editProjectForm, location: e.target.value})}
+                                    placeholder='Enter project location'
+                                />
+                            </div>
+                            <div className='form-row'>
+                                <div className='form-group'>
+                                    <label className='form-label'>Start Date</label>
+                                    <input
+                                        className='form-input'
+                                        type='date'
+                                        value={editProjectForm.startDate}
+                                        onChange={(e) => setEditProjectForm({...editProjectForm, startDate: e.target.value})}
+                                    />
+                                </div>
+                                <div className='form-group'>
+                                    <label className='form-label'>End Date</label>
+                                    <input
+                                        className='form-input'
+                                        type='date'
+                                        value={editProjectForm.endDate}
+                                        onChange={(e) => setEditProjectForm({...editProjectForm, endDate: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                            <div className='form-group'>
+                                <label className='form-label'>Status</label>
+                                <select
+                                    className='form-select'
+                                    value={editProjectForm.status}
+                                    onChange={(e) => setEditProjectForm({...editProjectForm, status: e.target.value})}
+                                >
+                                    <option value='Planning'>Planning</option>
+                                    <option value='Prepped'>Prepped</option>
+                                    <option value='Active'>Active</option>
+                                    <option value='Wrapped'>Wrapped</option>
+                                    <option value='Delivered'>Delivered</option>
+                                </select>
+                            </div>
+                            <div className='form-actions'>
+                                <button className='form-button form-button-primary' type='submit'>Update Project</button>
+                                <button className='form-button form-button-secondary' type='button' onClick={() => setShowEditProjectModal(false)}>Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </>
     )
 }
@@ -473,7 +637,7 @@ const getProcessPointColor = (processPoint) => {
         case 'idle': return '#757575'
         case 'ingest': return '#2196F3'
         case 'cull': return '#FF9800'
-        case 'color': return '#9C27B0'
+        case 'color': return '#DC3545'  // Red to match EventPlanner
         case 'delivered': return '#4CAF50'
         default: return '#757575'
     }
